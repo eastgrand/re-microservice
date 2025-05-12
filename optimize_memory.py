@@ -126,114 +126,53 @@ def optimize_dtypes(df):
     
     return df
 
-def load_and_optimize_data(file_path, low_memory=True, nrows=None):
-    """
-    Load a CSV file with optimized memory usage.
-    
-    Args:
-        file_path: Path to the CSV file
-        low_memory: Whether to use low_memory option
-        nrows: Optional number of rows to load (to reduce memory usage)
-        
-    Returns:
-        Optimized pandas DataFrame
-    """
-    log_memory_usage("Before data loading")
-    
-    # Check if we're in Render environment or memory is already tight
-    is_render = 'RENDER' in os.environ
-    current_memory = get_memory_usage()
-    max_mem = int(os.environ.get('MAX_MEMORY_MB', 450))
-    
-    # For Render or when memory is tight, use aggressive optimization from the start
-    if is_render or current_memory > (max_mem * 0.5):
-        logger.info("Using aggressive memory optimization for data loading")
-        
-        # First, identify only essential columns by reading the header
-        essential_columns = None
-        try:
-            header = pd.read_csv(file_path, nrows=0)
-            # Determine important columns - keep ID fields and common target variables
-            # This reduces memory by only loading columns we're likely to use
-            essential_columns = [col for col in header.columns if any(
-                key in col.lower() for key in [
-                    'id', 'code', 'zip', 'postal', 'population', 'income', 
-                    'mortgage', 'approval', 'application', 'object'
-                ]
-            )]
-            if not essential_columns:  # If no columns matched, load all columns
-                essential_columns = None
-            else:
-                logger.info(f"Loading only {len(essential_columns)} essential columns out of {len(header.columns)}")
-        except Exception as e:
-            logger.warning(f"Error identifying essential columns: {e}")
-        
-        # Determine optimal chunk size based on available memory
-        chunk_size = 10000  # Default chunk size
-        if current_memory > (max_mem * 0.7):
-            chunk_size = 5000
-        if nrows is not None:
-            chunk_size = min(chunk_size, nrows)
-            
-        # Load in chunks to control memory usage
-        chunks = []
-        total_rows = 0
-        
-        for chunk in pd.read_csv(file_path, 
-                                 chunksize=chunk_size, 
-                                 low_memory=low_memory,
-                                 usecols=essential_columns,
-                                 dtype='category'):  # Start with category type for all columns as it's memory efficient
-            
-            # Apply immediate type optimization to chunk
-            for col in chunk.columns:
-                if pd.api.types.is_numeric_dtype(chunk[col]):
-                    chunk[col] = pd.to_numeric(chunk[col], downcast='integer')
-                
-            chunks.append(chunk)
-            total_rows += len(chunk)
-            
-            # Check memory usage after each chunk
-            if get_memory_usage() > (max_mem * 0.85):
-                logger.warning("Memory usage too high, stopping after loading some chunks")
-                break
-                
-            if nrows is not None and total_rows >= nrows:
-                break
-                
-            # Force garbage collection after processing each chunk
-            gc.collect()
-            
-        # Combine chunks
-        df = pd.concat(chunks, ignore_index=True)
-        logger.info(f"Loaded {len(df)} rows from {file_path} using chunking")
-        
-    # For extremely large files, read in chunks
-    elif nrows is not None:
-        df = pd.read_csv(file_path, nrows=nrows, low_memory=low_memory)
-        logger.info(f"Loaded {nrows} rows from {file_path}")
-    else:
-        try:
-            # First attempt: try to infer data types from a sample
-            # This helps pandas choose efficient types from the start
-            sample = pd.read_csv(file_path, nrows=1000, low_memory=low_memory)
-            dtypes = {col: sample[col].dtype for col in sample.columns}
-            
-            # Then load the full file with optimized dtypes
-            df = pd.read_csv(file_path, dtype=dtypes, low_memory=low_memory)
-            
-            logger.info(f"Loaded full dataset from {file_path} with inferred types")
-        except Exception as e:
-            logger.warning(f"Error loading with dtype inference: {e}. Falling back to default loading.")
-            df = pd.read_csv(file_path, low_memory=low_memory)
-            logger.info(f"Loaded full dataset from {file_path}")
-    
-    log_memory_usage("After data loading")
-    
-    # Further optimize the data types
-    df = optimize_dtypes(df)
-    
+def fix_categorical_columns(df):
+    """Convert categorical columns to string to avoid serialization issues."""
+    for col in df.columns:
+        if pd.api.types.is_categorical_dtype(df[col]):
+            logger.info(f"Converting categorical column to string: {col}")
+            df[col] = df[col].astype(str)
     return df
+
+def load_and_optimize_data(file_path, nrows=None, **kwargs):
+    """
+    Load a CSV file with optimized memory usage and handling for categorical types.
+    """
+    # First pass to get column dtypes
+    dtypes = {}
+    try:
+        # Sample a few rows to determine types
+        sample = pd.read_csv(file_path, nrows=100)
+        
+        # Convert categorical columns to string
+        for col in sample.columns:
+            if pd.api.types.is_categorical_dtype(sample[col]):
+                dtypes[col] = str
+        
+        log_memory_usage("After sampling for dtypes")
+    except Exception as e:
+        logger.warning(f"Error during dtype detection: {e}")
+        
+    # Read the actual data
+    try:
+        if nrows:
+            df = pd.read_csv(file_path, nrows=nrows, dtype=dtypes, **kwargs)
+        else:
+            df = pd.read_csv(file_path, dtype=dtypes, **kwargs)
+        
+        # Fix any remaining categorical columns
+        df = fix_categorical_columns(df)
+        
+        log_memory_usage(f"After loading {file_path} with {len(df)} rows")
+        return df
+    except Exception as e:
+        logger.error(f"Error loading data: {e}")
+        # Fall back to basic read
+        logger.info(f"Falling back to basic read_csv for {file_path}")
+        if nrows:
+            return pd.read_csv(file_path, nrows=nrows)
+        else:
+            return pd.read_csv(file_path)
 
 def is_memory_critical(threshold_mb=450):
     """Check if memory usage is approaching the critical threshold."""

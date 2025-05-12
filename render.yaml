@@ -11,6 +11,8 @@ services:
       export MAX_MEMORY_MB=400 &&
       python setup_for_render.py && 
       python create_minimal_model.py && 
+      python fix_categorical_types.py && 
+      python fix_categorical_data.py && 
       python train_model.py
     startCommand: >-
       echo "Starting server on port $PORT" &&
