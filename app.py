@@ -52,7 +52,23 @@ ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() == 'true'
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
 MAX_RESULTS = int(os.getenv('MAX_RESULTS', 100))
 DEFAULT_ANALYSIS_TYPE = os.getenv('DEFAULT_ANALYSIS_TYPE', 'ranking')
+
 DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
+
+# Lazy loading globals for model/data
+model = None
+dataset = None
+feature_names = None
+
+def ensure_model_loaded():
+    global model, dataset, feature_names
+    if model is None or dataset is None or feature_names is None:
+        logger.info("Lazy-loading model and dataset...")
+        model_, dataset_, feature_names_ = load_model()
+        model = model_
+        dataset = dataset_
+        feature_names = feature_names_
+        logger.info("Model and dataset loaded successfully (lazy)")
 
 # Authentication settings
 API_KEY = os.getenv('API_KEY')
@@ -434,6 +450,7 @@ def ping():
 @require_api_key
 def list_versions():
     """Return all tracked versions of datasets and models."""
+    ensure_model_loaded()
     try:
         versions = version_tracker.list_all_versions()
         
@@ -474,22 +491,19 @@ def list_versions():
 @app.route('/health', methods=['GET'])
 @require_api_key
 def health_check():
+    ensure_model_loaded()
     import xgboost  # Import locally for version information
-    
     # Get memory usage
     try:
         import psutil  # Import inside function to avoid issues if library is missing
         process = psutil.Process(os.getpid())
         memory_usage = process.memory_info().rss / (1024 * 1024)  # Convert to MB
     except ImportError:
-        # Handle case when psutil is not installed
         logger.warning("psutil not installed. Memory usage information not available.")
         memory_usage = "psutil not installed"
-    
     # Get version information
     model_version = version_tracker.get_latest_model()
     dataset_version = version_tracker.get_latest_dataset()
-    
     # Format version info
     model_version_info = None
     if model_version:
@@ -499,7 +513,6 @@ def health_check():
             "created_at": model_info.get("timestamp"),
             "metrics": model_info.get("metrics", {})
         }
-    
     dataset_version_info = None
     if dataset_version:
         dataset_version_id, dataset_info = dataset_version
@@ -510,7 +523,6 @@ def health_check():
             "description": dataset_info.get("description"),
             "source": dataset_info.get("source")
         }
-    
     return jsonify({
         "status": "healthy",
         "model": {
@@ -537,6 +549,7 @@ def health_check():
 @require_api_key
 @timeout_handler(timeout=25)  # Set timeout to 25 seconds (Render has 30s limit)
 def analyze():
+    ensure_model_loaded()
     try:
         # Get the query from the request
         query = request.json
@@ -743,6 +756,7 @@ def analyze():
 @require_api_key
 def get_metadata():
     """Return metadata about the dataset."""
+    ensure_model_loaded()
     try:
         if dataset is None:
             raise APIError("Dataset not available", 500)
@@ -797,10 +811,7 @@ def get_metadata():
         logger.error(f"Error getting metadata: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# Load model and dataset when the app starts
-logger.info("Loading model and dataset...")
-model, dataset, feature_names = load_model()
-logger.info("Model and dataset loaded successfully")
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
