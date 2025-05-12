@@ -10,7 +10,18 @@ import logging
 import os
 import sys
 import platform
+import shutil
 from functools import wraps
+import threading
+import time
+
+# Check if psutil is available
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+import gc
 
 # Set up logging
 logging.basicConfig(
@@ -58,6 +69,18 @@ if os.path.exists('data/nesto_merge_0.csv'):
     logger.info("Nesto mortgage data detected. Using Mortgage_Approvals as target.")
     DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
 
+# Add additional Render-specific memory configuration
+is_render = 'RENDER' in os.environ
+if is_render:
+    logger.info("Running in Render environment - applying special memory optimizations")
+    # Enable aggressive garbage collection
+    gc.enable()
+    # Further reduce sample size for Render environment
+    sample_size = int(os.getenv('RENDER_SAMPLE_SIZE', 2000))
+    logger.info(f"Sample size limited to {sample_size} records for Render")
+else:
+    sample_size = int(os.getenv('SAMPLE_SIZE', 20000))
+
 # Flask app setup
 app = Flask(__name__)
 if ENABLE_CORS:
@@ -76,6 +99,52 @@ def require_api_key(f):
             return jsonify({"success": False, "error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated_function
+
+# Timeout handler decorator
+def timeout_handler(timeout=25):
+    """Decorator to handle timeouts for long-running routes.
+    Render has a 30-second timeout, so we should respond within 25 seconds."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not 'RENDER' in os.environ:
+                # If not on Render, just execute the function normally
+                return f(*args, **kwargs)
+            
+            # For Render, implement our own timeout handler
+            result = {"value": None, "error": None}
+            
+            def target():
+                try:
+                    result["value"] = f(*args, **kwargs)
+                except Exception as e:
+                    result["error"] = str(e)
+            
+            # Start the function in a thread
+            thread = threading.Thread(target=target)
+            thread.daemon = True
+            thread.start()
+            
+            # Wait for the function to complete or timeout
+            thread.join(timeout)
+            
+            # Check if we timed out
+            if thread.is_alive():
+                logger.warning(f"Function {f.__name__} timed out after {timeout} seconds")
+                # Return a helpful message indicating we're still processing
+                return jsonify({
+                    "success": False, 
+                    "error": "Request timed out. The operation is still processing in the background.",
+                    "retry_suggestion": "This request is taking longer than expected. Please try again in a few moments."
+                }), 503
+            
+            # Check if we had an error
+            if result["error"] is not None:
+                raise Exception(result["error"])
+            
+            return result["value"]
+        return decorated_function
+    return decorator
 
 # Error handler for API exceptions
 class APIError(Exception):
@@ -114,6 +183,28 @@ def load_model():
         
         # Import data paths from train_model.py
         from train_model import DATA_PATHS
+        
+        # Add a sanity check for Render
+        if 'RENDER' in os.environ:
+            logger.info("Running on Render: checking disk space and memory...")
+            try:
+                if PSUTIL_AVAILABLE:
+                    import psutil
+                    # Log available memory
+                    avail_memory = psutil.virtual_memory().available / (1024 * 1024)
+                    logger.info(f"Available memory: {avail_memory:.2f} MB")
+                
+                # Check disk space
+                disk_usage = shutil.disk_usage("/")
+                free_disk = disk_usage.free / (1024 * 1024 * 1024)  # Convert to GB
+                logger.info(f"Free disk space: {free_disk:.2f} GB")
+                
+                # Run garbage collection
+                logger.info("Running garbage collection...")
+                gc.collect()
+                
+            except Exception as e:
+                logger.warning(f"System info check failed: {e}")
         
         # Try to run the setup script to ensure all files are present
         try:
@@ -277,6 +368,38 @@ def load_model():
             except Exception as train_err:
                 logger.error(f"Emergency training failed: {train_err}")
             
+            # LAST RESORT: Try to create and use a minimal model
+            logger.warning("Attempting to create a minimal fallback model...")
+            try:
+                # Try running our minimal model script
+                import subprocess
+                minimal_script = 'create_minimal_model.py'
+                if os.path.exists(minimal_script):
+                    logger.info("Running minimal model creation script...")
+                    result = subprocess.run([sys.executable, minimal_script], 
+                                          capture_output=True, text=True, check=False)
+                    
+                    if result.returncode == 0:
+                        logger.info("Minimal model created successfully!")
+                        minimal_model_path = 'models/xgboost_minimal.pkl'
+                        minimal_features_path = 'models/minimal_feature_names.txt'
+                        minimal_data_path = 'data/minimal_dataset.csv'
+                        
+                        if os.path.exists(minimal_model_path) and os.path.exists(minimal_data_path):
+                            logger.info("Loading minimal model and dataset...")
+                            model = pickle.load(open(minimal_model_path, 'rb'))
+                            dataset = pd.read_csv(minimal_data_path)
+                            
+                            # Load feature names
+                            if os.path.exists(minimal_features_path):
+                                with open(minimal_features_path, 'r') as f:
+                                    feature_names = [line.strip() for line in f.readlines()]
+                                return model, dataset, feature_names
+                    else:
+                        logger.error(f"Minimal model script failed: {result.stderr}")
+            except Exception as e:
+                logger.error(f"Failed to create minimal model: {e}")
+            
             raise FileNotFoundError("Model not found, please train the model first. Check logs for errors.")
     except Exception as e:
         logger.error(f"Error loading model: {str(e)}")
@@ -292,6 +415,19 @@ def root():
             "/metadata": "GET - Get dataset metadata and statistics",
             "/versions": "GET - List all tracked versions of datasets and models"
         }
+    })
+
+# Add this after the root route but before loading any models
+@app.route('/ping', methods=['GET'])
+def ping():
+    """Simple endpoint to test connectivity without loading models"""
+    import sys
+    return jsonify({
+        "status": "OK", 
+        "message": "SHAP microservice is responding",
+        "python_version": sys.version,
+        "is_render": 'RENDER' in os.environ,
+        "environment": {k: v for k, v in os.environ.items() if not k.startswith('_') and k.isupper()}
     })
 
 @app.route('/versions', methods=['GET'])
@@ -399,6 +535,7 @@ def health_check():
 
 @app.route('/analyze', methods=['POST'])
 @require_api_key
+@timeout_handler(timeout=25)  # Set timeout to 25 seconds (Render has 30s limit)
 def analyze():
     try:
         # Get the query from the request
@@ -667,4 +804,10 @@ logger.info("Model and dataset loaded successfully")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    logger.info(f"Starting Flask app on port {port}...")
+    try:
+        app.run(host='0.0.0.0', port=port)
+        logger.info(f"Flask app running on port {port}")
+    except Exception as e:
+        logger.error(f"Failed to start Flask app: {str(e)}")
+        sys.exit(1)

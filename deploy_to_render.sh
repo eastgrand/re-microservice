@@ -38,6 +38,25 @@ else
     exit 1
 fi
 
+# Test application startup and port binding
+echo "Testing application startup and port binding..."
+export PORT=10000
+export FLASK_ENV=development
+timeout 10 gunicorn app:app --bind 0.0.0.0:$PORT --timeout 10 &
+GUNICORN_PID=$!
+sleep 5
+
+# Check if gunicorn is actually running and binding to the port
+if ps -p $GUNICORN_PID > /dev/null; then
+    echo "✅ Application started successfully and is binding to port $PORT"
+    kill $GUNICORN_PID
+    wait $GUNICORN_PID 2>/dev/null
+else
+    echo "❌ ERROR: Application failed to start or bind to port"
+    echo "This is likely why Render deployment is failing with 'no open ports detected'"
+    exit 1
+fi
+
 # Deploy to Render
 echo "Everything looks good! To deploy to Render:"
 echo "1. Commit your changes: git add . && git commit -m 'Enhanced memory optimization for Render deployment'"

@@ -10,8 +10,11 @@ services:
       export MEMORY_OPTIMIZATION=true && 
       export MAX_MEMORY_MB=400 &&
       python setup_for_render.py && 
+      python create_minimal_model.py && 
       python train_model.py
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    startCommand: >-
+      echo "Starting server on port $PORT" &&
+      gunicorn app:app -c gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.9
