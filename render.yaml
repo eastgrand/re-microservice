@@ -3,7 +3,11 @@ services:
     name: nesto-mortgage-analytics
     env: python
     plan: starter
-    buildCommand: pip install -r requirements.txt && python fix_flask_werkzeug.py && python patch_shap.py && python verify_nesto_data_pipeline.py
+    buildCommand: >-
+      pip install -r requirements.txt && 
+      python fix_flask_werkzeug.py && 
+      python patch_shap.py && 
+      python setup_for_render.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
@@ -21,7 +25,7 @@ services:
       - key: FEATURE_NAMES_PATH
         value: models/feature_names.txt
       - key: DATASET_PATH
-        value: data/nesto_merge_0.csv
+        value: data/cleaned_data.csv
       - key: DEFAULT_TARGET
         value: Mortgage_Approvals
       - key: DEFAULT_ANALYSIS_TYPE

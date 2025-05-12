@@ -8,6 +8,7 @@ import shap
 import traceback
 import logging
 import os
+import sys
 import platform
 from functools import wraps
 
@@ -35,11 +36,11 @@ DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 MODEL_PATH = os.getenv('MODEL_PATH', 'models/xgboost_model.pkl')
 FEATURE_NAMES_PATH = os.getenv('FEATURE_NAMES_PATH', 'models/feature_names.txt')
-DATASET_PATH = os.getenv('DATASET_PATH', 'data/cleaned_data.csv')
+DATASET_PATH = os.getenv('DATASET_PATH', 'data/nesto_merge_0.csv')
 ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() == 'true'
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
 MAX_RESULTS = int(os.getenv('MAX_RESULTS', 100))
-DEFAULT_ANALYSIS_TYPE = os.getenv('DEFAULT_ANALYSIS_TYPE', 'correlation')
+DEFAULT_ANALYSIS_TYPE = os.getenv('DEFAULT_ANALYSIS_TYPE', 'ranking')
 DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
 
 # Authentication settings
@@ -109,6 +110,17 @@ version_tracker = DataVersionTracker()
 # Load the trained model or create a fallback
 def load_model():
     try:
+        logger.info("Loading model and dataset...")
+        
+        # Try to run the setup script to ensure all files are present
+        try:
+            import subprocess
+            subprocess.run([sys.executable, 'setup_for_render.py'], 
+                           capture_output=True, check=False)
+            logger.info("Setup script completed")
+        except Exception as setup_err:
+            logger.warning(f"Setup script could not run: {setup_err}")
+        
         # Try to load the saved model using environment variable path
         if os.path.exists(MODEL_PATH):
             logger.info(f"Loading trained model from {MODEL_PATH}...")
@@ -122,15 +134,20 @@ def load_model():
                 logger.info(f"Loaded {len(feature_names)} features")
             else:
                 logger.warning(f"Feature names file not found at {FEATURE_NAMES_PATH}")
-                feature_names = None
+                feature_names = []
             
             # Load dataset
-            if os.path.exists(DATASET_PATH):
+            cleaned_data_path = 'data/cleaned_data.csv'
+            if os.path.exists(cleaned_data_path):
+                logger.info(f"Loading dataset from {cleaned_data_path}...")
+                dataset = pd.read_csv(cleaned_data_path)
+                logger.info(f"Loaded dataset with {dataset.shape[0]} records and {dataset.shape[1]} columns")
+            elif os.path.exists(DATASET_PATH):
                 logger.info(f"Loading dataset from {DATASET_PATH}...")
                 dataset = pd.read_csv(DATASET_PATH)
                 logger.info(f"Loaded dataset with {dataset.shape[0]} records and {dataset.shape[1]} columns")
             else:
-                error_msg = f"Dataset not found at {DATASET_PATH}"
+                error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
                 logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
             
