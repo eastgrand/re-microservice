@@ -1,6 +1,6 @@
 # SHAP Library Patches Documentation
 
-This document provides a comprehensive overview of patches applied to the SHAP library in this microservice to address compatibility issues with Python 3.13 and newer versions of NumPy.
+This document provides a comprehensive overview of patches applied to the SHAP library in this microservice to address compatibility issues with Python 3.13 and newer versions of NumPy, as well as deployment fixes.
 
 ## Issues Addressed
 
