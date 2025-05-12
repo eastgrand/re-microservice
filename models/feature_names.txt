@@ -1,0 +1,5 @@
+Income
+Age
+Hispanic_Population
+African_American_Population
+Asian_Population

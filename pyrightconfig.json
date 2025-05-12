@@ -1,0 +1,6 @@
+{
+  "exclude": [
+    "**/venv/lib/python3.13/site-packages/shap/**"
+  ],
+  "reportMissingImports": "none"
+}

@@ -1,0 +1,42 @@
+{
+  "datasets": {
+    "dataset_20250511232809": {
+      "path": "data/cleaned_data.csv",
+      "file_hash": "c2bcefe4c3a7cd6efe036893fb847b08",
+      "data_hash": "d2f53307dcb9c4b0fc2a476526aea2af",
+      "timestamp": "2025-05-11T23:28:09.988635",
+      "row_count": 10,
+      "column_count": 9,
+      "columns": [
+        "zip_code",
+        "Income",
+        "Age",
+        "Hispanic_Population",
+        "African_American_Population",
+        "Asian_Population",
+        "latitude",
+        "longitude",
+        "Nike_Sales"
+      ],
+      "description": "Dataset loaded on startup",
+      "source": "Unknown (loaded on startup)"
+    }
+  },
+  "models": {
+    "model_20250511232809": {
+      "path": "models/xgboost_model.pkl",
+      "hash": "85584d4b58a594d79b26faf4602ddc4e",
+      "timestamp": "2025-05-11T23:28:09.989027",
+      "dataset_version_id": "dataset_20250511232809",
+      "metrics": {},
+      "feature_names": [
+        "Income",
+        "Age",
+        "Hispanic_Population",
+        "African_American_Population",
+        "Asian_Population"
+      ],
+      "feature_names_path": "models/feature_names.txt"
+    }
+  }
+}
