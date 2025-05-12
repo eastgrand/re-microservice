@@ -16,7 +16,8 @@ services:
       python train_model.py
     startCommand: >-
       echo "Starting server on port $PORT" &&
-      gunicorn app:app -c gunicorn_config.py
+      python -c "import time; time.sleep(2); print('Pre-starting delay complete')" &&
+      gunicorn app:app -c gunicorn_config.py --preload
     envVars:
       - key: PYTHON_VERSION
         value: 3.9

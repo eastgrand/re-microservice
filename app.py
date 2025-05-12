@@ -806,7 +806,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     logger.info(f"Starting Flask app on port {port}...")
     try:
-        app.run(host='0.0.0.0', port=port)
+        # Use threaded=True to improve responsiveness to health checks
+        app.run(host='0.0.0.0', port=port, threaded=True)
         logger.info(f"Flask app running on port {port}")
     except Exception as e:
         logger.error(f"Failed to start Flask app: {str(e)}")

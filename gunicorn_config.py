@@ -12,6 +12,12 @@ threads = 2  # Multiple threads to handle slow responses
 worker_class = 'gthread'
 timeout = 120  # Increased timeout to allow for slow model loading
 
+# Make sure we respond quickly to health checks
+# This helps Render.com detect that our service is running
+backlog = 100  # Increased connection queue
+worker_connections = 100  # Maximum number of simultaneous client connections
+keepalive = 65  # How long to keep connections open
+
 # Render has memory constraints, so configure for that
 max_requests = 10
 max_requests_jitter = 5
