@@ -8,6 +8,7 @@ services:
       python fix_flask_werkzeug.py && 
       python patch_shap.py && 
       export MEMORY_OPTIMIZATION=true && 
+      export MAX_MEMORY_MB=400 &&
       python setup_for_render.py && 
       python train_model.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
@@ -31,12 +32,10 @@ services:
       - key: MEMORY_OPTIMIZATION
         value: true
       - key: MAX_MEMORY_MB
-        value: 450
+        value: 400
       - key: DEFAULT_TARGET
         value: Mortgage_Approvals
       - key: DEFAULT_ANALYSIS_TYPE
         value: ranking
-      - key: MEMORY_OPTIMIZATION
+      - key: AGGRESSIVE_MEMORY_MANAGEMENT
         value: true
-      - key: MAX_MEMORY_MB
-        value: 450

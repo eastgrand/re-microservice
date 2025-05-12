@@ -9,6 +9,7 @@ import numpy as np
 import os
 import logging
 import gc
+import time
 
 # Try to import psutil, but provide fallback if not available
 try:
@@ -23,6 +24,16 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("memory-optimizer")
+
+# Check for aggressive memory management flag
+AGGRESSIVE_MEMORY = os.environ.get('AGGRESSIVE_MEMORY_MANAGEMENT', 'false').lower() == 'true'
+if AGGRESSIVE_MEMORY:
+    logger.info("AGGRESSIVE memory optimization mode is ENABLED")
+    # More aggressive thresholds for Render to start optimizing earlier
+    DEFAULT_MAX_MEMORY_MB = 400
+else:
+    # Standard memory optimization thresholds
+    DEFAULT_MAX_MEMORY_MB = 450
 
 def get_memory_usage():
     """Get current process memory usage in megabytes."""
@@ -129,8 +140,76 @@ def load_and_optimize_data(file_path, low_memory=True, nrows=None):
     """
     log_memory_usage("Before data loading")
     
+    # Check if we're in Render environment or memory is already tight
+    is_render = 'RENDER' in os.environ
+    current_memory = get_memory_usage()
+    max_mem = int(os.environ.get('MAX_MEMORY_MB', 450))
+    
+    # For Render or when memory is tight, use aggressive optimization from the start
+    if is_render or current_memory > (max_mem * 0.5):
+        logger.info("Using aggressive memory optimization for data loading")
+        
+        # First, identify only essential columns by reading the header
+        essential_columns = None
+        try:
+            header = pd.read_csv(file_path, nrows=0)
+            # Determine important columns - keep ID fields and common target variables
+            # This reduces memory by only loading columns we're likely to use
+            essential_columns = [col for col in header.columns if any(
+                key in col.lower() for key in [
+                    'id', 'code', 'zip', 'postal', 'population', 'income', 
+                    'mortgage', 'approval', 'application', 'object'
+                ]
+            )]
+            if not essential_columns:  # If no columns matched, load all columns
+                essential_columns = None
+            else:
+                logger.info(f"Loading only {len(essential_columns)} essential columns out of {len(header.columns)}")
+        except Exception as e:
+            logger.warning(f"Error identifying essential columns: {e}")
+        
+        # Determine optimal chunk size based on available memory
+        chunk_size = 10000  # Default chunk size
+        if current_memory > (max_mem * 0.7):
+            chunk_size = 5000
+        if nrows is not None:
+            chunk_size = min(chunk_size, nrows)
+            
+        # Load in chunks to control memory usage
+        chunks = []
+        total_rows = 0
+        
+        for chunk in pd.read_csv(file_path, 
+                                 chunksize=chunk_size, 
+                                 low_memory=low_memory,
+                                 usecols=essential_columns,
+                                 dtype='category'):  # Start with category type for all columns as it's memory efficient
+            
+            # Apply immediate type optimization to chunk
+            for col in chunk.columns:
+                if pd.api.types.is_numeric_dtype(chunk[col]):
+                    chunk[col] = pd.to_numeric(chunk[col], downcast='integer')
+                
+            chunks.append(chunk)
+            total_rows += len(chunk)
+            
+            # Check memory usage after each chunk
+            if get_memory_usage() > (max_mem * 0.85):
+                logger.warning("Memory usage too high, stopping after loading some chunks")
+                break
+                
+            if nrows is not None and total_rows >= nrows:
+                break
+                
+            # Force garbage collection after processing each chunk
+            gc.collect()
+            
+        # Combine chunks
+        df = pd.concat(chunks, ignore_index=True)
+        logger.info(f"Loaded {len(df)} rows from {file_path} using chunking")
+        
     # For extremely large files, read in chunks
-    if nrows is not None:
+    elif nrows is not None:
         df = pd.read_csv(file_path, nrows=nrows, low_memory=low_memory)
         logger.info(f"Loaded {nrows} rows from {file_path}")
     else:
@@ -188,23 +267,56 @@ def sample_data_if_needed(df, original_size, max_mb=None):
     
     current_memory = get_memory_usage()
     
-    if current_memory < max_mb:
+    # For Render, be more aggressive with memory management
+    is_render = 'RENDER' in os.environ
+    memory_threshold = max_mb * (0.5 if is_render else 0.9)
+    
+    if current_memory < memory_threshold:
         return df
     
-    # Calculate how much we need to reduce
-    reduction_factor = max_mb / current_memory
-    target_size = int(len(df) * reduction_factor * 0.9)  # 10% safety margin
+    # Calculate reduction needed
+    # More aggressive for Render environment
+    safety_margin = 0.6 if is_render else 0.9
+    reduction_factor = memory_threshold / current_memory
+    target_size = int(len(df) * reduction_factor * safety_margin)
     
     logger.warning(f"Memory usage critical: {current_memory:.2f} MB. "
                   f"Reducing dataset from {len(df)} to {target_size} rows.")
     
-    # Ensure we keep at least some data
-    target_size = max(target_size, min(5000, len(df)))
+    # Ensure we keep enough data, but be aggressive on Render
+    min_rows = 3000 if is_render else 5000
+    target_size = max(target_size, min(min_rows, len(df)))
     
-    # Sample the data
+    # Sample the data - use stratified sampling if possible for better representation
     if target_size < len(df):
-        df = df.sample(n=target_size, random_state=42)
-        gc.collect()  # Force garbage collection
+        try:
+            # Try stratified sampling on a categorical column if available
+            cat_cols = [col for col in df.columns if pd.api.types.is_categorical_dtype(df[col])]
+            if cat_cols and len(cat_cols) > 0:
+                # Use the first categorical column with not too many unique values
+                for col in cat_cols:
+                    if df[col].nunique() <= 50:
+                        logger.info(f"Using stratified sampling on column {col}")
+                        # Calculate fraction needed to get target_size
+                        frac = target_size / len(df)
+                        df = df.groupby(col, group_keys=False).apply(
+                            lambda x: x.sample(frac=frac, random_state=42)
+                        )
+                        break
+                else:
+                    # If no good stratification column found, do regular sampling
+                    df = df.sample(n=target_size, random_state=42)
+            else:
+                # Regular random sampling
+                df = df.sample(n=target_size, random_state=42)
+                
+        except Exception as e:
+            logger.warning(f"Error in stratified sampling: {e}. Using random sampling.")
+            df = df.sample(n=target_size, random_state=42)
+            
+        # Force garbage collection multiple times
+        for _ in range(3):  # Multiple GC calls can help recover more memory
+            gc.collect()
         log_memory_usage(f"After sampling to {target_size} rows")
     
     return df
@@ -219,9 +331,13 @@ def reduce_model_complexity(model_params, max_mb=None):
         max_mb = int(os.environ.get('MAX_MEMORY_MB', 450))
     
     current_memory = get_memory_usage()
+    is_render = 'RENDER' in os.environ
+    
+    # For Render, be more aggressive - start optimizing at 60% of max memory
+    memory_threshold = max_mb * (0.6 if is_render else 0.8)
     
     # Only adjust if we're getting close to the limit
-    if current_memory < max_mb * 0.8:
+    if current_memory < memory_threshold:
         return model_params.copy()
     
     logger.warning(f"Memory usage high ({current_memory:.2f} MB), reducing model complexity.")
@@ -229,14 +345,112 @@ def reduce_model_complexity(model_params, max_mb=None):
     # Create a copy to modify
     adjusted_params = model_params.copy()
     
-    # Reduce number of estimators
-    if 'n_estimators' in adjusted_params and adjusted_params['n_estimators'] > 50:
-        adjusted_params['n_estimators'] = 50
-        logger.info(f"Reduced n_estimators to {adjusted_params['n_estimators']}")
+    # Set level of complexity reduction based on memory pressure
+    memory_ratio = current_memory / max_mb
     
-    # Reduce max_depth
-    if 'max_depth' in adjusted_params and adjusted_params['max_depth'] > 3:
-        adjusted_params['max_depth'] = 3
-        logger.info(f"Reduced max_depth to {adjusted_params['max_depth']}")
+    # Extreme memory pressure - use minimal model  
+    if memory_ratio > 0.85:
+        # Use histogram-based training for much lower memory usage
+        adjusted_params['tree_method'] = 'hist'
+        
+        # Minimize estimators
+        if 'n_estimators' in adjusted_params:
+            adjusted_params['n_estimators'] = 30
+            logger.info(f"Severely reduced n_estimators to {adjusted_params['n_estimators']}")
+        
+        # Minimize tree depth
+        if 'max_depth' in adjusted_params:
+            adjusted_params['max_depth'] = 2
+            logger.info(f"Severely reduced max_depth to {adjusted_params['max_depth']}")
+            
+        # Add leaf-wise growth for smaller trees
+        adjusted_params['grow_policy'] = 'lossguide'
+        
+        # Force more aggressive pruning
+        adjusted_params['gamma'] = 1.0
+        
+    # High memory pressure - use reduced model
+    elif memory_ratio > 0.7:
+        # Use histogram-based training
+        adjusted_params['tree_method'] = 'hist'
+        
+        # Reduce estimators
+        if 'n_estimators' in adjusted_params and adjusted_params['n_estimators'] > 50:
+            adjusted_params['n_estimators'] = 50
+            logger.info(f"Reduced n_estimators to {adjusted_params['n_estimators']}")
+        
+        # Reduce tree depth
+        if 'max_depth' in adjusted_params and adjusted_params['max_depth'] > 3:
+            adjusted_params['max_depth'] = 3
+            logger.info(f"Reduced max_depth to {adjusted_params['max_depth']}")
+            
+        # Add moderate pruning
+        adjusted_params['gamma'] = 0.5
     
+    # Apply additional memory-saving settings for all cases when needed
+    if memory_ratio > 0.6:
+        # Reduce complexity of individual trees
+        adjusted_params['min_child_weight'] = 5
+        
+        # Skip some data for training (subsample data)
+        adjusted_params['subsample'] = 0.8
+        adjusted_params['colsample_bytree'] = 0.8
+        
+        # Reduce precision to save memory
+        adjusted_params['single_precision_histogram'] = True
+        
     return adjusted_params
+
+
+def prune_dataframe_columns(df, target_column=None, max_columns=None, importance_threshold=0.01):
+    """
+    Reduce DataFrame memory usage by removing only specific legacy fields.
+    Preserves all important analytical fields.
+    
+    Args:
+        df: The DataFrame to optimize
+        target_column: The target column to keep (won't be removed)
+        max_columns: Maximum number of columns to keep (ignored in this implementation)
+        importance_threshold: Minimum correlation threshold (ignored in this implementation)
+        
+    Returns:
+        DataFrame with legacy fields removed
+    """
+    log_memory_usage("Before column pruning")
+    original_columns = df.columns.tolist()
+    
+    # Legacy fields to remove as specified by the user
+    legacy_fields = [
+        'Single_Status',       # SUM_ECYMARNMCL
+        'Single_Family_Homes', # SUM_ECYSTYSING  
+        'Married_Population',  # SUM_ECYMARM
+        'Aggregate_Income',    # SUM_HSHNIAGG
+        'Market_Weight'        # Sum_Weight
+    ]
+    
+    # Identify which legacy fields are actually present
+    found_legacy_fields = [field for field in legacy_fields if field in df.columns]
+    
+    # Keep all columns except legacy fields
+    keep_columns = [col for col in df.columns if col not in legacy_fields]
+    
+    # Keep only non-legacy columns
+    df_pruned = df[keep_columns].copy()
+    
+    # Log results
+    columns_removed = len(original_columns) - len(keep_columns)
+    logger.info(f"Pruned {columns_removed} legacy columns to save memory. Kept {len(keep_columns)} columns.")
+    
+    # Log which legacy fields were found and removed
+    if found_legacy_fields:
+        logger.info(f"Removed legacy fields: {found_legacy_fields}")
+    else:
+        logger.info("No legacy fields found in the dataset.")
+    
+    # Force garbage collection
+    gc.collect()
+    time.sleep(0.1)  # Short delay to let memory be released
+    gc.collect()  # Second collection sometimes helps more
+    
+    log_memory_usage("After column pruning")
+    return df_pruned

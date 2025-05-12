@@ -83,6 +83,11 @@ log_memory_usage("Before data loading")
 # Try each path until we find a valid data file
 df = None
 dataset_path = None
+
+# For Render deployment, use more aggressive memory settings
+is_render = 'RENDER' in os.environ
+initial_sample_size = 20000 if is_render else 50000
+
 for path in DATA_PATHS:
     if os.path.exists(path):
         logger.info(f"Loading data from {path}...")
@@ -92,11 +97,25 @@ for path in DATA_PATHS:
                 logger.info(f"Loading Nesto data from {path} with memory optimization")
                 # On Render with limited memory, we may need to use a sample of the data
                 try:
-                    df = load_and_optimize_data(path, low_memory=False)
+                    # Start with a smaller sample on Render to avoid immediate OOM
+                    if is_render:
+                        logger.info(f"Running on Render, using initial sample of {initial_sample_size} rows")
+                        df = load_and_optimize_data(path, low_memory=False, nrows=initial_sample_size)
+                    else:
+                        df = load_and_optimize_data(path, low_memory=False)
                 except Exception as mem_error:
-                    logger.warning(f"Full dataset loading failed: {mem_error}. Falling back to sample.")
+                    logger.warning(f"Full dataset loading failed: {mem_error}. Falling back to smaller sample.")
                     # Try with a smaller sample if full load fails
-                    df = load_and_optimize_data(path, low_memory=False, nrows=25000)
+                    sample_size = 10000 if is_render else 25000
+                    df = load_and_optimize_data(path, low_memory=False, nrows=sample_size)
+                    
+                # Even after loading, if memory is still high, prune columns
+                from optimize_memory import prune_dataframe_columns
+                
+                if is_render or is_memory_critical(threshold_mb=400):
+                    logger.warning("Memory still high after loading, removing legacy fields")
+                    target_col = "Mortgage_Approvals"
+                    df = prune_dataframe_columns(df, target_column=target_col)
                 
                 dataset_path = path
                 
@@ -177,6 +196,16 @@ else:
 
 # Basic data cleaning
 print("Cleaning data...")
+log_memory_usage("Before data cleaning")
+
+# For extremely memory constrained environments, only focus on essential cleaning
+is_render = 'RENDER' in os.environ
+memory_critical = is_render or is_memory_critical(threshold_mb=400)
+
+# Delete unnecessary objects before proceeding
+if 'rename_dict' in locals():
+    del rename_dict
+gc.collect()
 
 # Check before dropping NAs how many records we have
 print(f"Initial record count: {len(df)}")
@@ -366,9 +395,13 @@ else:
     if MEMORY_OPTIMIZATION and is_memory_critical(MEMORY_CAUTION):
         logger.warning("Memory very low before training, reducing training size")
         # Use a smaller subset for training in extremely low memory conditions
-        sample_size = min(5000, int(len(X_train) * 0.3))
+        sample_size = min(3000 if 'RENDER' in os.environ else 5000, int(len(X_train) * 0.3))
         X_train_sample = X_train.sample(n=sample_size, random_state=42)
         y_train_sample = y_train.loc[X_train_sample.index]
+        
+        # Release the original dataframes to save memory
+        del X_train, y_train
+        gc.collect()
         model.fit(X_train_sample, y_train_sample)
         logger.info(f"Model trained on reduced dataset of {sample_size} samples")
         del X_train_sample, y_train_sample
@@ -424,9 +457,13 @@ def train_and_save_model():
     os.makedirs('data', exist_ok=True)
     
     logger.info("Starting model training process from train_and_save_model function...")
+    log_memory_usage("Starting train_and_save_model function")
     
     # Initialize data version tracker
     version_tracker = DataVersionTracker()
+    
+    # Check if we're in Render's environment for stricter memory management
+    is_render = 'RENDER' in os.environ
     
     # Try each path until we find a valid data file
     df = None
@@ -436,24 +473,38 @@ def train_and_save_model():
             logger.info(f"Loading data from {path}...")
             try:
                 if 'nesto_merge_0.csv' in path:
-                    # Direct loading of nesto_merge_0.csv
-                    logger.info(f"Loading Nesto data from {path}")
-                    df = pd.read_csv(path, low_memory=False)
+                    # Use memory-optimized loading for Nesto data
+                    logger.info(f"Loading Nesto data from {path} with memory optimization")
+                    try:
+                        # Start with a smaller sample if in Render environment
+                        sample_size = 15000 if is_render else None
+                        df = load_and_optimize_data(path, low_memory=False, nrows=sample_size)
+                    except Exception as mem_error:
+                        logger.warning(f"Optimized loading failed: {mem_error}. Trying with minimal sample.")
+                        sample_size = 10000 if is_render else 25000
+                        df = load_and_optimize_data(path, low_memory=False, nrows=sample_size)
+                    
                     dataset_path = path
+                    log_memory_usage("After loading Nesto data")
                     
                     # Define the field mappings
                     from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
                     
-                    # Create a mapped DataFrame
-                    mapped_df = pd.DataFrame()
-                    
-                    # Apply mappings to create the processed dataset
+                    # Process in a memory-efficient way - map columns one at a time
+                    # instead of creating a duplicate dataframe
+                    rename_dict = {}
                     for source_col, target_col in FIELD_MAPPINGS.items():
                         if source_col in df.columns:
-                            mapped_df[target_col] = df[source_col]
+                            rename_dict[source_col] = target_col
                     
-                    # Set the processed DataFrame as our working set
-                    df = mapped_df
+                    # Apply rename at once instead of creating a new dataframe
+                    if rename_dict:
+                        df = df.rename(columns=rename_dict)
+                        logger.info(f"Renamed {len(rename_dict)} columns using field mappings")
+                    
+                    # Clean up to save memory
+                    del rename_dict
+                    gc.collect()
                     
                 else:
                     # Direct loading of already processed data

@@ -152,24 +152,49 @@ def load_model():
             # Load dataset with memory optimization
             # First try to import the memory optimizer
             try:
-                from optimize_memory import load_and_optimize_data, log_memory_usage
+                from optimize_memory import load_and_optimize_data, log_memory_usage, prune_dataframe_columns
                 log_memory_usage("Before loading dataset in app.py")
+                
+                # Check if we're in Render's environment
+                is_render = 'RENDER' in os.environ
+                
+                # Use smaller sample size for Render
+                sample_size = 10000 if is_render else 20000
                 
                 cleaned_data_path = 'data/cleaned_data.csv'
                 if os.path.exists(cleaned_data_path):
                     logger.info(f"Loading dataset from {cleaned_data_path} with memory optimization...")
                     try:
-                        dataset = load_and_optimize_data(cleaned_data_path, nrows=20000)
+                        # For Render, use more aggressive optimization
+                        if is_render:
+                            logger.info("Running in Render environment, using aggressive data loading optimizations")
+                            # Load dataset with essential columns only for rendering
+                            dataset = load_and_optimize_data(cleaned_data_path, nrows=sample_size)
+                            # Remove only legacy fields, preserve all important analytical columns
+                            target_col = 'Mortgage_Approvals'
+                            dataset = prune_dataframe_columns(dataset, target_column=target_col)
+                        else:
+                            dataset = load_and_optimize_data(cleaned_data_path, nrows=sample_size)
                     except Exception as e:
-                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load")
-                        dataset = pd.read_csv(cleaned_data_path, nrows=20000)
+                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load with reduced rows")
+                        # Even more aggressive fallback with fewer rows
+                        reduced_sample = 5000 if is_render else sample_size
+                        dataset = pd.read_csv(cleaned_data_path, nrows=reduced_sample)
                 elif os.path.exists(DATASET_PATH):
                     logger.info(f"Loading dataset from {DATASET_PATH} with memory optimization...")
                     try:
-                        dataset = load_and_optimize_data(DATASET_PATH, nrows=20000)
+                        if is_render:
+                            # Use aggressive optimizations for Render
+                            dataset = load_and_optimize_data(DATASET_PATH, nrows=sample_size)
+                            # Remove only legacy fields, preserve all important analytical columns
+                            target_col = 'Mortgage_Approvals'
+                            dataset = prune_dataframe_columns(dataset, target_column=target_col)
+                        else:
+                            dataset = load_and_optimize_data(DATASET_PATH, nrows=sample_size)
                     except Exception as e:
-                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load")
-                        dataset = pd.read_csv(DATASET_PATH, nrows=20000)
+                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load with reduced rows")
+                        reduced_sample = 5000 if is_render else sample_size
+                        dataset = pd.read_csv(DATASET_PATH, nrows=reduced_sample)
                 else:
                     error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
                     logger.error(error_msg)

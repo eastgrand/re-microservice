@@ -19,16 +19,22 @@ This document summarizes the memory optimization techniques applied to the Nesto
 - **Impact**: Allows model training with as few as 5,000 samples when memory is constrained
 - **Implementation**: Memory-based sampling in `train_model.py` and `app.py`
 
-### 4. Memory Usage Monitoring
+### 4. Legacy Field Removal
+- **Description**: Removes only specific legacy fields that aren't needed for analysis
+- **Impact**: Preserves all important fields while removing unnecessary columns
+- **Implementation**: Updated `prune_dataframe_columns()` function that targets only legacy fields
+
+### 5. Memory Usage Monitoring
 - **Description**: Tracks and logs memory usage at key points throughout execution
 - **Impact**: Provides visibility into memory pressure points for debugging
 - **Implementation**: `log_memory_usage()` function called at critical code sections
 
 ## Thresholds and Triggers
 
-- **450MB**: Critical threshold - activates all optimizations
-- **400MB**: High threshold - skips cross-validation and reduces data size
-- **350MB**: Moderate threshold - reduces model complexity
+- **400MB**: Critical threshold - activates all optimizations (reduced from 450MB for Render)
+- **350MB**: High threshold - skips cross-validation and reduces data size
+- **300MB**: Moderate threshold - reduces model complexity
+- **For Render deployment**: Uses even more aggressive optimizations including column pruning and chunked data loading
 
 ## Test Results
 

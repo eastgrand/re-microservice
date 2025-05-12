@@ -95,3 +95,32 @@ If memory issues persist:
 2. Implement chunked processing for larger datasets 
 3. Consider using more aggressive feature selection
 4. Move to a higher memory tier on Render
+
+## Enhanced Memory Optimizations (May 2025 Update)
+
+The following additional memory optimizations have been implemented to keep memory usage under Render's 512MB limit:
+
+### 1. Targeted Legacy Field Removal
+- Updated `prune_dataframe_columns()` function that removes only specific legacy fields
+- Preserves all important analytical columns for accurate analysis
+- Only removes identified legacy fields: 'Single_Status', 'Single_Family_Homes', 'Married_Population', 'Aggregate_Income', 'Market_Weight'
+
+### 2. Chunked Data Loading
+- Data loading now occurs in chunks when memory is constrained
+- Each chunk is optimized for memory usage before processing the next chunk
+- Prevents memory spikes during data loading
+
+### 3. Smarter Memory Thresholds
+- Automatically detects Render environment and applies more aggressive thresholds
+- Starts optimization measures at lower memory usage levels on Render
+- Separate thresholds for different environments
+
+### 4. Enhanced Data Type Optimization
+- More aggressive data type selection for numeric columns
+- Converting more columns to categorical type where appropriate
+- Multiple garbage collection passes after major operations
+
+### 5. Stratified Data Sampling
+- When sampling is needed, uses stratified sampling on categorical columns
+- Ensures representative data distribution even with extreme sampling
+- Falls back to random sampling when stratification isn't possible
