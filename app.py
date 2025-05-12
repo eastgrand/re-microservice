@@ -40,7 +40,7 @@ ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() == 'true'
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
 MAX_RESULTS = int(os.getenv('MAX_RESULTS', 100))
 DEFAULT_ANALYSIS_TYPE = os.getenv('DEFAULT_ANALYSIS_TYPE', 'correlation')
-DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Nike_Sales')
+DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
 
 # Authentication settings
 API_KEY = os.getenv('API_KEY')
@@ -51,6 +51,11 @@ numeric_level = getattr(logging, LOG_LEVEL.upper(), None)
 if not isinstance(numeric_level, int):
     numeric_level = getattr(logging, 'INFO')
 logger.setLevel(numeric_level)
+
+# Configure the app to use the correct target variable for Nesto data
+if os.path.exists('data/nesto_merge_0.csv'):
+    logger.info("Nesto mortgage data detected. Using Mortgage_Approvals as target.")
+    DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
 
 # Flask app setup
 app = Flask(__name__)
