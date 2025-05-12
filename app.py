@@ -149,20 +149,49 @@ def load_model():
                 logger.warning(f"Feature names file not found at {FEATURE_NAMES_PATH}")
                 feature_names = []
             
-            # Load dataset
-            cleaned_data_path = 'data/cleaned_data.csv'
-            if os.path.exists(cleaned_data_path):
-                logger.info(f"Loading dataset from {cleaned_data_path}...")
-                dataset = pd.read_csv(cleaned_data_path)
-                logger.info(f"Loaded dataset with {dataset.shape[0]} records and {dataset.shape[1]} columns")
-            elif os.path.exists(DATASET_PATH):
-                logger.info(f"Loading dataset from {DATASET_PATH}...")
-                dataset = pd.read_csv(DATASET_PATH)
-                logger.info(f"Loaded dataset with {dataset.shape[0]} records and {dataset.shape[1]} columns")
-            else:
-                error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
-                logger.error(error_msg)
-                raise FileNotFoundError(error_msg)
+            # Load dataset with memory optimization
+            # First try to import the memory optimizer
+            try:
+                from optimize_memory import load_and_optimize_data, log_memory_usage
+                log_memory_usage("Before loading dataset in app.py")
+                
+                cleaned_data_path = 'data/cleaned_data.csv'
+                if os.path.exists(cleaned_data_path):
+                    logger.info(f"Loading dataset from {cleaned_data_path} with memory optimization...")
+                    try:
+                        dataset = load_and_optimize_data(cleaned_data_path, nrows=20000)
+                    except Exception as e:
+                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load")
+                        dataset = pd.read_csv(cleaned_data_path, nrows=20000)
+                elif os.path.exists(DATASET_PATH):
+                    logger.info(f"Loading dataset from {DATASET_PATH} with memory optimization...")
+                    try:
+                        dataset = load_and_optimize_data(DATASET_PATH, nrows=20000)
+                    except Exception as e:
+                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load")
+                        dataset = pd.read_csv(DATASET_PATH, nrows=20000)
+                else:
+                    error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
+                    logger.error(error_msg)
+                    raise FileNotFoundError(error_msg)
+                
+                log_memory_usage("After loading dataset in app.py")
+                
+            except ImportError:
+                # Fall back to standard loading
+                cleaned_data_path = 'data/cleaned_data.csv'
+                if os.path.exists(cleaned_data_path):
+                    logger.info(f"Loading dataset from {cleaned_data_path}...")
+                    dataset = pd.read_csv(cleaned_data_path, nrows=20000)
+                elif os.path.exists(DATASET_PATH):
+                    logger.info(f"Loading dataset from {DATASET_PATH}...")
+                    dataset = pd.read_csv(DATASET_PATH, nrows=20000)
+                else:
+                    error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
+                    logger.error(error_msg)
+                    raise FileNotFoundError(error_msg)
+            
+            logger.info(f"Loaded dataset with {dataset.shape[0]} records and {dataset.shape[1]} columns")
             
             # Get model and dataset version information
             model_version = version_tracker.get_latest_model()
@@ -358,7 +387,7 @@ def analyze():
         
         # Extract query parameters using environment defaults
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
-        target_variable = query.get('target_variable', DEFAULT_TARGET)
+        target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
         filters = query.get('demographic_filters', [])
         
         print(f"Analysis type: {analysis_type}")
@@ -481,7 +510,14 @@ def analyze():
             # Add other columns
             for col in row.index:
                 if col not in ['zip_code', 'latitude', 'longitude', target_variable]:
-                    result[col.lower()] = float(row[col])
+                    try:
+                        result[col.lower()] = float(row[col])
+                    except (ValueError, TypeError):
+                        # Handle non-numeric values
+                        if isinstance(row[col], str):
+                            result[col.lower()] = row[col]
+                        else:
+                            result[col.lower()] = str(row[col])
             
             results.append(result)
         

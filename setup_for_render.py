@@ -11,6 +11,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 import shutil
+import gc
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +19,22 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("setup-for-render")
+
+# Check for memory optimization mode
+MEMORY_OPTIMIZATION = os.environ.get('MEMORY_OPTIMIZATION', 'false').lower() == 'true'
+if MEMORY_OPTIMIZATION:
+    logger.info("Memory optimization mode is ENABLED for setup")
+    try:
+        from optimize_memory import log_memory_usage, get_memory_usage
+        log_memory_usage("Setup script start")
+    except ImportError:
+        logger.warning("Could not import optimize_memory module, continuing without memory tracking")
+        
+        # Simple implementation in case the module isn't available yet
+        def log_memory_usage(step_name):
+            logger.info(f"Memory usage tracking not available for: {step_name}")
+else:
+    logger.info("Running in standard mode (memory optimization disabled)")
 
 def setup_environment():
     """Prepare the environment for deployment."""
@@ -33,98 +50,101 @@ def setup_environment():
     if not os.path.exists(nesto_data_path):
         logger.warning(f"Nesto data file not found at {nesto_data_path}")
         
-        # Create a comprehensive sample data file for deployment with all mapped fields
-        logger.info("Creating comprehensive sample data file with all mapped fields")
+        # Create a small sample data file for deployment with all mapped fields
+        logger.info("Creating small sample data file with all mapped fields to reduce memory usage")
+        
+        # Set a smaller number of rows to reduce memory footprint
+        sample_size = 50  # Reduced from 100 to save memory
         
         # Base demographic values
-        total_pop = np.random.randint(1000, 50000, 100)
-        female_pop = np.random.randint(500, 25000, 100)
+        total_pop = np.random.randint(1000, 50000, sample_size)
+        female_pop = np.random.randint(500, 25000, sample_size)
         male_pop = total_pop - female_pop
         
         # Housing tenure values
-        owned_dwellings = np.random.randint(100, 5000, 100)
-        rented_dwellings = np.random.randint(50, 3000, 100)
-        band_housing = np.random.randint(0, 200, 100)
+        owned_dwellings = np.random.randint(100, 5000, sample_size)
+        rented_dwellings = np.random.randint(50, 3000, sample_size)
+        band_housing = np.random.randint(0, 200, sample_size)
         total_households = owned_dwellings + rented_dwellings + band_housing
         
         # Minority populations
-        total_minority = np.random.randint(0, 5000, 100)
-        black_minority = np.random.randint(0, 1000, 100)
-        chinese_minority = np.random.randint(0, 1000, 100)
-        latin_minority = np.random.randint(0, 1000, 100)
-        arab_minority = np.random.randint(0, 800, 100)
-        filipino_minority = np.random.randint(0, 600, 100)
-        south_asian_minority = np.random.randint(0, 1200, 100)
-        southeast_asian_minority = np.random.randint(0, 500, 100)
-        japanese_minority = np.random.randint(0, 200, 100)
-        korean_minority = np.random.randint(0, 300, 100)
-        west_asian_minority = np.random.randint(0, 400, 100)
+        total_minority = np.random.randint(0, 5000, sample_size)
+        black_minority = np.random.randint(0, 1000, sample_size)
+        chinese_minority = np.random.randint(0, 1000, sample_size)
+        latin_minority = np.random.randint(0, 1000, sample_size)
+        arab_minority = np.random.randint(0, 800, sample_size)
+        filipino_minority = np.random.randint(0, 600, sample_size)
+        south_asian_minority = np.random.randint(0, 1200, sample_size)
+        southeast_asian_minority = np.random.randint(0, 500, sample_size)
+        japanese_minority = np.random.randint(0, 200, sample_size)
+        korean_minority = np.random.randint(0, 300, sample_size)
+        west_asian_minority = np.random.randint(0, 400, sample_size)
         
         # Housing types
-        condo_units = np.random.randint(50, 2000, 100)
+        condo_units = np.random.randint(50, 2000, sample_size)
         non_condo_units = total_households - condo_units
-        single_detached = np.random.randint(200, 3000, 100)
-        semi_detached = np.random.randint(50, 1000, 100)
-        row_houses = np.random.randint(50, 1000, 100)
-        large_apartments = np.random.randint(50, 2000, 100)
-        small_apartments = np.random.randint(100, 2000, 100)
-        movable_dwellings = np.random.randint(0, 200, 100)
-        other_attached_houses = np.random.randint(0, 500, 100)
-        duplex_apartments = np.random.randint(50, 1000, 100)
+        single_detached = np.random.randint(200, 3000, sample_size)
+        semi_detached = np.random.randint(50, 1000, sample_size)
+        row_houses = np.random.randint(50, 1000, sample_size)
+        large_apartments = np.random.randint(50, 2000, sample_size)
+        small_apartments = np.random.randint(100, 2000, sample_size)
+        movable_dwellings = np.random.randint(0, 200, sample_size)
+        other_attached_houses = np.random.randint(0, 500, sample_size)
+        duplex_apartments = np.random.randint(50, 1000, sample_size)
         
         # Housing age/period values
-        old_housing = np.random.randint(50, 1500, 100)
-        housing_1961_1980 = np.random.randint(100, 2000, 100)
-        housing_1981_1990 = np.random.randint(50, 1000, 100)
-        housing_1991_2000 = np.random.randint(50, 1000, 100)
-        housing_2001_2005 = np.random.randint(20, 800, 100)
-        housing_2006_2010 = np.random.randint(20, 800, 100)
-        housing_2011_2016 = np.random.randint(20, 600, 100)
-        housing_2016_2021 = np.random.randint(10, 500, 100)
+        old_housing = np.random.randint(50, 1500, sample_size)
+        housing_1961_1980 = np.random.randint(100, 2000, sample_size)
+        housing_1981_1990 = np.random.randint(50, 1000, sample_size)
+        housing_1991_2000 = np.random.randint(50, 1000, sample_size)
+        housing_2001_2005 = np.random.randint(20, 800, sample_size)
+        housing_2006_2010 = np.random.randint(20, 800, sample_size)
+        housing_2011_2016 = np.random.randint(20, 600, sample_size)
+        housing_2016_2021 = np.random.randint(10, 500, sample_size)
         total_housing = (old_housing + housing_1961_1980 + housing_1981_1990 + 
                         housing_1991_2000 + housing_2001_2005 + housing_2006_2010 + 
                         housing_2011_2016 + housing_2016_2021)
         
         # Marital status demographics
-        married_pop = np.random.randint(500, 20000, 100)
-        common_law_pop = np.random.randint(100, 5000, 100)
-        single_pop = np.random.randint(300, 15000, 100)
-        divorced_pop = np.random.randint(50, 3000, 100)
-        separated_pop = np.random.randint(20, 2000, 100)
-        widowed_pop = np.random.randint(20, 3000, 100)
+        married_pop = np.random.randint(500, 20000, sample_size)
+        common_law_pop = np.random.randint(100, 5000, sample_size)
+        single_pop = np.random.randint(300, 15000, sample_size)
+        divorced_pop = np.random.randint(50, 3000, sample_size)
+        separated_pop = np.random.randint(20, 2000, sample_size)
+        widowed_pop = np.random.randint(20, 3000, sample_size)
         combined_married = married_pop + common_law_pop
         not_married = single_pop + divorced_pop + separated_pop + widowed_pop
         adult_pop = combined_married + not_married  # Population 15+
         
         # Age group values for household maintainers
-        young_adult_maintainers = np.random.randint(100, 1000, 100)
-        middle_age_maintainers = np.random.randint(200, 1500, 100)
-        mature_maintainers = np.random.randint(150, 1200, 100)
-        senior_maintainers = np.random.randint(150, 1200, 100)
+        young_adult_maintainers = np.random.randint(100, 1000, sample_size)
+        middle_age_maintainers = np.random.randint(200, 1500, sample_size)
+        mature_maintainers = np.random.randint(150, 1200, sample_size)
+        senior_maintainers = np.random.randint(150, 1200, sample_size)
         total_maintainers = young_adult_maintainers + middle_age_maintainers + mature_maintainers + senior_maintainers
         
         # Financial metrics
-        property_tax_total = np.random.uniform(1e6, 1e7, 100)
-        mortgage_payments_total = np.random.uniform(5e6, 2e7, 100)
-        condo_fees_total = np.random.uniform(2e5, 2e6, 100)
-        financial_services_total = np.random.uniform(1e6, 5e6, 100)
-        bank_charges_total = np.random.uniform(2e5, 1e6, 100)
+        property_tax_total = np.random.uniform(1e6, 1e7, sample_size)
+        mortgage_payments_total = np.random.uniform(5e6, 2e7, sample_size)
+        condo_fees_total = np.random.uniform(2e5, 2e6, sample_size)
+        financial_services_total = np.random.uniform(1e6, 5e6, sample_size)
+        bank_charges_total = np.random.uniform(2e5, 1e6, sample_size)
         
         # Income metrics
-        avg_income = np.random.normal(75000, 15000, 100)
-        median_income = np.random.normal(68000, 12000, 100)
+        avg_income = np.random.normal(75000, 15000, sample_size)
+        median_income = np.random.normal(68000, 12000, sample_size)
         total_income = avg_income * total_households
-        discretionary_income = total_income * np.random.uniform(0.3, 0.5, 100)
-        disposable_income = total_income * np.random.uniform(0.6, 0.8, 100)
+        discretionary_income = total_income * np.random.uniform(0.3, 0.5, sample_size)
+        disposable_income = total_income * np.random.uniform(0.6, 0.8, sample_size)
         
         # Calculate percentage fields based on absolute values
         sample_data = pd.DataFrame({
             # Geographic fields
-            'Object ID': np.arange(1001, 1101),
-            'Forward Sortation Area': [f'A{i}A' for i in range(100)],
-            'ID': [f'AB{i:02d}' for i in range(100)],
-            'Shape__Area': np.random.uniform(1000000, 10000000, 100),
-            'Shape__Length': np.random.uniform(10000, 100000, 100),
+            'Object ID': np.arange(1001, 1001 + sample_size),
+            'Forward Sortation Area': [f'A{i}A' for i in range(sample_size)],
+            'ID': [f'AB{i:02d}' for i in range(sample_size)],
+            'Shape__Area': np.random.uniform(1000000, 10000000, sample_size),
+            'Shape__Length': np.random.uniform(10000, 100000, sample_size),
             
             # Basic demographic fields
             '2024 Total Population': total_pop,

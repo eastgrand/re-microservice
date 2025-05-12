@@ -3,10 +3,20 @@ import numpy as np
 import xgboost as xgb
 import pickle
 import os
+import gc
+import sys
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import logging
 from data_versioning import DataVersionTracker
+from optimize_memory import (
+    log_memory_usage, 
+    optimize_dtypes, 
+    load_and_optimize_data,
+    is_memory_critical,
+    sample_data_if_needed,
+    reduce_model_complexity
+)
 
 # Set up logging
 logging.basicConfig(
@@ -14,6 +24,30 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("train-model")
+
+# Check for memory optimization environment variable
+MEMORY_OPTIMIZATION = os.environ.get('MEMORY_OPTIMIZATION', 'false').lower() == 'true'
+if MEMORY_OPTIMIZATION:
+    logger.info("Memory optimization mode is ENABLED")
+    
+    # Set smaller memory thresholds for Render deployment
+    MEMORY_CRITICAL = 400  # MB
+    MEMORY_WARNING = 350   # MB
+    MEMORY_CAUTION = 300   # MB
+    
+    # Log system information
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Running on: {os.uname().sysname} {os.uname().release}")
+    
+    # Print memory info at startup
+    log_memory_usage("Script startup")
+else:
+    logger.info("Running in standard mode (memory optimization disabled)")
+    
+    # Higher thresholds for local development
+    MEMORY_CRITICAL = 1800  # MB
+    MEMORY_WARNING = 1500   # MB
+    MEMORY_CAUTION = 1200   # MB
 
 # Define data paths globally for import from app.py
 DATA_PATHS = [
@@ -43,6 +77,9 @@ DATA_PATHS = [
     os.path.join('data', 'sample_data.csv')        # Sample data for development
 ]
 
+# Log initial memory usage
+log_memory_usage("Before data loading")
+
 # Try each path until we find a valid data file
 df = None
 dataset_path = None
@@ -51,15 +88,26 @@ for path in DATA_PATHS:
         logger.info(f"Loading data from {path}...")
         try:
             if 'nesto_merge_0.csv' in path:
-                # Direct loading of nesto_merge_0.csv
-                logger.info(f"Loading Nesto data from {path}")
-                df = pd.read_csv(path, low_memory=False)  # Added low_memory=False to avoid dtype warning
+                # Use memory-optimized loading for Nesto data
+                logger.info(f"Loading Nesto data from {path} with memory optimization")
+                # On Render with limited memory, we may need to use a sample of the data
+                try:
+                    df = load_and_optimize_data(path, low_memory=False)
+                except Exception as mem_error:
+                    logger.warning(f"Full dataset loading failed: {mem_error}. Falling back to sample.")
+                    # Try with a smaller sample if full load fails
+                    df = load_and_optimize_data(path, low_memory=False, nrows=25000)
+                
                 dataset_path = path
+                
+                # Force garbage collection before mapping
+                gc.collect()
+                log_memory_usage("After loading Nesto data")
                 
                 # Define the field mappings
                 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
                 
-                # Map column names to the standardized format
+                # Map column names to the standardized format in a memory-efficient way
                 rename_dict = {}
                 for source_col, target_col in FIELD_MAPPINGS.items():
                     if source_col in df.columns:
@@ -70,8 +118,8 @@ for path in DATA_PATHS:
                     df = df.rename(columns=rename_dict)
                     logger.info(f"Renamed {len(rename_dict)} columns using field mappings")
                 
-                # Add proxy location data for visualization
-                if 'Shape__Area' in df.columns and 'Shape__Length' in df.columns:
+                # Only add proxy location if memory isn't critical
+                if 'Shape__Area' in df.columns and 'Shape__Length' in df.columns and not is_memory_critical(400):
                     df['latitude'] = df['Shape__Area'].rank(pct=True) * 10
                     df['longitude'] = df['Shape__Length'].rank(pct=True) * 10
                     logger.info("Added proxy latitude/longitude based on Shape area/length")
@@ -80,10 +128,16 @@ for path in DATA_PATHS:
                 data_description = "Nesto mortgage application data with descriptive fields"
                     
             else:
-                # For other data files, load directly
-                df = pd.read_csv(path)
+                # For other data files, use memory-optimized loading
+                logger.info(f"Loading data from {path} with memory optimization")
+                try:
+                    df = load_and_optimize_data(path)
+                except Exception as mem_error:
+                    logger.warning(f"Optimized loading failed: {mem_error}. Trying basic load.")
+                    df = pd.read_csv(path)
+                
                 dataset_path = path
-                logger.info(f"Loaded dataset with {df.shape[0]} records and {df.shape[1]} columns")
+                log_memory_usage("After loading data")
                 
                 # Set source and description based on file path
                 if 'sales_data' in path:
@@ -96,6 +150,9 @@ for path in DATA_PATHS:
                     data_source = "Unknown source"
                     data_description = f"Data loaded from {path}"
                 
+            # Check memory usage and sample data if needed
+            df = sample_data_if_needed(df, len(df))
+            
             break  # Exit the loop once we successfully load data
         except Exception as e:
             logger.error(f"Error loading data from {path}: {e}")
@@ -217,49 +274,110 @@ if len(object_cols) > 0:
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 print("Training XGBoost model...")
-# Define model parameters
+# Define model parameters (will be adjusted based on memory)
 model_params = {
     'n_estimators': 100,
     'learning_rate': 0.1,
     'max_depth': 5,
     'subsample': 0.8,
     'colsample_bytree': 0.8,
-    'random_state': 42
+    'random_state': 42,
+    'tree_method': 'hist',  # Use histogram-based algorithm (faster and uses less memory)
+    'enable_categorical': True  # Enable categorical feature support
 }
+
+# Check memory and adjust model parameters if needed
+model_params = reduce_model_complexity(model_params)
+
+log_memory_usage("Before model training")
 
 # Initialize CV metrics
 cv_metrics = {}
 
-# Use cross-validation to evaluate model robustness
-try:
-    if len(X) >= 50:  # Only do cross-validation if we have enough data
-        from sklearn.model_selection import cross_val_score
-        from sklearn.model_selection import KFold
-        
-        print("Performing 5-fold cross-validation...")
-        cv = KFold(n_splits=5, shuffle=True, random_state=42)
-        model_cv = xgb.XGBRegressor(**model_params)
-        
-        try:
-            cv_scores = cross_val_score(model_cv, X, y, cv=cv, scoring='neg_mean_squared_error')
-            cv_rmse = np.sqrt(-cv_scores)
-            print(f"Cross-validation RMSE: {cv_rmse.mean():.4f} (±{cv_rmse.std():.4f})")
+# Use cross-validation to evaluate model robustness only if memory allows
+if not is_memory_critical(MEMORY_CRITICAL):
+    try:
+        if len(X) >= 50:  # Only do cross-validation if we have enough data
+            from sklearn.model_selection import cross_val_score
+            from sklearn.model_selection import KFold
             
-            # Add CV metrics to the metrics dictionary that will be defined later
-            cv_metrics = {
-                "cv_rmse_mean": float(cv_rmse.mean()),
-                "cv_rmse_std": float(cv_rmse.std())
-            }
-        except Exception as e:
-            print(f"Cross-validation failed: {str(e)}")
-            print("Skipping cross-validation and proceeding with model training")
-except Exception as e:
-    logger.warning(f"Error during cross-validation setup: {e}")
-    print("Skipping cross-validation due to setup error")
+            print("Performing cross-validation (reduced folds if memory limited)...")
+            # Use fewer folds if memory is tight
+            n_splits = 3 if is_memory_critical(MEMORY_WARNING) else 5
+            cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+            
+            # Create a reduced version of X for cross-validation if needed
+            X_cv = X
+            y_cv = y
+            if is_memory_critical(MEMORY_WARNING) and len(X) > 10000:
+                sample_size = min(10000, int(len(X) * 0.5))
+                indices = np.random.choice(len(X), sample_size, replace=False)
+                X_cv = X.iloc[indices]
+                y_cv = y.iloc[indices]
+                print(f"Using {len(X_cv)} samples for cross-validation to save memory")
+            
+            # Use model with reduced complexity for CV
+            cv_model_params = reduce_model_complexity(model_params, max_mb=MEMORY_WARNING)
+            model_cv = xgb.XGBRegressor(**cv_model_params)
+            
+            try:
+                cv_scores = cross_val_score(model_cv, X_cv, y_cv, cv=cv, scoring='neg_mean_squared_error')
+                cv_rmse = np.sqrt(-cv_scores)
+                print(f"Cross-validation RMSE: {cv_rmse.mean():.4f} (±{cv_rmse.std():.4f})")
+                
+                # Add CV metrics to the metrics dictionary that will be defined later
+                cv_metrics = {
+                    "cv_rmse_mean": float(cv_rmse.mean()),
+                    "cv_rmse_std": float(cv_rmse.std())
+                }
+                
+                # Free memory used by CV
+                del X_cv, y_cv, model_cv
+                gc.collect()
+                
+            except Exception as e:
+                print(f"Cross-validation failed: {str(e)}")
+                print("Skipping cross-validation and proceeding with model training")
+    except Exception as e:
+        logger.warning(f"Error during cross-validation setup: {e}")
+        print("Skipping cross-validation due to setup error")
+else:
+    logger.warning("Memory usage too high, skipping cross-validation")
 
 # Train the final model on all training data
+log_memory_usage("Before final model training")
 model = xgb.XGBRegressor(**model_params)
-model.fit(X_train, y_train)
+
+# For very large datasets, use early stopping with a separate validation set
+if len(X_train) > 20000 and not is_memory_critical(MEMORY_CRITICAL):
+    # Create a validation set
+    X_t, X_v, y_t, y_v = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+    model.fit(
+        X_t, y_t,
+        eval_set=[(X_v, y_v)],
+        early_stopping_rounds=10,
+        verbose=True
+    )
+    # Free memory used by separate validation set
+    del X_t, X_v, y_t, y_v
+    gc.collect()
+else:
+    # Regular training without validation set
+    if MEMORY_OPTIMIZATION and is_memory_critical(MEMORY_CAUTION):
+        logger.warning("Memory very low before training, reducing training size")
+        # Use a smaller subset for training in extremely low memory conditions
+        sample_size = min(5000, int(len(X_train) * 0.3))
+        X_train_sample = X_train.sample(n=sample_size, random_state=42)
+        y_train_sample = y_train.loc[X_train_sample.index]
+        model.fit(X_train_sample, y_train_sample)
+        logger.info(f"Model trained on reduced dataset of {sample_size} samples")
+        del X_train_sample, y_train_sample
+        gc.collect()
+    else:
+        # Regular training on full training set
+        model.fit(X_train, y_train)
+
+log_memory_usage("After model training")
 
 # Evaluate model on test set
 y_pred = model.predict(X_test)

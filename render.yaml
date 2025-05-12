@@ -4,9 +4,10 @@ services:
     env: python
     plan: starter
     buildCommand: >-
-      pip install -r requirements.txt && 
+      pip install -r requirements.txt memory-profiler && 
       python fix_flask_werkzeug.py && 
       python patch_shap.py && 
+      export MEMORY_OPTIMIZATION=true && 
       python setup_for_render.py && 
       python train_model.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
@@ -27,7 +28,15 @@ services:
         value: models/feature_names.txt
       - key: DATASET_PATH
         value: data/cleaned_data.csv
+      - key: MEMORY_OPTIMIZATION
+        value: true
+      - key: MAX_MEMORY_MB
+        value: 450
       - key: DEFAULT_TARGET
         value: Mortgage_Approvals
       - key: DEFAULT_ANALYSIS_TYPE
         value: ranking
+      - key: MEMORY_OPTIMIZATION
+        value: true
+      - key: MAX_MEMORY_MB
+        value: 450
