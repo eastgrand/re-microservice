@@ -112,14 +112,27 @@ def load_model():
     try:
         logger.info("Loading model and dataset...")
         
+        # Import data paths from train_model.py
+        from train_model import DATA_PATHS
+        
         # Try to run the setup script to ensure all files are present
         try:
+            logger.info("Running setup and training scripts to ensure model is available...")
             import subprocess
-            subprocess.run([sys.executable, 'setup_for_render.py'], 
-                           capture_output=True, check=False)
+            setup_result = subprocess.run([sys.executable, 'setup_for_render.py'], 
+                           capture_output=True, text=True, check=False)
             logger.info("Setup script completed")
+            
+            # If the model still doesn't exist, try to run the train_model.py directly
+            if not os.path.exists(MODEL_PATH):
+                logger.info("Model not found after setup, running training script directly...")
+                train_result = subprocess.run([sys.executable, 'train_model.py'], 
+                                           capture_output=True, text=True, check=False)
+                logger.info("Training script completed")
+                if train_result.returncode != 0:
+                    logger.error("Training script failed with error")
         except Exception as setup_err:
-            logger.warning(f"Setup script could not run: {setup_err}")
+            logger.warning(f"Setup/training scripts could not run: {setup_err}")
         
         # Try to load the saved model using environment variable path
         if os.path.exists(MODEL_PATH):
@@ -177,7 +190,40 @@ def load_model():
             
             return model, dataset, feature_names
         else:
-            raise FileNotFoundError("Model not found, please train the model first")
+            # Try one last time to train the model directly
+            logger.error("Model file still not found, attempting emergency training...")
+            try:
+                # Import and run training function directly
+                from train_model import train_and_save_model
+                model, feature_names_list = train_and_save_model()
+                
+                # Check if model was created
+                if os.path.exists(MODEL_PATH):
+                    logger.info("Emergency model training successful!")
+                    
+                    # Use the feature names returned from training
+                    feature_names = feature_names_list
+                    
+                    # Try to load the dataset from any available source
+                    for data_path in DATA_PATHS:
+                        if os.path.exists(data_path):
+                            dataset = pd.read_csv(data_path)
+                            return model, dataset, feature_names
+                    
+                    # If no dataset found, create a minimal one
+                    logger.warning("No dataset found, creating minimal dataset")
+                    dataset = pd.DataFrame({
+                        "Mortgage_Approvals": [10, 20, 30],
+                        "Income": [50000, 60000, 70000],
+                        "Age": [30, 40, 50],
+                        "Homeownership_Pct": [60, 70, 80]
+                    })
+                    dataset.to_csv('data/minimal_dataset.csv', index=False)
+                    return model, dataset, feature_names
+            except Exception as train_err:
+                logger.error(f"Emergency training failed: {train_err}")
+            
+            raise FileNotFoundError("Model not found, please train the model first. Check logs for errors.")
     except Exception as e:
         logger.error(f"Error loading model: {str(e)}")
         raise

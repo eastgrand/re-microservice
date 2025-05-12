@@ -7,7 +7,8 @@ services:
       pip install -r requirements.txt && 
       python fix_flask_werkzeug.py && 
       python patch_shap.py && 
-      python setup_for_render.py
+      python setup_for_render.py && 
+      python train_model.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION

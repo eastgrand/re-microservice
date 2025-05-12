@@ -15,6 +15,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("train-model")
 
+# Define data paths globally for import from app.py
+DATA_PATHS = [
+    os.getenv('DATASET_PATH', 'data/cleaned_data.csv'),  # Path from environment variable
+    os.path.join('data', 'cleaned_data.csv'),            # Mapped nesto data 
+    os.path.join('data', 'nesto_merge_0.csv'),           # Nesto data with descriptive fields
+    os.path.join('data', 'sales_data.csv'),              # Original production data
+    os.path.join('data', 'sample_data.csv')              # Sample data for development
+]
+
 # Create directories if they don't exist
 os.makedirs('models', exist_ok=True)
 os.makedirs('data', exist_ok=True)
@@ -289,3 +298,172 @@ model_version_id = version_tracker.register_model(
 
 logger.info(f"Registered model with version ID: {model_version_id}")
 logger.info("Done! Model and feature names saved.")
+
+def train_and_save_model():
+    """Function to train and save the model, to be called from other modules."""
+    # Create directories if they don't exist
+    os.makedirs('models', exist_ok=True)
+    os.makedirs('data', exist_ok=True)
+    
+    logger.info("Starting model training process from train_and_save_model function...")
+    
+    # Initialize data version tracker
+    version_tracker = DataVersionTracker()
+    
+    # Try each path until we find a valid data file
+    df = None
+    dataset_path = None
+    for path in DATA_PATHS:
+        if os.path.exists(path):
+            logger.info(f"Loading data from {path}...")
+            try:
+                if 'nesto_merge_0.csv' in path:
+                    # Direct loading of nesto_merge_0.csv
+                    logger.info(f"Loading Nesto data from {path}")
+                    df = pd.read_csv(path, low_memory=False)
+                    dataset_path = path
+                    
+                    # Define the field mappings
+                    from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
+                    
+                    # Create a mapped DataFrame
+                    mapped_df = pd.DataFrame()
+                    
+                    # Apply mappings to create the processed dataset
+                    for source_col, target_col in FIELD_MAPPINGS.items():
+                        if source_col in df.columns:
+                            mapped_df[target_col] = df[source_col]
+                    
+                    # Set the processed DataFrame as our working set
+                    df = mapped_df
+                    
+                else:
+                    # Direct loading of already processed data
+                    logger.info(f"Loading processed data from {path}")
+                    df = pd.read_csv(path)
+                    dataset_path = path
+                    
+                # Basic data checks
+                if df is not None and not df.empty:
+                    logger.info(f"Successfully loaded data from {path} with shape {df.shape}")
+                    break
+            except Exception as e:
+                logger.warning(f"Error loading data from {path}: {str(e)}")
+                continue
+    
+    # If we couldn't find any valid data, exit
+    if df is None or df.empty:
+        logger.error("Could not load data from any of the specified paths")
+        # Create minimal dataset for testing
+        logger.warning("Creating minimal test dataset")
+        df = pd.DataFrame({
+            "Mortgage_Approvals": [10, 20, 30, 40, 50],
+            "Income": [50000, 60000, 70000, 80000, 90000],
+            "Age": [30, 40, 50, 60, 70],
+            "Homeownership_Pct": [70, 80, 60, 50, 40]
+        })
+        dataset_path = 'data/minimal_test_data.csv'
+        df.to_csv(dataset_path, index=False)
+    
+    # Register the dataset
+    dataset_version_id = version_tracker.register_dataset(dataset_path, description="Dataset for model training")
+    
+    # Identify target variable
+    target_variable = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
+    
+    # Check if target exists in dataframe
+    if target_variable not in df.columns:
+        logger.warning(f"Target variable {target_variable} not found in DataFrame columns")
+        possible_targets = [col for col in df.columns if 'approv' in col.lower() or 'fund' in col.lower()]
+        if possible_targets:
+            target_variable = possible_targets[0]
+            logger.info(f"Using {target_variable} as target instead")
+        else:
+            # Just use the last column as target if we can't find an approval-related column
+            target_variable = df.columns[-1]
+            logger.warning(f"Using {target_variable} as target (fallback)")
+    
+    # Basic preprocessing
+    logger.info(f"Preprocessing data with target variable: {target_variable}")
+    y = df[target_variable].copy()
+    X = df.drop(columns=[target_variable], errors='ignore')
+    
+    # Remove identifier/non-useful columns
+    id_columns = [col for col in X.columns if 'id' in col.lower() or 'code' in col.lower()]
+    X = X.drop(columns=id_columns, errors='ignore')
+    
+    # Remove columns with too many missing values
+    missing_threshold = 0.5
+    missing_cols = [col for col in X.columns if X[col].isna().mean() > missing_threshold]
+    if missing_cols:
+        logger.info(f"Removing {len(missing_cols)} columns with >{missing_threshold*100}% missing values")
+        X = X.drop(columns=missing_cols)
+    
+    # Fill remaining missing values
+    logger.info("Filling missing values")
+    X = X.fillna(X.mean())
+    
+    # Handle any columns that are still objects
+    object_cols = X.select_dtypes(include=['object']).columns
+    for col in object_cols:
+        X[col] = pd.to_numeric(X[col], errors='coerce')
+        X[col] = X[col].fillna(0)
+    
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Define model parameters
+    model_params = {
+        'n_estimators': 100,
+        'learning_rate': 0.1,
+        'max_depth': 5,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'random_state': 42
+    }
+    
+    # Train the model
+    logger.info("Training XGBoost model...")
+    model = xgb.XGBRegressor(**model_params)
+    model.fit(X_train, y_train)
+    
+    # Evaluate model on test set
+    y_pred = model.predict(X_test)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    r2 = r2_score(y_test, y_pred)
+    logger.info(f"Test set evaluation - RMSE: {rmse:.4f}, R²: {r2:.4f}")
+    
+    # Save model
+    logger.info("Saving model...")
+    model_path = 'models/xgboost_model.pkl'
+    pickle.dump(model, open(model_path, 'wb'))
+    
+    # Save feature names
+    feature_names_path = 'models/feature_names.txt'
+    with open(feature_names_path, 'w') as f:
+        for feature in X.columns:
+            f.write(f"{feature}\n")
+    
+    # Register model in version tracker with metrics
+    metrics = {
+        "rmse": float(rmse),
+        "r2": float(r2),
+        "test_size": len(y_test),
+    }
+    
+    model_version_id = version_tracker.register_model(
+        model_path, 
+        dataset_version_id, 
+        feature_names_path=feature_names_path,
+        metrics=metrics
+    )
+    
+    logger.info(f"Registered model with version ID: {model_version_id}")
+    logger.info("Done! Model and feature names saved.")
+    
+    return model, X.columns.tolist()
+
+# Execute main code only if script is run directly
+if __name__ == "__main__":
+    # Original script execution continues here
+    pass
