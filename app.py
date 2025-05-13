@@ -67,21 +67,21 @@ def start_analysis_job(query, job_id):
     sys.stdout.flush()
     import time
     ensure_model_loaded()
-    logger.info(f"[DEBUG] Dataset shape after loading: {dataset.shape if dataset is not None else None}")
-    print(f"[DEBUG] Dataset shape after loading: {dataset.shape if dataset is not None else None}")
-    logger.info(f"[DEBUG] Dataset columns: {list(dataset.columns) if dataset is not None else None}")
-    print(f"[DEBUG] Dataset columns: {list(dataset.columns) if dataset is not None else None}")
-    sys.stdout.flush()
     job_store[job_id]['status'] = 'running'
     job_store[job_id]['started_at'] = time.time()
     try:
+        logger.info(f"[DEBUG] Dataset shape after loading: {dataset.shape if dataset is not None else None}")
+        print(f"[DEBUG] Dataset shape after loading: {dataset.shape if dataset is not None else None}")
+        logger.info(f"[DEBUG] Dataset columns: {list(dataset.columns) if dataset is not None else None}")
+        print(f"[DEBUG] Dataset columns: {list(dataset.columns) if dataset is not None else None}")
+        sys.stdout.flush()
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
         target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
         filters = query.get('demographic_filters', [])
         filtered_data = dataset.copy()
-    logger.info(f"[DEBUG] Initial filtered_data shape: {filtered_data.shape}")
-    print(f"[DEBUG] Initial filtered_data shape: {filtered_data.shape}")
-    sys.stdout.flush()
+        logger.info(f"[DEBUG] Initial filtered_data shape: {filtered_data.shape}")
+        print(f"[DEBUG] Initial filtered_data shape: {filtered_data.shape}")
+        sys.stdout.flush()
         for filter_item in filters:
             if isinstance(filter_item, str) and '>' in filter_item:
                 feature, value = filter_item.split('>')
