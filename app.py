@@ -329,8 +329,6 @@ def ensure_model_loaded():
         print(f"[ENSURE_MODEL_LOADED ERROR] Exception: {e}\nTraceback:\n{tb}")
         sys.stdout.flush()
         raise
-        sys.stdout.flush()
-        raise
 
 def load_model():
     try:
