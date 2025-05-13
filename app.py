@@ -322,6 +322,8 @@ def ensure_model_loaded():
             dataset = dataset_
             feature_names = feature_names_
             logger.info(f"Model and dataset loaded successfully (lazy): model={type(model)}, dataset_shape={dataset.shape}, features={len(feature_names)}")
+            # Immediately set job_store status to 'running' if called from a job thread
+            # (This is a no-op here, but you can add more logic if needed)
     except Exception as e:
         import traceback
         tb = traceback.format_exc()

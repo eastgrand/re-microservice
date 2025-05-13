@@ -1,4 +1,9 @@
-"""Gunicorn configuration for Render deployment.
+bind = "0.0.0.0:10000"
+workers = 1
+threads = 4
+timeout = 300
+preload_app = False
+worker_class = "gthread""""Gunicorn configuration for Render deployment.
 This file configures Gunicorn to better handle memory constraints and timeouts.
 """
 
