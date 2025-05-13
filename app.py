@@ -312,7 +312,7 @@ def analyze():
             results.append(result)
         if analysis_type == 'correlation':
             if len(feature_importance) > 0:
-                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}.")
+                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}."
             else:
                 summary = f"Analysis complete for {target_variable}, but no clear correlations found."
         elif analysis_type == 'ranking':
