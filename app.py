@@ -1,13 +1,42 @@
 
 
 
-# --- EARLY FLASK APP DEFINITION AND DECORATORS (fixes NameError and require_api_key) ---
-from flask import Flask, request, jsonify
-from functools import wraps
-import os
-import logging
-from dotenv import load_dotenv
 
+# --- EARLY LOGGING SETUP (fixes NameError: logger not defined) ---
+import os
+import sys
+import logging
+import traceback
+import threading
+import gc
+import pickle
+import platform
+import shutil
+import numpy as np
+import pandas as pd
+import shap
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from functools import wraps
+from dotenv import load_dotenv
+from data_versioning import DataVersionTracker
+import uuid
+from collections import defaultdict
+
+# Logging setup (must be before any use of logger)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("shap-microservice")
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+numeric_level = getattr(logging, LOG_LEVEL.upper(), None)
+if not isinstance(numeric_level, int):
+    numeric_level = getattr(logging, 'INFO')
+logger.setLevel(numeric_level)
+
+# --- EARLY FLASK APP DEFINITION AND DECORATORS (fixes NameError and require_api_key) ---
 app = Flask(__name__)
 
 # Load environment variables early
@@ -21,31 +50,11 @@ def require_api_key(f):
         if not REQUIRE_AUTH:
             return f(*args, **kwargs)
         api_key = request.headers.get('X-API-KEY')
-        # logger may not be defined yet, so use print for early debug
-        print(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
+        logger.info(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
         if not api_key or api_key != API_KEY:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated_function
-
-import os
-import sys
-import logging
-import traceback
-import threading
-import gc
-import pickle
-import platform
-import shutil
-import numpy as np
-import pandas as pd
-import shap
-from flask_cors import CORS
-from functools import wraps
-from dotenv import load_dotenv
-from data_versioning import DataVersionTracker
-import uuid
-from collections import defaultdict
 
 
 
