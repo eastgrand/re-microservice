@@ -71,8 +71,9 @@ def require_api_key(f):
 
 
 def start_analysis_job(query, job_id):
-    logger.info(f"[DEBUG] start_analysis_job called for job_id={job_id}")
-    print(f"[DEBUG] start_analysis_job called for job_id={job_id}")
+    import threading as _threading
+    logger.info(f"[DEBUG] start_analysis_job called for job_id={job_id} (thread ident: {_threading.get_ident()})")
+    print(f"[DEBUG] start_analysis_job called for job_id={job_id} (thread ident: {_threading.get_ident()})")
     sys.stdout.flush()
     import time
     logger.info("[DEBUG] About to call ensure_model_loaded()")
@@ -237,7 +238,8 @@ def start_analysis_job(query, job_id):
 @app.route('/analyze', methods=['POST'])
 @require_api_key
 def analyze_async():
-    logger.info("[DEBUG] analyze_async endpoint called")
+    import threading as _threading
+    logger.info(f"[DEBUG] analyze_async endpoint called (main thread ident: {_threading.get_ident()})")
     query = request.json
     if not query:
         return jsonify({"error": "No query provided"}), 400
@@ -248,7 +250,7 @@ def analyze_async():
     thread = threading.Thread(target=start_analysis_job, args=(query, job_id))
     thread.daemon = True
     thread.start()
-    logger.info(f"[DEBUG] Background thread started for job_id={job_id}")
+    logger.info(f"[DEBUG] Background thread started for job_id={job_id} (thread ident: {thread.ident})")
     return jsonify({"success": True, "job_id": job_id, "status": "queued"})
 
 @app.route('/job_status/<job_id>', methods=['GET'])
