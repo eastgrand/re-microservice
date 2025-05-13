@@ -251,7 +251,7 @@ def health_check():
 
 @app.route('/analyze', methods=['POST'])
 @require_api_key
-@timeout_handler(timeout=25)
+@timeout_handler(timeout=120)
 def analyze():
     ensure_model_loaded()
     try:
