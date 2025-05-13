@@ -108,9 +108,9 @@ def start_analysis_job(query, job_id):
         top_data = filtered_data.sort_values(by=target_variable, ascending=False)
         t0 = time.time()
         X = top_data.copy()
-    logger.info(f"[DEBUG] top_data shape: {top_data.shape}")
-    print(f"[DEBUG] top_data shape: {top_data.shape}")
-    sys.stdout.flush()
+        logger.info(f"[DEBUG] top_data shape: {top_data.shape}")
+        print(f"[DEBUG] top_data shape: {top_data.shape}")
+        sys.stdout.flush()
         for col in ['zip_code', 'latitude', 'longitude']:
             if col in X.columns:
                 X = X.drop(col, axis=1)
@@ -175,7 +175,7 @@ def start_analysis_job(query, job_id):
         logger.info(f"[SHAP DEBUG] Results formatting took {t4-t3:.2f}s for {len(results)} rows.")
         if analysis_type == 'correlation':
             if len(feature_importance) > 0:
-                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}."
+                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}.")
             else:
                 summary = f"Analysis complete for {target_variable}, but no clear correlations found."
         elif analysis_type == 'ranking':
