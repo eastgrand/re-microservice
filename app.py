@@ -1,3 +1,4 @@
+
 import os
 import sys
 import logging
@@ -18,11 +19,7 @@ from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
 
-# Flask app (must be defined before any route or job infrastructure)
-app = Flask(__name__)
 
-# In-memory job store: job_id -> {status, result, error, started_at, finished_at}
-job_store = defaultdict(dict)
 
 def start_analysis_job(query, job_id):
     import time
@@ -223,6 +220,9 @@ logger.setLevel(numeric_level)
 app = Flask(__name__)
 if ENABLE_CORS:
     CORS(app, resources={r"/*": {"origins": CORS_ORIGINS}})
+
+# In-memory job store: job_id -> {status, result, error, started_at, finished_at}
+job_store = defaultdict(dict)
 
 # Authentication
 API_KEY = os.getenv('API_KEY')
