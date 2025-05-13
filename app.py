@@ -91,7 +91,7 @@ def timeout_handler(timeout=25):
                     "error": "Request timed out. The operation is still processing in the background.",
                     "retry_suggestion": "This request is taking longer than expected. Please try again in a few moments."
                 }), 503
-            if result["error"] != None:
+            if result["error"] is not None:
                 raise Exception(result["error"])
             return result["value"]
         return decorated_function
@@ -237,8 +237,8 @@ def health_check():
             "version_info": model_version_info
         },
         "dataset": {
-            "shape": f"{dataset.shape[0]} rows, {dataset.shape[1]} columns" if dataset != None else None,
-            "columns": list(dataset.columns) if dataset != None else None,
+        "shape": f"{dataset.shape[0]} rows, {dataset.shape[1]} columns" if dataset is not None else None,
+        "columns": list(dataset.columns) if dataset is not None else None,
             "version_info": dataset_version_info
         },
         "system_info": {
@@ -290,7 +290,10 @@ def analyze():
             top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(count)
         else:
             top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(10)
-        X = filtered_data.copy()
+        import time
+        t0 = time.time()
+        # Only compute SHAP for the top N rows (not the whole filtered dataset)
+        X = top_data.copy()
         for col in ['zip_code', 'latitude', 'longitude']:
             if col in X.columns:
                 X = X.drop(col, axis=1)
@@ -305,8 +308,13 @@ def analyze():
             if feature not in X.columns:
                 X[feature] = 0
         X = X[model_features]
+        t1 = time.time()
+        logger.info(f"[SHAP DEBUG] Data prep for SHAP took {t1-t0:.2f}s for {len(X)} rows.")
         explainer = shap.TreeExplainer(model)
+        t2 = time.time()
         shap_values = explainer(X)
+        t3 = time.time()
+        logger.info(f"[SHAP DEBUG] SHAP computation took {t3-t2:.2f}s for {len(X)} rows.")
         feature_importance = []
         for i, feature in enumerate(model_features):
             importance = abs(shap_values.values[:, i]).mean()
@@ -333,6 +341,8 @@ def analyze():
                         else:
                             result[col.lower()] = str(row[col])
             results.append(result)
+        t4 = time.time()
+        logger.info(f"[SHAP DEBUG] Results formatting took {t4-t3:.2f}s for {len(results)} rows.")
         if analysis_type == 'correlation':
             if len(feature_importance) > 0:
                 summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}."
@@ -375,7 +385,7 @@ def analyze():
 def get_metadata():
     ensure_model_loaded()
     try:
-        if dataset == None:
+        if dataset is None:
             raise APIError("Dataset not available", 500)
         summary_stats = {}
         for column in dataset.columns:
