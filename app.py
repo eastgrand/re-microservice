@@ -202,23 +202,6 @@ def job_status(job_id):
         return jsonify({"success": False, "status": status, "error": job.get('error')})
     else:
         return jsonify({"success": True, "status": status})
-# --- REWRITE STARTS HERE ---
-import os
-import sys
-import logging
-import traceback
-import threading
-import gc
-import pickle
-import platform
-import shutil
-import numpy as np
-import pandas as pd
-import shap
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from functools import wraps
-from dotenv import load_dotenv
 from data_versioning import DataVersionTracker
 
 # Load environment variables
