@@ -308,13 +308,21 @@ dataset = None
 feature_names = None
 def ensure_model_loaded():
     global model, dataset, feature_names
-    if model is None or dataset is None or feature_names is None:
-        logger.info("Lazy-loading model and dataset...")
-        model_, dataset_, feature_names_ = load_model()
-        model = model_
-        dataset = dataset_
-        feature_names = feature_names_
-        logger.info("Model and dataset loaded successfully (lazy)")
+    try:
+        if model is None or dataset is None or feature_names is None:
+            logger.info("Lazy-loading model and dataset...")
+            model_, dataset_, feature_names_ = load_model()
+            model = model_
+            dataset = dataset_
+            feature_names = feature_names_
+            logger.info("Model and dataset loaded successfully (lazy)")
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"[ENSURE_MODEL_LOADED ERROR] Exception: {e}\nTraceback:\n{tb}")
+        print(f"[ENSURE_MODEL_LOADED ERROR] Exception: {e}\nTraceback:\n{tb}")
+        sys.stdout.flush()
+        raise
 
 def load_model():
     try:
