@@ -50,6 +50,7 @@ from collections import defaultdict
 
 
 def start_analysis_job(query, job_id):
+    logger.info(f"[DEBUG] start_analysis_job called for job_id={job_id}")
     import time
     ensure_model_loaded()
     job_store[job_id]['status'] = 'running'
@@ -178,15 +179,18 @@ def start_analysis_job(query, job_id):
 @app.route('/analyze', methods=['POST'])
 @require_api_key
 def analyze_async():
+    logger.info("[DEBUG] analyze_async endpoint called")
     query = request.json
     if not query:
         return jsonify({"error": "No query provided"}), 400
     job_id = str(uuid.uuid4())
     job_store[job_id]['status'] = 'queued'
+    logger.info(f"[DEBUG] Created job_id={job_id}, status set to queued")
     # Start background thread
     thread = threading.Thread(target=start_analysis_job, args=(query, job_id))
     thread.daemon = True
     thread.start()
+    logger.info(f"[DEBUG] Background thread started for job_id={job_id}")
     return jsonify({"success": True, "job_id": job_id, "status": "queued"})
 
 @app.route('/job_status/<job_id>', methods=['GET'])
@@ -204,58 +208,8 @@ def job_status(job_id):
         return jsonify({"success": True, "status": status})
 from data_versioning import DataVersionTracker
 
-# Load environment variables
-load_dotenv()
 
-# Configuration
-PORT = int(os.getenv('PORT', 5000))
-DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-MODEL_PATH = os.getenv('MODEL_PATH', 'models/xgboost_model.pkl')
-FEATURE_NAMES_PATH = os.getenv('FEATURE_NAMES_PATH', 'models/feature_names.txt')
-DATASET_PATH = os.getenv('DATASET_PATH', 'data/nesto_merge_0.csv')
-ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() == 'true'
-CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
-MAX_RESULTS = int(os.getenv('MAX_RESULTS', 100))
-DEFAULT_ANALYSIS_TYPE = os.getenv('DEFAULT_ANALYSIS_TYPE', 'ranking')
-DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
-
-# Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger("shap-microservice")
-numeric_level = getattr(logging, LOG_LEVEL.upper(), None)
-if not isinstance(numeric_level, int):
-    numeric_level = getattr(logging, 'INFO')
-logger.setLevel(numeric_level)
-
-# Flask app
-app = Flask(__name__)
-if ENABLE_CORS:
-    CORS(app, resources={r"/*": {"origins": CORS_ORIGINS}})
-
-# In-memory job store: job_id -> {status, result, error, started_at, finished_at}
-job_store = defaultdict(dict)
-
-# Authentication
-API_KEY = os.getenv('API_KEY')
-REQUIRE_AUTH = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true' or API_KEY != None
-
-def require_api_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not REQUIRE_AUTH:
-            return f(*args, **kwargs)
-        api_key = request.headers.get('X-API-KEY')
-        logger.info(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
-        if not api_key or api_key != API_KEY:
-            logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
-            return jsonify({"success": False, "error": "Unauthorized"}), 401
-        return f(*args, **kwargs)
-    return decorated_function
+## --- REMOVED DUPLICATE DEFINITIONS OF app, require_api_key, job_store ---
 
 # Timeout handler
 def timeout_handler(timeout=25):
