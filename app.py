@@ -65,6 +65,8 @@ def start_analysis_job(query, job_id):
     logger.info(f"[DEBUG] start_analysis_job called for job_id={job_id}")
     import time
     ensure_model_loaded()
+    logger.info(f"[DEBUG] Dataset shape after loading: {dataset.shape if dataset is not None else None}")
+    logger.info(f"[DEBUG] Dataset columns: {list(dataset.columns) if dataset is not None else None}")
     job_store[job_id]['status'] = 'running'
     job_store[job_id]['started_at'] = time.time()
     try:
@@ -72,6 +74,7 @@ def start_analysis_job(query, job_id):
         target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
         filters = query.get('demographic_filters', [])
         filtered_data = dataset.copy()
+        logger.info(f"[DEBUG] Initial filtered_data shape: {filtered_data.shape}")
         for filter_item in filters:
             if isinstance(filter_item, str) and '>' in filter_item:
                 feature, value = filter_item.split('>')
@@ -90,15 +93,21 @@ def start_analysis_job(query, job_id):
                     if feature in filtered_data.columns:
                         threshold = filtered_data[feature].quantile(0.75)
                         filtered_data = filtered_data[filtered_data[feature] > threshold]
+        logger.info(f"[DEBUG] Filtered_data shape after filters: {filtered_data.shape}")
+        logger.info(f"[DEBUG] Filtered_data columns: {list(filtered_data.columns)}")
         top_data = filtered_data.sort_values(by=target_variable, ascending=False)
         t0 = time.time()
         X = top_data.copy()
+        logger.info(f"[DEBUG] top_data shape: {top_data.shape}")
         for col in ['zip_code', 'latitude', 'longitude']:
             if col in X.columns:
                 X = X.drop(col, axis=1)
         if target_variable in X.columns:
             X = X.drop(target_variable, axis=1)
+        logger.info(f"[DEBUG] X shape after dropping geo/target: {X.shape}")
+        logger.info(f"[DEBUG] X columns: {list(X.columns)}")
         model_features = feature_names
+        logger.info(f"[DEBUG] Model features: {model_features}")
         X_cols = list(X.columns)
         for col in X_cols:
             if col not in model_features:
@@ -107,6 +116,8 @@ def start_analysis_job(query, job_id):
             if feature not in X.columns:
                 X[feature] = 0
         X = X[model_features]
+        logger.info(f"[DEBUG] Final X shape for SHAP: {X.shape}")
+        logger.info(f"[DEBUG] Final X columns for SHAP: {list(X.columns)}")
         t1 = time.time()
         logger.info(f"[SHAP DEBUG] Data prep for SHAP took {t1-t0:.2f}s for {len(X)} rows.")
         explainer = shap.TreeExplainer(model)
