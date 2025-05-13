@@ -32,8 +32,7 @@ DATASET_PATH = "data/cleaned_data.csv"  # Fallback dataset path
 DEFAULT_ANALYSIS_TYPE = 'correlation'
 DEFAULT_TARGET = 'target'  # TODO: Set this to your actual default target column name
 
-# In-memory job store: job_id -> {status, result, error, started_at, finished_at}
-job_store = defaultdict(dict)
+
 
 # Logging setup (must be before any use of logger)
 logging.basicConfig(
@@ -49,12 +48,15 @@ if not isinstance(numeric_level, int):
 logger.setLevel(numeric_level)
 
 # --- EARLY FLASK APP DEFINITION AND DECORATORS (fixes NameError and require_api_key) ---
+
 app = Flask(__name__)
 
-# Load environment variables early
+
+
+
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
-REQUIRE_AUTH = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true' or API_KEY is not None
+REQUIRE_AUTH = True  # Re-enable API key requirement for Render
 
 def require_api_key(f):
     @wraps(f)
@@ -62,7 +64,6 @@ def require_api_key(f):
         if not REQUIRE_AUTH:
             return f(*args, **kwargs)
         api_key = request.headers.get('X-API-KEY')
-        logger.info(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
         if not api_key or api_key != API_KEY:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
         return f(*args, **kwargs)
@@ -71,17 +72,16 @@ def require_api_key(f):
 
 
 def start_analysis_job(query, job_id):
-    import threading as _threading
-    logger.info(f"[DEBUG] start_analysis_job called for job_id={job_id} (thread ident: {_threading.get_ident()})")
-    print(f"[DEBUG] start_analysis_job called for job_id={job_id} (thread ident: {_threading.get_ident()})")
-    sys.stdout.flush()
     import time
+    logger.info(f"[DEBUG] start_analysis_job called for job_id={job_id}")
+    print(f"[DEBUG] start_analysis_job called for job_id={job_id}")
+    sys.stdout.flush()
     logger.info("[DEBUG] About to call ensure_model_loaded()")
     print("[DEBUG] About to call ensure_model_loaded()")
     sys.stdout.flush()
     ensure_model_loaded()
-    logger.info(f"[DEBUG] After ensure_model_loaded: model={model is not None}, dataset={dataset is not None}, feature_names={feature_names is not None}")
-    print(f"[DEBUG] After ensure_model_loaded: model={model is not None}, dataset={dataset is not None}, feature_names={feature_names is not None}")
+    logger.info(f"[DEBUG] After ensure_model_loaded: model={{model is not None}}, dataset={{dataset is not None}}, feature_names={{feature_names is not None}}")
+    print(f"[DEBUG] After ensure_model_loaded: model={{model is not None}}, dataset={{dataset is not None}}, feature_names={{feature_names is not None}}")
     sys.stdout.flush()
     job_store[job_id]['status'] = 'running'
     job_store[job_id]['started_at'] = time.time()
@@ -233,39 +233,123 @@ def start_analysis_job(query, job_id):
         job_store[job_id]['error'] = f"{e}\nTraceback:\n{tb}"
         job_store[job_id]['finished_at'] = time.time()
 
-### --- ASYNC ENDPOINTS ---
-# Remove the duplicate/old analyze endpoint below (keep only async)
+
+# --- SYNCHRONOUS /analyze ENDPOINT FOR RENDER ---
 @app.route('/analyze', methods=['POST'])
 @require_api_key
-def analyze_async():
-    import threading as _threading
-    logger.info(f"[DEBUG] analyze_async endpoint called (main thread ident: {_threading.get_ident()})")
+def analyze():
+    logger.info("/analyze endpoint called")
     query = request.json
     if not query:
         return jsonify({"error": "No query provided"}), 400
-    job_id = str(uuid.uuid4())
-    job_store[job_id]['status'] = 'queued'
-    logger.info(f"[DEBUG] Created job_id={job_id}, status set to queued")
-    # Start background thread
-    thread = threading.Thread(target=start_analysis_job, args=(query, job_id))
-    thread.daemon = True
-    thread.start()
-    logger.info(f"[DEBUG] Background thread started for job_id={job_id} (thread ident: {thread.ident})")
-    return jsonify({"success": True, "job_id": job_id, "status": "queued"})
+    try:
+        ensure_model_loaded()
+        analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
+        target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
+        filters = query.get('demographic_filters', [])
+        filtered_data = dataset.copy()
+        for filter_item in filters:
+            if isinstance(filter_item, str) and '>' in filter_item:
+                feature, value = filter_item.split('>')
+                feature = feature.strip()
+                value = float(value.strip())
+                filtered_data = filtered_data[filtered_data[feature] > value]
+            elif isinstance(filter_item, str) and '<' in filter_item:
+                feature, value = filter_item.split('<')
+                feature = feature.strip()
+                value = float(value.strip())
+                filtered_data = filtered_data[filtered_data[feature] < value]
+            elif isinstance(filter_item, str):
+                if 'high' in filter_item.lower():
+                    feature = filter_item.lower().replace('high', '').strip()
+                    feature = ''.join([w.capitalize() for w in feature.split(' ')])
+                    if feature in filtered_data.columns:
+                        threshold = filtered_data[feature].quantile(0.75)
+                        filtered_data = filtered_data[filtered_data[feature] > threshold]
+        top_data = filtered_data.sort_values(by=target_variable, ascending=False)
+        X = top_data.copy()
+        for col in ['zip_code', 'latitude', 'longitude']:
+            if col in X.columns:
+                X = X.drop(col, axis=1)
+        if target_variable in X.columns:
+            X = X.drop(target_variable, axis=1)
+        model_features = feature_names
+        X_cols = list(X.columns)
+        for col in X_cols:
+            if col not in model_features:
+                X = X.drop(col, axis=1)
+        for feature in model_features:
+            if feature not in X.columns:
+                X[feature] = 0
+        X = X[model_features]
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer(X)
+        feature_importance = []
+        for i, feature in enumerate(model_features):
+            importance = abs(shap_values.values[:, i]).mean()
+            feature_importance.append({'feature': feature, 'importance': float(importance)})
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        results = []
+        for idx, row in top_data.iterrows():
+            result = {}
+            if 'zip_code' in row:
+                result['zip_code'] = str(row['zip_code'])
+            if 'latitude' in row and 'longitude' in row:
+                result['latitude'] = float(row['latitude'])
+                result['longitude'] = float(row['longitude'])
+            target_var_lower = target_variable.lower()
+            if target_variable in row:
+                result[target_var_lower] = float(row[target_variable])
+            for col in row.index:
+                if col not in ['zip_code', 'latitude', 'longitude', target_variable]:
+                    try:
+                        result[col.lower()] = float(row[col])
+                    except (ValueError, TypeError):
+                        if isinstance(row[col], str):
+                            result[col.lower()] = row[col]
+                        else:
+                            result[col.lower()] = str(row[col])
+            results.append(result)
+        if analysis_type == 'correlation':
+            if len(feature_importance) > 0:
+                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}.")
+            else:
+                summary = f"Analysis complete for {target_variable}, but no clear correlations found."
+        elif analysis_type == 'ranking':
+            if len(results) > 0:
+                summary = f"The top area for {target_variable} has a value of {results[0][target_variable.lower()]:.2f}."
+            else:
+                summary = f"No results found for {target_variable} with the specified filters."
+        else:
+            summary = f"Analysis complete for {target_variable}."
+        if len(feature_importance) >= 3:
+            summary += f" The top 3 factors influencing {target_variable} are {feature_importance[0]['feature']}, "
+            summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
+        shap_values_dict = {}
+        for i, feature in enumerate(model_features):
+            shap_values_dict[feature] = shap_values.values[:, i].tolist()[:10]
+        model_version = version_tracker.get_latest_model()
+        dataset_version = version_tracker.get_latest_dataset()
+        version_info = {}
+        if model_version:
+            version_info["model_version"] = model_version[0]
+        if dataset_version:
+            version_info["dataset_version"] = dataset_version[0]
+        return jsonify({
+            "success": True,
+            "results": results,
+            "summary": summary,
+            "feature_importance": feature_importance,
+            "shap_values": shap_values_dict,
+            "version_info": version_info
+        })
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"[ANALYZE ERROR] Exception: {e}\nTraceback:\n{tb}")
+        return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
 
-@app.route('/job_status/<job_id>', methods=['GET'])
-@require_api_key
-def job_status(job_id):
-    job = job_store.get(job_id)
-    if not job:
-        return jsonify({"success": False, "error": "Job ID not found"}), 404
-    status = job.get('status', 'unknown')
-    if status == 'finished':
-        return jsonify({"success": True, "status": status, "result": job.get('result')})
-    elif status == 'failed':
-        return jsonify({"success": False, "status": status, "error": job.get('error')})
-    else:
-        return jsonify({"success": True, "status": status})
+
 from data_versioning import DataVersionTracker
 
 

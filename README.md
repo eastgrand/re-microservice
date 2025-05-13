@@ -1,3 +1,29 @@
+# SHAP Microservice Async Job Processing with RQ
+
+## How to run with RQ (Redis Queue)
+
+1. **Install dependencies:**
+   ```sh
+   pip install -r requirements.txt
+   ```
+
+2. **Start Redis server:**
+   - On macOS: `brew install redis && brew services start redis`
+   - Or with Docker: `docker run -d -p 6379:6379 redis`
+
+3. **Start the Flask app:**
+   ```sh
+   python app.py
+   ```
+
+4. **Start the RQ worker (in a new terminal):**
+   ```sh
+   rq worker shap-tasks
+   ```
+
+5. **Submit jobs to `/analyze` and poll `/job_status/<job_id>` as before.**
+
+**Note:** For production, use a managed Redis service and run the RQ worker as a background process (see Render docs for details).
 # SHAP/XGBoost Microservice
 
 This microservice powers advanced analytics features using SHAP (SHapley Additive exPlanations) and XGBoost. It provides an API for analyzing sales data and demographic information with machine learning.
