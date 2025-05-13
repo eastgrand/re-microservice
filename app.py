@@ -1,8 +1,32 @@
 
 
-# --- EARLY FLASK APP DEFINITION (fixes NameError) ---
+
+# --- EARLY FLASK APP DEFINITION AND DECORATORS (fixes NameError and require_api_key) ---
 from flask import Flask, request, jsonify
+from functools import wraps
+import os
+import logging
+from dotenv import load_dotenv
+
 app = Flask(__name__)
+
+# Load environment variables early
+load_dotenv()
+API_KEY = os.getenv('API_KEY')
+REQUIRE_AUTH = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true' or API_KEY is not None
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not REQUIRE_AUTH:
+            return f(*args, **kwargs)
+        api_key = request.headers.get('X-API-KEY')
+        # logger may not be defined yet, so use print for early debug
+        print(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
+        if not api_key or api_key != API_KEY:
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 import os
 import sys
