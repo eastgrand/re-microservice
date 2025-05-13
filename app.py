@@ -23,6 +23,9 @@ from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
 
+# In-memory job store: job_id -> {status, result, error, started_at, finished_at}
+job_store = defaultdict(dict)
+
 # Logging setup (must be before any use of logger)
 logging.basicConfig(
     level=logging.INFO,
