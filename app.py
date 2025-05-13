@@ -23,6 +23,11 @@ from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
 
+# --- PATHS FOR MODEL, FEATURE NAMES, AND DATASET ---
+MODEL_PATH = "models/xgboost_model.pkl"  # Update if your model file is named differently
+FEATURE_NAMES_PATH = "models/feature_names.txt"  # Update if your feature names file is named differently
+DATASET_PATH = "data/cleaned_data.csv"  # Fallback dataset path
+
 # --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
 DEFAULT_ANALYSIS_TYPE = 'correlation'
 DEFAULT_TARGET = 'target'  # TODO: Set this to your actual default target column name
