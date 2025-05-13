@@ -23,6 +23,10 @@ from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
 
+# --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
+DEFAULT_ANALYSIS_TYPE = 'correlation'
+DEFAULT_TARGET = 'target'  # TODO: Set this to your actual default target column name
+
 # In-memory job store: job_id -> {status, result, error, started_at, finished_at}
 job_store = defaultdict(dict)
 
