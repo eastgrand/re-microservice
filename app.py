@@ -108,8 +108,9 @@ def require_api_key(f):
     def decorated_function(*args, **kwargs):
         if not REQUIRE_AUTH:
             return f(*args, **kwargs)
-            
+
         api_key = request.headers.get('X-API-KEY')
+        logger.info(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
         if not api_key or api_key != API_KEY:
             logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
             return jsonify({"success": False, "error": "Unauthorized"}), 401
