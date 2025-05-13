@@ -1,3 +1,158 @@
+# --- ASYNC JOB INFRASTRUCTURE ---
+import uuid
+from collections import defaultdict
+
+# In-memory job store: job_id -> {status, result, error, started_at, finished_at}
+job_store = defaultdict(dict)
+
+def start_analysis_job(query, job_id):
+    import time
+    ensure_model_loaded()
+    job_store[job_id]['status'] = 'running'
+    job_store[job_id]['started_at'] = time.time()
+    try:
+        analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
+        target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
+        filters = query.get('demographic_filters', [])
+        filtered_data = dataset.copy()
+        for filter_item in filters:
+            if isinstance(filter_item, str) and '>' in filter_item:
+                feature, value = filter_item.split('>')
+                feature = feature.strip()
+                value = float(value.strip())
+                filtered_data = filtered_data[filtered_data[feature] > value]
+            elif isinstance(filter_item, str) and '<' in filter_item:
+                feature, value = filter_item.split('<')
+                feature = feature.strip()
+                value = float(value.strip())
+                filtered_data = filtered_data[filtered_data[feature] < value]
+            elif isinstance(filter_item, str):
+                if 'high' in filter_item.lower():
+                    feature = filter_item.lower().replace('high', '').strip()
+                    feature = ''.join([w.capitalize() for w in feature.split(' ')])
+                    if feature in filtered_data.columns:
+                        threshold = filtered_data[feature].quantile(0.75)
+                        filtered_data = filtered_data[filtered_data[feature] > threshold]
+        top_data = filtered_data.sort_values(by=target_variable, ascending=False)
+        t0 = time.time()
+        X = top_data.copy()
+        for col in ['zip_code', 'latitude', 'longitude']:
+            if col in X.columns:
+                X = X.drop(col, axis=1)
+        if target_variable in X.columns:
+            X = X.drop(target_variable, axis=1)
+        model_features = feature_names
+        X_cols = list(X.columns)
+        for col in X_cols:
+            if col not in model_features:
+                X = X.drop(col, axis=1)
+        for feature in model_features:
+            if feature not in X.columns:
+                X[feature] = 0
+        X = X[model_features]
+        t1 = time.time()
+        logger.info(f"[SHAP DEBUG] Data prep for SHAP took {t1-t0:.2f}s for {len(X)} rows.")
+        explainer = shap.TreeExplainer(model)
+        t2 = time.time()
+        shap_values = explainer(X)
+        t3 = time.time()
+        logger.info(f"[SHAP DEBUG] SHAP computation took {t3-t2:.2f}s for {len(X)} rows.")
+        feature_importance = []
+        for i, feature in enumerate(model_features):
+            importance = abs(shap_values.values[:, i]).mean()
+            feature_importance.append({'feature': feature, 'importance': float(importance)})
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        results = []
+        for idx, row in top_data.iterrows():
+            result = {}
+            if 'zip_code' in row:
+                result['zip_code'] = str(row['zip_code'])
+            if 'latitude' in row and 'longitude' in row:
+                result['latitude'] = float(row['latitude'])
+                result['longitude'] = float(row['longitude'])
+            target_var_lower = target_variable.lower()
+            if target_variable in row:
+                result[target_var_lower] = float(row[target_variable])
+            for col in row.index:
+                if col not in ['zip_code', 'latitude', 'longitude', target_variable]:
+                    try:
+                        result[col.lower()] = float(row[col])
+                    except (ValueError, TypeError):
+                        if isinstance(row[col], str):
+                            result[col.lower()] = row[col]
+                        else:
+                            result[col.lower()] = str(row[col])
+            results.append(result)
+        t4 = time.time()
+        logger.info(f"[SHAP DEBUG] Results formatting took {t4-t3:.2f}s for {len(results)} rows.")
+        if analysis_type == 'correlation':
+            if len(feature_importance) > 0:
+                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}."
+            else:
+                summary = f"Analysis complete for {target_variable}, but no clear correlations found."
+        elif analysis_type == 'ranking':
+            if len(results) > 0:
+                summary = f"The top area for {target_variable} has a value of {results[0][target_variable.lower()]:.2f}."
+            else:
+                summary = f"No results found for {target_variable} with the specified filters."
+        else:
+            summary = f"Analysis complete for {target_variable}."
+        if len(feature_importance) >= 3:
+            summary += f" The top 3 factors influencing {target_variable} are {feature_importance[0]['feature']}, "
+            summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
+        shap_values_dict = {}
+        for i, feature in enumerate(model_features):
+            shap_values_dict[feature] = shap_values.values[:, i].tolist()[:10]
+        model_version = version_tracker.get_latest_model()
+        dataset_version = version_tracker.get_latest_dataset()
+        version_info = {}
+        if model_version:
+            version_info["model_version"] = model_version[0]
+        if dataset_version:
+            version_info["dataset_version"] = dataset_version[0]
+        job_store[job_id]['result'] = {
+            "success": True,
+            "results": results,
+            "summary": summary,
+            "feature_importance": feature_importance,
+            "shap_values": shap_values_dict,
+            "version_info": version_info
+        }
+        job_store[job_id]['status'] = 'finished'
+        job_store[job_id]['finished_at'] = time.time()
+    except Exception as e:
+        job_store[job_id]['status'] = 'failed'
+        job_store[job_id]['error'] = str(e)
+        job_store[job_id]['finished_at'] = time.time()
+
+# --- ASYNC ENDPOINTS ---
+@app.route('/analyze', methods=['POST'])
+@require_api_key
+def analyze_async():
+    query = request.json
+    if not query:
+        return jsonify({"error": "No query provided"}), 400
+    job_id = str(uuid.uuid4())
+    job_store[job_id]['status'] = 'queued'
+    # Start background thread
+    thread = threading.Thread(target=start_analysis_job, args=(query, job_id))
+    thread.daemon = True
+    thread.start()
+    return jsonify({"success": True, "job_id": job_id, "status": "queued"})
+
+@app.route('/job_status/<job_id>', methods=['GET'])
+@require_api_key
+def job_status(job_id):
+    job = job_store.get(job_id)
+    if not job:
+        return jsonify({"success": False, "error": "Job ID not found"}), 404
+    status = job.get('status', 'unknown')
+    if status == 'finished':
+        return jsonify({"success": True, "status": status, "result": job.get('result')})
+    elif status == 'failed':
+        return jsonify({"success": False, "status": status, "error": job.get('error')})
+    else:
+        return jsonify({"success": True, "status": status})
 # --- REWRITE STARTS HERE ---
 import os
 import sys
@@ -254,6 +409,7 @@ def health_check():
 @timeout_handler(timeout=120)
 def analyze():
     ensure_model_loaded()
+    import time
     try:
         query = request.json
         if not query:
@@ -262,6 +418,9 @@ def analyze():
         target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
         filters = query.get('demographic_filters', [])
         filtered_data = dataset.copy()
+        # Limit the number of rows to process for performance (Render 30s limit)
+        MAX_ANALYZE_ROWS = int(os.getenv('MAX_ANALYZE_ROWS', '200'))
+        # Apply filters as before
         for filter_item in filters:
             if isinstance(filter_item, str) and '>' in filter_item:
                 feature, value = filter_item.split('>')
@@ -280,6 +439,7 @@ def analyze():
                     if feature in filtered_data.columns:
                         threshold = filtered_data[feature].quantile(0.75)
                         filtered_data = filtered_data[filtered_data[feature] > threshold]
+        # Always limit the number of rows to process for SHAP
         if 'top' in query.get('output_format', '').lower():
             try:
                 count = int(''.join(filter(str.isdigit, query.get('output_format', 'top_10').lower())))
@@ -287,10 +447,10 @@ def analyze():
                     count = 10
             except:
                 count = 10
+            count = min(count, MAX_ANALYZE_ROWS)
             top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(count)
         else:
-            top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(10)
-        import time
+            top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(min(10, MAX_ANALYZE_ROWS))
         t0 = time.time()
         # Only compute SHAP for the top N rows (not the whole filtered dataset)
         X = top_data.copy()
@@ -310,6 +470,7 @@ def analyze():
         X = X[model_features]
         t1 = time.time()
         logger.info(f"[SHAP DEBUG] Data prep for SHAP took {t1-t0:.2f}s for {len(X)} rows.")
+        # Use SHAP in a way that avoids excessive computation for small N
         explainer = shap.TreeExplainer(model)
         t2 = time.time()
         shap_values = explainer(X)
