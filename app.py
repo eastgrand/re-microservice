@@ -1,6 +1,25 @@
-# --- ASYNC JOB INFRASTRUCTURE ---
+import os
+import sys
+import logging
+import traceback
+import threading
+import gc
+import pickle
+import platform
+import shutil
+import numpy as np
+import pandas as pd
+import shap
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from functools import wraps
+from dotenv import load_dotenv
+from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
+
+# Flask app (must be defined before any route or job infrastructure)
+app = Flask(__name__)
 
 # In-memory job store: job_id -> {status, result, error, started_at, finished_at}
 job_store = defaultdict(dict)
