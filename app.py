@@ -76,6 +76,9 @@ def start_analysis_job(query, job_id):
     sys.stdout.flush()
     import time
     ensure_model_loaded()
+    logger.info(f"[DEBUG] After ensure_model_loaded: model={{model is not None}}, dataset={{dataset is not None}}, feature_names={{feature_names is not None}}")
+    print(f"[DEBUG] After ensure_model_loaded: model={{model is not None}}, dataset={{dataset is not None}}, feature_names={{feature_names is not None}}")
+    sys.stdout.flush()
     job_store[job_id]['status'] = 'running'
     job_store[job_id]['started_at'] = time.time()
     try:
