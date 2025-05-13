@@ -4,15 +4,16 @@ This document maps the field names in the Nesto dataset (`nesto_merge_0.csv`) to
 
 ## Field Mapping Table
 
+
 ### Geographic Fields
 
 | Original Field Name | Mapped Name | Description | Type | Category |
 |---------------------|-------------|-------------|------|----------|
-| `Forward Sortation Area` | `zip_code` | Forward Sortation Area (FSA) postal code | string | Geographic |
-| `ID` | `Province_Code` | Province identification code | string | Geographic |
-| `Object ID` | `Object_ID` | Unique identifier for geographic object | string | Geographic |
-| `Shape__Area` | `Geographic_Area` | Geographic area measurement | numeric | Geographic |
-| `Shape__Length` | `Geographic_Length` | Geographic perimeter measurement | numeric | Geographic |
+| `Forward Sortation Area` | `zip_code` | Forward Sortation Area (FSA) postal code. **This is the canonical FSA field used for location.** | string | Geographic |
+| `ID` | `Province_Code` | Province identification code (not an FSA). | string | Geographic |
+| `Object ID` | `Object_ID` | Unique identifier for geographic object (**always excluded from model features**). | string | Geographic |
+| `Shape__Area` | `Geographic_Area` | Geographic area measurement (**always excluded from model features**). | numeric | Geographic |
+| `Shape__Length` | `Geographic_Length` | Geographic perimeter measurement (**always excluded from model features**). | numeric | Geographic |
 | `LANDAREA` | `Area_Size` | Land area in square kilometers | numeric | Geographic |
 
 ### Basic Demographic Fields
@@ -230,11 +231,15 @@ These mapped field names are used in the model training and prediction processes
 
 ## Data Preprocessing Notes
 
+
 During preprocessing, we:
 1. Convert string types to appropriate numeric values
 2. Handle missing values with mean imputation
 3. Scale features to normalize ranges
-4. Exclude non-predictive geographic identifiers from model features
+4. **Explicitly exclude the following fields from all model analysis and inference:**
+   - `Object_ID`, `Geographic_Area`, `Geographic_Length`
+   - Any other non-predictive geographic identifiers
+5. Ensure `zip_code` (FSA) is always present and used as the canonical location identifier
 
 ## Importance of Percentage Fields
 

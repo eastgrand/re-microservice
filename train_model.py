@@ -273,22 +273,37 @@ logger.info(f"Registered cleaned dataset with version ID: {dataset_version_id}")
 
 # Prepare features and target
 print("Preparing data for training...")
-# Exclude non-feature columns - adjust based on your dataset structure
+
+
+# Exclude non-feature columns. 'ID' is the FSA (postal code) and should only be used as a descriptor, never as a model feature.
+
+# Exclude non-feature columns. 'ID' is the FSA (postal code) and should only be used as a descriptor, never as a model feature.
 TARGET_VARIABLE = 'Mortgage_Approvals'  # New target variable for mortgage data
-exclude_cols = ['zip_code', TARGET_VARIABLE]
+exclude_cols = ['ID', TARGET_VARIABLE]
 if 'latitude' in df.columns:
     exclude_cols.append('latitude')
 if 'longitude' in df.columns:
     exclude_cols.append('longitude')
 
+# Explicitly exclude legacy/geographic identifier fields and their mapped equivalents from model features
+# These must never be used in analysis or inference
+exclude_cols += [
+    'OBJECTID', 'Shape__Area', 'Shape__Length',
+    'Geographic_Area', 'Geographic_Length'
+]
+
 # Also exclude any non-numeric columns and object dtypes that XGBoost can't handle
 for col in df.columns:
-    if df[col].dtype == 'object' or df[col].dtype.name == 'category' or col.startswith('ID'):
+    if df[col].dtype == 'object' or df[col].dtype.name == 'category':
         exclude_cols.append(col)
         print(f"Excluding non-numeric column: {col} (dtype: {df[col].dtype})")
 
+# Remove duplicates in exclude_cols and only drop columns that exist
+exclude_cols = list(set([col for col in exclude_cols if col in df.columns]))
+
+# Drop excluded columns for model training
 X = df.drop(exclude_cols, axis=1)
-print(f"Selected {len(X.columns)} numeric feature columns")
+print(f"Selected {len(X.columns)} numeric feature columns (after explicit exclusion of ID (FSA), OBJECTID, Shape__Area, Shape__Length, Geographic_Area, Geographic_Length)")
 y = df[TARGET_VARIABLE]
 
 # Check X dataset for any remaining objects

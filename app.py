@@ -1,47 +1,27 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import numpy as np
-import pandas as pd
-import xgboost as xgb
-# Import the real SHAP implementation
-import shap
-import traceback
-import logging
+
+# --- REWRITE STARTS HERE ---
 import os
 import sys
+import logging
+import traceback
+import threading
+import gc
+import pickle
 import platform
 import shutil
+import numpy as np
+import pandas as pd
+import shap
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from functools import wraps
-import threading
-import time
-
-# Check if psutil is available
-try:
-    import psutil
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
-import gc
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("shap-microservice")
-import os
-import json
-import pickle
 from dotenv import load_dotenv
 from data_versioning import DataVersionTracker
 
 # Load environment variables
 load_dotenv()
 
-# Configuration from environment variables
+# Configuration
 PORT = int(os.getenv('PORT', 5000))
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -52,14 +32,79 @@ ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() == 'true'
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*')
 MAX_RESULTS = int(os.getenv('MAX_RESULTS', 100))
 DEFAULT_ANALYSIS_TYPE = os.getenv('DEFAULT_ANALYSIS_TYPE', 'ranking')
-
 DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
 
-# Lazy loading globals for model/data
+# Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("shap-microservice")
+numeric_level = getattr(logging, LOG_LEVEL.upper(), None)
+if not isinstance(numeric_level, int):
+    numeric_level = getattr(logging, 'INFO')
+logger.setLevel(numeric_level)
+
+# Flask app
+app = Flask(__name__)
+if ENABLE_CORS:
+    CORS(app, resources={r"/*": {"origins": CORS_ORIGINS}})
+
+# Authentication
+API_KEY = os.getenv('API_KEY')
+REQUIRE_AUTH = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true' or API_KEY is not None
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not REQUIRE_AUTH:
+            return f(*args, **kwargs)
+        api_key = request.headers.get('X-API-KEY')
+        logger.info(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
+        if not api_key or api_key != API_KEY:
+            logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Timeout handler
+def timeout_handler(timeout=25):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'RENDER' not in os.environ:
+                return f(*args, **kwargs)
+            result = {"value": None, "error": None}
+            def target():
+                try:
+                    result["value"] = f(*args, **kwargs)
+                except Exception as e:
+                    result["error"] = str(e)
+            thread = threading.Thread(target=target)
+            thread.daemon = True
+            thread.start()
+            thread.join(timeout)
+            if thread.is_alive():
+                logger.warning(f"Function {f.__name__} timed out after {timeout} seconds")
+                return jsonify({
+                    "success": False,
+                    "error": "Request timed out. The operation is still processing in the background.",
+                    "retry_suggestion": "This request is taking longer than expected. Please try again in a few moments."
+                }), 503
+            if result["error"] is not None:
+                raise Exception(result["error"])
+            return result["value"]
+        return decorated_function
+    return decorator
+
+# Version tracker
+version_tracker = DataVersionTracker()
+
+# Lazy model/data loading
 model = None
 dataset = None
 feature_names = None
-
 def ensure_model_loaded():
     global model, dataset, feature_names
     if model is None or dataset is None or feature_names is None:
@@ -70,102 +115,314 @@ def ensure_model_loaded():
         feature_names = feature_names_
         logger.info("Model and dataset loaded successfully (lazy)")
 
-# Authentication settings
-API_KEY = os.getenv('API_KEY')
-REQUIRE_AUTH = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true' or API_KEY is not None
+def load_model():
+    try:
+        logger.info("Loading model and dataset...")
+        import xgboost as xgb
+        from train_model import DATA_PATHS
+        is_render = 'RENDER' in os.environ
+        if is_render:
+            gc.enable()
+        # Try to load model
+        if os.path.exists(MODEL_PATH):
+            model = pickle.load(open(MODEL_PATH, 'rb'))
+            if os.path.exists(FEATURE_NAMES_PATH):
+                with open(FEATURE_NAMES_PATH, 'r') as f:
+                    feature_names = [line.strip() for line in f.readlines()]
+            else:
+                feature_names = []
+            cleaned_data_path = 'data/cleaned_data.csv'
+            if os.path.exists(cleaned_data_path):
+                dataset = pd.read_csv(cleaned_data_path, nrows=10000 if is_render else 20000)
+            elif os.path.exists(DATASET_PATH):
+                dataset = pd.read_csv(DATASET_PATH, nrows=10000 if is_render else 20000)
+            else:
+                dataset = pd.DataFrame()
+            return model, dataset, feature_names
+        else:
+            raise FileNotFoundError("Model not found, please train the model first.")
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
+        raise
 
-# Set up logging level
-numeric_level = getattr(logging, LOG_LEVEL.upper(), None)
-if not isinstance(numeric_level, int):
-    numeric_level = getattr(logging, 'INFO')
-logger.setLevel(numeric_level)
+# Routes
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({
+        "message": "SHAP/XGBoost Analytics API",
+        "endpoints": {
+            "/analyze": "POST - Run analysis with structured query",
+            "/health": "GET - Check system health",
+            "/metadata": "GET - Get dataset metadata and statistics",
+            "/versions": "GET - List all tracked versions of datasets and models"
+        }
+    })
 
-# Configure the app to use the correct target variable for Nesto data
-if os.path.exists('data/nesto_merge_0.csv'):
-    logger.info("Nesto mortgage data detected. Using Mortgage_Approvals as target.")
-    DEFAULT_TARGET = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
+@app.route('/ping', methods=['GET'])
+def ping():
+    import sys
+    return jsonify({
+        "status": "OK",
+        "message": "SHAP microservice is responding",
+        "python_version": sys.version,
+        "is_render": 'RENDER' in os.environ,
+        "environment": {k: v for k, v in os.environ.items() if not k.startswith('_') and k.isupper()}
+    })
 
-# Add additional Render-specific memory configuration
-is_render = 'RENDER' in os.environ
-if is_render:
-    logger.info("Running in Render environment - applying special memory optimizations")
-    # Enable aggressive garbage collection
-    gc.enable()
-    # Further reduce sample size for Render environment
-    sample_size = int(os.getenv('RENDER_SAMPLE_SIZE', 2000))
-    logger.info(f"Sample size limited to {sample_size} records for Render")
-else:
-    sample_size = int(os.getenv('SAMPLE_SIZE', 20000))
+@app.route('/versions', methods=['GET'])
+@require_api_key
+def list_versions():
+    ensure_model_loaded()
+    try:
+        versions = version_tracker.list_all_versions()
+        simplified_versions = {"datasets": {}, "models": {}}
+        for version_id, info in versions.get("datasets", {}).items():
+            simplified_versions["datasets"][version_id] = {
+                "timestamp": info.get("timestamp"),
+                "description": info.get("description"),
+                "source": info.get("source"),
+                "row_count": info.get("row_count"),
+                "column_count": info.get("column_count"),
+                "columns": info.get("columns")
+            }
+        for version_id, info in versions.get("models", {}).items():
+            simplified_versions["models"][version_id] = {
+                "timestamp": info.get("timestamp"),
+                "dataset_version_id": info.get("dataset_version_id"),
+                "metrics": info.get("metrics", {}),
+                "feature_names": info.get("feature_names")
+            }
+        return jsonify({"success": True, "versions": simplified_versions})
+    except Exception as e:
+        logger.error(f"Error listing versions: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
-# Flask app setup
-app = Flask(__name__)
-if ENABLE_CORS:
-    CORS(app, resources={r"/*": {"origins": CORS_ORIGINS}})
+@app.route('/health', methods=['GET'])
+@require_api_key
+def health_check():
+    ensure_model_loaded()
+    import xgboost
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        memory_usage = process.memory_info().rss / (1024 * 1024)
+    except ImportError:
+        memory_usage = "psutil not installed"
+    model_version = version_tracker.get_latest_model()
+    dataset_version = version_tracker.get_latest_dataset()
+    model_version_info = None
+    if model_version:
+        model_version_id, model_info = model_version
+        model_version_info = {
+            "id": model_version_id,
+            "created_at": model_info.get("timestamp"),
+            "metrics": model_info.get("metrics", {})
+        }
+    dataset_version_info = None
+    if dataset_version:
+        dataset_version_id, dataset_info = dataset_version
+        dataset_version_info = {
+            "id": dataset_version_id,
+            "created_at": dataset_info.get("timestamp"),
+            "record_count": dataset_info.get("row_count"),
+            "description": dataset_info.get("description"),
+            "source": dataset_info.get("source")
+        }
+    return jsonify({
+        "status": "healthy",
+        "model": {
+            "type": "xgboost",
+            "version": xgboost.__version__,
+            "feature_count": len(feature_names) if feature_names else 0,
+            "features": feature_names,
+            "version_info": model_version_info
+        },
+        "dataset": {
+            "shape": f"{dataset.shape[0]} rows, {dataset.shape[1]} columns" if dataset is not None else None,
+            "columns": list(dataset.columns) if dataset is not None else None,
+            "version_info": dataset_version_info
+        },
+        "system_info": {
+            "python_version": platform.python_version(),
+            "system": platform.system(),
+            "memory_usage_mb": memory_usage
+        },
+        "shap_version": shap.__version__
+    })
 
-# Authentication decorator
-def require_api_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not REQUIRE_AUTH:
-            return f(*args, **kwargs)
+@app.route('/analyze', methods=['POST'])
+@require_api_key
+@timeout_handler(timeout=25)
+def analyze():
+    ensure_model_loaded()
+    try:
+        query = request.json
+        if not query:
+            return jsonify({"error": "No query provided"}), 400
+        analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
+        target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
+        filters = query.get('demographic_filters', [])
+        filtered_data = dataset.copy()
+        for filter_item in filters:
+            if isinstance(filter_item, str) and '>' in filter_item:
+                feature, value = filter_item.split('>')
+                feature = feature.strip()
+                value = float(value.strip())
+                filtered_data = filtered_data[filtered_data[feature] > value]
+            elif isinstance(filter_item, str) and '<' in filter_item:
+                feature, value = filter_item.split('<')
+                feature = feature.strip()
+                value = float(value.strip())
+                filtered_data = filtered_data[filtered_data[feature] < value]
+            elif isinstance(filter_item, str):
+                if 'high' in filter_item.lower():
+                    feature = filter_item.lower().replace('high', '').strip()
+                    feature = ''.join([w.capitalize() for w in feature.split(' ')])
+                    if feature in filtered_data.columns:
+                        threshold = filtered_data[feature].quantile(0.75)
+                        filtered_data = filtered_data[filtered_data[feature] > threshold]
+        if 'top' in query.get('output_format', '').lower():
+            try:
+                count = int(''.join(filter(str.isdigit, query.get('output_format', 'top_10').lower())))
+                if count == 0:
+                    count = 10
+            except:
+                count = 10
+            top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(count)
+        else:
+            top_data = filtered_data.sort_values(by=target_variable, ascending=False).head(10)
+        X = filtered_data.copy()
+        for col in ['zip_code', 'latitude', 'longitude']:
+            if col in X.columns:
+                X = X.drop(col, axis=1)
+        if target_variable in X.columns:
+            X = X.drop(target_variable, axis=1)
+        model_features = feature_names
+        X_cols = list(X.columns)
+        for col in X_cols:
+            if col not in model_features:
+                X = X.drop(col, axis=1)
+        for feature in model_features:
+            if feature not in X.columns:
+                X[feature] = 0
+        X = X[model_features]
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer(X)
+        feature_importance = []
+        for i, feature in enumerate(model_features):
+            importance = abs(shap_values.values[:, i]).mean()
+            feature_importance.append({'feature': feature, 'importance': float(importance)})
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        results = []
+        for idx, row in top_data.iterrows():
+            result = {}
+            if 'zip_code' in row:
+                result['zip_code'] = str(row['zip_code'])
+            if 'latitude' in row and 'longitude' in row:
+                result['latitude'] = float(row['latitude'])
+                result['longitude'] = float(row['longitude'])
+            target_var_lower = target_variable.lower()
+            if target_variable in row:
+                result[target_var_lower] = float(row[target_variable])
+            for col in row.index:
+                if col not in ['zip_code', 'latitude', 'longitude', target_variable]:
+                    try:
+                        result[col.lower()] = float(row[col])
+                    except (ValueError, TypeError):
+                        if isinstance(row[col], str):
+                            result[col.lower()] = row[col]
+                        else:
+                            result[col.lower()] = str(row[col])
+            results.append(result)
+        if analysis_type == 'correlation':
+            if len(feature_importance) > 0:
+                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}."
+            else:
+                summary = f"Analysis complete for {target_variable}, but no clear correlations found."
+        elif analysis_type == 'ranking':
+            if len(results) > 0:
+                summary = f"The top area for {target_variable} has a value of {results[0][target_variable.lower()]:.2f}."
+            else:
+                summary = f"No results found for {target_variable} with the specified filters."
+        else:
+            summary = f"Analysis complete for {target_variable}."
+        if len(feature_importance) >= 3:
+            summary += f" The top 3 factors influencing {target_variable} are {feature_importance[0]['feature']}, "
+            summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
+        shap_values_dict = {}
+        for i, feature in enumerate(model_features):
+            shap_values_dict[feature] = shap_values.values[:, i].tolist()[:10]
+        model_version = version_tracker.get_latest_model()
+        dataset_version = version_tracker.get_latest_dataset()
+        version_info = {}
+        if model_version:
+            version_info["model_version"] = model_version[0]
+        if dataset_version:
+            version_info["dataset_version"] = dataset_version[0]
+        return jsonify({
+            "success": True,
+            "results": results,
+            "summary": summary,
+            "feature_importance": feature_importance,
+            "shap_values": shap_values_dict,
+            "version_info": version_info
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
-        api_key = request.headers.get('X-API-KEY')
-        logger.info(f"[DEBUG] Header X-API-KEY: {repr(api_key)}, Config API_KEY: {repr(API_KEY)}")
-        if not api_key or api_key != API_KEY:
-            logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
-            return jsonify({"success": False, "error": "Unauthorized"}), 401
-        return f(*args, **kwargs)
-    return decorated_function
+@app.route('/metadata', methods=['GET'])
+@require_api_key
+def get_metadata():
+    ensure_model_loaded()
+    try:
+        if dataset is None:
+            raise Exception("Dataset not available")
+        summary_stats = {}
+        for column in dataset.columns:
+            if column in ['zip_code']:
+                continue
+            if np.issubdtype(dataset[column].dtype, np.number):
+                column_stats = {
+                    "mean": float(dataset[column].mean()),
+                    "median": float(dataset[column].median()),
+                    "min": float(dataset[column].min()),
+                    "max": float(dataset[column].max()),
+                    "std": float(dataset[column].std())
+                }
+                summary_stats[column] = column_stats
+        if DEFAULT_TARGET in dataset.columns:
+            correlations = {}
+            for column in dataset.columns:
+                if column != DEFAULT_TARGET and np.issubdtype(dataset[column].dtype, np.number):
+                    correlations[column] = float(dataset[column].corr(dataset[DEFAULT_TARGET]))
+        else:
+            correlations = None
+        dataset_version = version_tracker.get_latest_dataset()
+        if dataset_version:
+            dataset_version_id, dataset_info = dataset_version
+            version_info = {
+                "id": dataset_version_id,
+                "created_at": dataset_info.get("timestamp"),
+                "description": dataset_info.get("description"),
+                "source": dataset_info.get("source")
+            }
+        else:
+            version_info = None
+        return jsonify({
+            "success": True,
+            "columns": list(dataset.columns),
+            "record_count": len(dataset),
+            "statistics": summary_stats,
+            "correlations_with_target": correlations,
+            "version_info": version_info
+        })
+    except Exception as e:
+        logger.error(f"Error getting metadata: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
-# Timeout handler decorator
-def timeout_handler(timeout=25):
-    """Decorator to handle timeouts for long-running routes.
-    Render has a 30-second timeout, so we should respond within 25 seconds."""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not 'RENDER' in os.environ:
-                # If not on Render, just execute the function normally
-                return f(*args, **kwargs)
-            
-            # For Render, implement our own timeout handler
-            result = {"value": None, "error": None}
-            
-            def target():
-                try:
-                    result["value"] = f(*args, **kwargs)
-                except Exception as e:
-                    result["error"] = str(e)
-            
-            # Start the function in a thread
-            thread = threading.Thread(target=target)
-            thread.daemon = True
-            thread.start()
-            
-            # Wait for the function to complete or timeout
-            thread.join(timeout)
-            
-            # Check if we timed out
-            if thread.is_alive():
-                logger.warning(f"Function {f.__name__} timed out after {timeout} seconds")
-                # Return a helpful message indicating we're still processing
-                return jsonify({
-                    "success": False, 
-                    "error": "Request timed out. The operation is still processing in the background.",
-                    "retry_suggestion": "This request is taking longer than expected. Please try again in a few moments."
-                }), 503
-            
-            # Check if we had an error
-            if result["error"] is not None:
-                raise Exception(result["error"])
-            
-            return result["value"]
-        return decorated_function
-    return decorator
-
-# Error handler for API exceptions
+# Error handlers
 class APIError(Exception):
-    """Custom exception for API errors with status code and message."""
     def __init__(self, message, status_code=400):
         self.message = message
         self.status_code = status_code
@@ -173,254 +430,27 @@ class APIError(Exception):
 
 @app.errorhandler(APIError)
 def handle_api_error(error):
-    """Return JSON response for API errors."""
     response = jsonify({"success": False, "error": error.message})
     response.status_code = error.status_code
     return response
 
 @app.errorhandler(Exception)
 def handle_generic_exception(error):
-    """Handle any unhandled exception."""
     logger.error(f"Unhandled exception: {str(error)}")
     logger.error(traceback.format_exc())
-    response = jsonify({
-        "success": False, 
-        "error": "An internal server error occurred. Please try again later."
-    })
+    response = jsonify({"success": False, "error": "An internal server error occurred. Please try again later."})
     response.status_code = 500
     return response
 
-# Initialize version tracker
-version_tracker = DataVersionTracker()
-
-# Load the trained model or create a fallback
-def load_model():
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    logger.info(f"Starting Flask app on port {port}...")
     try:
-        logger.info("Loading model and dataset...")
-        
-        # Import data paths from train_model.py
-        from train_model import DATA_PATHS
-        
-        # Add a sanity check for Render
-        if 'RENDER' in os.environ:
-            logger.info("Running on Render: checking disk space and memory...")
-            try:
-                if PSUTIL_AVAILABLE:
-                    import psutil
-                    # Log available memory
-                    avail_memory = psutil.virtual_memory().available / (1024 * 1024)
-                    logger.info(f"Available memory: {avail_memory:.2f} MB")
-                
-                # Check disk space
-                disk_usage = shutil.disk_usage("/")
-                free_disk = disk_usage.free / (1024 * 1024 * 1024)  # Convert to GB
-                logger.info(f"Free disk space: {free_disk:.2f} GB")
-                
-                # Run garbage collection
-                logger.info("Running garbage collection...")
-                gc.collect()
-                
-            except Exception as e:
-                logger.warning(f"System info check failed: {e}")
-        
-        # Try to run the setup script to ensure all files are present
-        try:
-            logger.info("Running setup and training scripts to ensure model is available...")
-            import subprocess
-            setup_result = subprocess.run([sys.executable, 'setup_for_render.py'], 
-                           capture_output=True, text=True, check=False)
-            logger.info("Setup script completed")
-            
-            # If the model still doesn't exist, try to run the train_model.py directly
-            if not os.path.exists(MODEL_PATH):
-                logger.info("Model not found after setup, running training script directly...")
-                train_result = subprocess.run([sys.executable, 'train_model.py'], 
-                                           capture_output=True, text=True, check=False)
-                logger.info("Training script completed")
-                if train_result.returncode != 0:
-                    logger.error("Training script failed with error")
-        except Exception as setup_err:
-            logger.warning(f"Setup/training scripts could not run: {setup_err}")
-        
-        # Try to load the saved model using environment variable path
-        if os.path.exists(MODEL_PATH):
-            logger.info(f"Loading trained model from {MODEL_PATH}...")
-            model = pickle.load(open(MODEL_PATH, 'rb'))
-            
-            # Load feature names
-            if os.path.exists(FEATURE_NAMES_PATH):
-                logger.info(f"Loading feature names from {FEATURE_NAMES_PATH}...")
-                with open(FEATURE_NAMES_PATH, 'r') as f:
-                    feature_names = [line.strip() for line in f.readlines()]
-                logger.info(f"Loaded {len(feature_names)} features")
-            else:
-                logger.warning(f"Feature names file not found at {FEATURE_NAMES_PATH}")
-                feature_names = []
-            
-            # Load dataset with memory optimization
-            # First try to import the memory optimizer
-            try:
-                from optimize_memory import load_and_optimize_data, log_memory_usage, prune_dataframe_columns
-                log_memory_usage("Before loading dataset in app.py")
-                
-                # Check if we're in Render's environment
-                is_render = 'RENDER' in os.environ
-                
-                # Use smaller sample size for Render
-                sample_size = 10000 if is_render else 20000
-                
-                cleaned_data_path = 'data/cleaned_data.csv'
-                if os.path.exists(cleaned_data_path):
-                    logger.info(f"Loading dataset from {cleaned_data_path} with memory optimization...")
-                    try:
-                        # For Render, use more aggressive optimization
-                        if is_render:
-                            logger.info("Running in Render environment, using aggressive data loading optimizations")
-                            # Load dataset with essential columns only for rendering
-                            dataset = load_and_optimize_data(cleaned_data_path, nrows=sample_size)
-                            # Remove only legacy fields, preserve all important analytical columns
-                            target_col = 'Mortgage_Approvals'
-                            dataset = prune_dataframe_columns(dataset, target_column=target_col)
-                        else:
-                            dataset = load_and_optimize_data(cleaned_data_path, nrows=sample_size)
-                    except Exception as e:
-                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load with reduced rows")
-                        # Even more aggressive fallback with fewer rows
-                        reduced_sample = 5000 if is_render else sample_size
-                        dataset = pd.read_csv(cleaned_data_path, nrows=reduced_sample)
-                elif os.path.exists(DATASET_PATH):
-                    logger.info(f"Loading dataset from {DATASET_PATH} with memory optimization...")
-                    try:
-                        if is_render:
-                            # Use aggressive optimizations for Render
-                            dataset = load_and_optimize_data(DATASET_PATH, nrows=sample_size)
-                            # Remove only legacy fields, preserve all important analytical columns
-                            target_col = 'Mortgage_Approvals'
-                            dataset = prune_dataframe_columns(dataset, target_column=target_col)
-                        else:
-                            dataset = load_and_optimize_data(DATASET_PATH, nrows=sample_size)
-                    except Exception as e:
-                        logger.warning(f"Memory-optimized loading failed: {e}, falling back to basic load with reduced rows")
-                        reduced_sample = 5000 if is_render else sample_size
-                        dataset = pd.read_csv(DATASET_PATH, nrows=reduced_sample)
-                else:
-                    error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
-                    logger.error(error_msg)
-                    raise FileNotFoundError(error_msg)
-                
-                log_memory_usage("After loading dataset in app.py")
-                
-            except ImportError:
-                # Fall back to standard loading
-                cleaned_data_path = 'data/cleaned_data.csv'
-                if os.path.exists(cleaned_data_path):
-                    logger.info(f"Loading dataset from {cleaned_data_path}...")
-                    dataset = pd.read_csv(cleaned_data_path, nrows=20000)
-                elif os.path.exists(DATASET_PATH):
-                    logger.info(f"Loading dataset from {DATASET_PATH}...")
-                    dataset = pd.read_csv(DATASET_PATH, nrows=20000)
-                else:
-                    error_msg = f"Dataset not found at {DATASET_PATH} or {cleaned_data_path}"
-                    logger.error(error_msg)
-                    raise FileNotFoundError(error_msg)
-            
-            logger.info(f"Loaded dataset with {dataset.shape[0]} records and {dataset.shape[1]} columns")
-            
-            # Get model and dataset version information
-            model_version = version_tracker.get_latest_model()
-            dataset_version = version_tracker.get_latest_dataset()
-            
-            # If model is not registered yet, register it now
-            if model_version is None and os.path.exists(MODEL_PATH):
-                logger.info("Model not registered in version tracker. Registering now...")
-                if dataset_version:
-                    dataset_version_id = dataset_version[0]
-                else:
-                    # Register dataset if not already registered
-                    dataset_version_id = version_tracker.register_dataset(
-                        DATASET_PATH, 
-                        description="Dataset loaded on startup", 
-                        source="Unknown (loaded on startup)"
-                    )
-                
-                model_version_id = version_tracker.register_model(
-                    MODEL_PATH, 
-                    dataset_version_id,
-                    feature_names_path=FEATURE_NAMES_PATH
-                )
-                logger.info(f"Registered model with ID: {model_version_id}")
-            
-            return model, dataset, feature_names
-        else:
-            # Try one last time to train the model directly
-            logger.error("Model file still not found, attempting emergency training...")
-            try:
-                # Import and run training function directly
-                from train_model import train_and_save_model
-                model, feature_names_list = train_and_save_model()
-                
-                # Check if model was created
-                if os.path.exists(MODEL_PATH):
-                    logger.info("Emergency model training successful!")
-                    
-                    # Use the feature names returned from training
-                    feature_names = feature_names_list
-                    
-                    # Try to load the dataset from any available source
-                    for data_path in DATA_PATHS:
-                        if os.path.exists(data_path):
-                            dataset = pd.read_csv(data_path)
-                            return model, dataset, feature_names
-                    
-                    # If no dataset found, create a minimal one
-                    logger.warning("No dataset found, creating minimal dataset")
-                    dataset = pd.DataFrame({
-                        "Mortgage_Approvals": [10, 20, 30],
-                        "Income": [50000, 60000, 70000],
-                        "Age": [30, 40, 50],
-                        "Homeownership_Pct": [60, 70, 80]
-                    })
-                    dataset.to_csv('data/minimal_dataset.csv', index=False)
-                    return model, dataset, feature_names
-            except Exception as train_err:
-                logger.error(f"Emergency training failed: {train_err}")
-            
-            # LAST RESORT: Try to create and use a minimal model
-            logger.warning("Attempting to create a minimal fallback model...")
-            try:
-                # Try running our minimal model script
-                import subprocess
-                minimal_script = 'create_minimal_model.py'
-                if os.path.exists(minimal_script):
-                    logger.info("Running minimal model creation script...")
-                    result = subprocess.run([sys.executable, minimal_script], 
-                                          capture_output=True, text=True, check=False)
-                    
-                    if result.returncode == 0:
-                        logger.info("Minimal model created successfully!")
-                        minimal_model_path = 'models/xgboost_minimal.pkl'
-                        minimal_features_path = 'models/minimal_feature_names.txt'
-                        minimal_data_path = 'data/minimal_dataset.csv'
-                        
-                        if os.path.exists(minimal_model_path) and os.path.exists(minimal_data_path):
-                            logger.info("Loading minimal model and dataset...")
-                            model = pickle.load(open(minimal_model_path, 'rb'))
-                            dataset = pd.read_csv(minimal_data_path)
-                            
-                            # Load feature names
-                            if os.path.exists(minimal_features_path):
-                                with open(minimal_features_path, 'r') as f:
-                                    feature_names = [line.strip() for line in f.readlines()]
-                                return model, dataset, feature_names
-                    else:
-                        logger.error(f"Minimal model script failed: {result.stderr}")
-            except Exception as e:
-                logger.error(f"Failed to create minimal model: {e}")
-            
-            raise FileNotFoundError("Model not found, please train the model first. Check logs for errors.")
+        app.run(host='0.0.0.0', port=port, threaded=True)
+        logger.info(f"Flask app running on port {port}")
     except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
-        raise
+        logger.error(f"Failed to start Flask app: {str(e)}")
+        sys.exit(1)
 
 @app.route('/', methods=['GET'])
 def root():

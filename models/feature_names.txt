@@ -1,4 +1,3 @@
-Object_ID
 Geographic_Area
 Geographic_Length
 Population
@@ -128,4 +127,3 @@ Financial_Services_Total
 Avg_Financial_Services
 Bank_Service_Charges_Total
 Avg_Bank_Service_Charges
-Mortgage_Applications
