@@ -165,8 +165,12 @@ def start_analysis_job(query, job_id):
         job_store[job_id]['status'] = 'finished'
         job_store[job_id]['finished_at'] = time.time()
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"[ANALYSIS JOB ERROR] Exception: {e}\nTraceback:\n{tb}")
+        print(f"[ANALYSIS JOB ERROR] Exception: {e}\nTraceback:\n{tb}")
         job_store[job_id]['status'] = 'failed'
-        job_store[job_id]['error'] = str(e)
+        job_store[job_id]['error'] = f"{e}\nTraceback:\n{tb}"
         job_store[job_id]['finished_at'] = time.time()
 
 ### --- ASYNC ENDPOINTS ---
