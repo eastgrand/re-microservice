@@ -58,15 +58,23 @@ app = Flask(__name__)
 
 # --- REDIS/RQ SETUP ---
 # Prefer Render/Upstash REDIS_URL, fallback to localhost only for local dev
+
+# --- REDIS/RQ SETUP ---
 REDIS_URL = os.getenv('REDIS_URL')
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("shap-microservice")
+logger.info(f"[DEBUG] REDIS_URL at startup: {REDIS_URL}")
 if not REDIS_URL:
     # Try to load from .env if not set
     from dotenv import load_dotenv
     load_dotenv()
     REDIS_URL = os.getenv('REDIS_URL')
+    logger.info(f"[DEBUG] REDIS_URL after load_dotenv: {REDIS_URL}")
 if not REDIS_URL:
     # Final fallback for local dev
     REDIS_URL = 'redis://localhost:6379/0'
+    logger.info(f"[DEBUG] REDIS_URL falling back to localhost: {REDIS_URL}")
 redis_conn = redis.from_url(REDIS_URL)
 queue = Queue('shap-jobs', connection=redis_conn)
 
