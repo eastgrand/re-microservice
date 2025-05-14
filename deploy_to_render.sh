@@ -1,4 +1,15 @@
 #!/bin/bash
+set -e
+python -m pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler
+python fix_flask_werkzeug.py
+# python patch_shap.py
+export MEMORY_OPTIMIZATION=true
+export MAX_MEMORY_MB=400
+python setup_for_render.py
+python create_minimal_model.py
+python fix_categorical_types.py
+python fix_categorical_data.py
+python train_model.py#!/bin/bash
 # Deployment script for Nesto mortgage microservice to Render
 # Ensures memory optimizations are properly configured
 
