@@ -186,8 +186,8 @@ FIELD_MAPPINGS = {
     '2024 Service Charges for Banks, Other Financial Institutions (Avg)': 'Avg_Bank_Service_Charges',
     
     # Mortgage data
-    'Mortgage Applicationns': 'Mortgage_Applications',
-    'Funded Applications': 'Mortgage_Approvals'
+    'FREQUENCY': 'Mortgage_Applications',
+    'SUM_FUNDED': 'Mortgage_Approvals'
 }
 
 # Target variable for the model
