@@ -1,3 +1,9 @@
+
+# --- FLASK APP SETUP (must come first) ---
+app = Flask(__name__)
+CORS(app)
+
+# --- /analyze GET handler (added for friendly error) ---
 @app.route('/analyze', methods=['GET'])
 def analyze_get():
     """GET handler for /analyze to provide a helpful message instead of 404."""
