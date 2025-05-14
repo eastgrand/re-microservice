@@ -20,7 +20,7 @@ services:
       gunicorn app:app -c gunicorn_config.py --preload
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9
+        value: 3.9.18
       - key: DEBUG
         value: false
       - key: LOG_LEVEL
