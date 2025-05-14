@@ -4,17 +4,17 @@ services:
     env: python
     plan: starter
     buildCommand: >-
-      which python3 && python3 --version && \
-      python3 -m pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler && \
-      python3 fix_flask_werkzeug.py && \
-      # python3 patch_shap.py && \
+      which python && python --version && \
+      python -m pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler && \
+      python fix_flask_werkzeug.py && \
+      # python patch_shap.py && \
       export MEMORY_OPTIMIZATION=true && \
       export MAX_MEMORY_MB=400 && \
-      python3 setup_for_render.py && \
-      python3 create_minimal_model.py && \
-      python3 fix_categorical_types.py && \
-      python3 fix_categorical_data.py && \
-      python3 train_model.py
+      python setup_for_render.py && \
+      python create_minimal_model.py && \
+      python fix_categorical_types.py && \
+      python fix_categorical_data.py && \
+      python train_model.py
     startCommand: >-
       echo "Starting server on port $PORT" &&
       python -c "import time; time.sleep(2); print('Pre-starting delay complete')" &&
@@ -54,7 +54,7 @@ services:
     env: python
     plan: starter
     buildCommand: >-
-      pip install --force-reinstall --no-cache-dir -r requirements.txt
+      python -m pip install --force-reinstall --no-cache-dir -r requirements.txt
     startCommand: rq worker shap-jobs --url $REDIS_URL
     envVars:
       - key: REDIS_URL
