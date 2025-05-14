@@ -1,23 +1,15 @@
-bind = "0.0.0.0:10000"
-workers = 1
-threads = 4
-timeout = 300
-preload_app = False
-worker_class = "gthread""""Gunicorn configuration for Render deployment.
+"""Gunicorn configuration for Render deployment.
 This file configures Gunicorn to better handle memory constraints and timeouts.
 """
 
 import os
-import multiprocessing
 
-# Basic configuration
-bind = f"0.0.0.0:{os.getenv('PORT', '5000')}"
+# Bind to the port specified by the PORT environment variable (Render requirement)
+bind = f"0.0.0.0:{os.environ.get('PORT', '10000')}"
 workers = 1  # Single worker for Render free tier
 threads = 2  # Multiple threads to handle slow responses
 worker_class = 'gthread'
 timeout = 120  # Increased timeout to allow for slow model loading
-
-# Make sure we respond quickly to health checks
 # This helps Render.com detect that our service is running
 backlog = 100  # Increased connection queue
 worker_connections = 100  # Maximum number of simultaneous client connections
