@@ -4,7 +4,7 @@ services:
     env: python
     plan: starter
     buildCommand: >-
-      pip install -r requirements.txt memory-profiler && 
+      pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler && 
       python fix_flask_werkzeug.py && 
       python patch_shap.py && 
       export MEMORY_OPTIMIZATION=true && 
@@ -52,7 +52,7 @@ services:
     name: shap-microservice-worker
     env: python
     plan: starter
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --force-reinstall --no-cache-dir -r requirements.txt
     startCommand: rq worker shap-jobs --url $REDIS_URL
     envVars:
       - key: REDIS_URL
