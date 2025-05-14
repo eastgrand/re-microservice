@@ -1,3 +1,14 @@
+@app.route('/analyze', methods=['GET'])
+def analyze_get():
+    """GET handler for /analyze to provide a helpful message instead of 404."""
+    return jsonify({
+        "message": "Use POST to /analyze to submit a job for SHAP/XGBoost analysis. This endpoint only accepts POST for analysis jobs.",
+        "usage": {
+            "POST /analyze": "Submit a JSON body with analysis_type, target_variable, and demographic_filters to start an async job.",
+            "GET /job_status/<job_id>": "Poll for job status/results."
+        },
+        "status": 405
+    }), 405
 
 
 
