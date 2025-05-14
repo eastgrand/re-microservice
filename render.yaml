@@ -6,7 +6,7 @@ services:
     buildCommand: >-
       pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler && 
       python fix_flask_werkzeug.py && 
-      python patch_shap.py && 
+      # python patch_shap.py && 
       export MEMORY_OPTIMIZATION=true && 
       export MAX_MEMORY_MB=400 &&
       python setup_for_render.py && 
