@@ -34,7 +34,7 @@ DATASET_PATH = "data/cleaned_data.csv"  # Fallback dataset path
 
 # --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
 DEFAULT_ANALYSIS_TYPE = 'correlation'
-DEFAULT_TARGET = 'target'  # TODO: Set this to your actual default target column name
+DEFAULT_TARGET = 'Mortgage_Approvals'  # Set to actual default target column name for production
 
 
 
