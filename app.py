@@ -21,7 +21,11 @@ import uuid
 from collections import defaultdict
 
 # --- FLASK APP SETUP (must come after imports) ---
+CORS_ENABLED = True
 app = Flask(__name__)
+if CORS_ENABLED:
+    from flask_cors import CORS
+    CORS(app)
 CORS(app)
 
 # --- /analyze GET handler (added for friendly error) ---
@@ -91,7 +95,6 @@ logger.setLevel(numeric_level)
 
 
 # --- EARLY FLASK APP DEFINITION AND DECORATORS (fixes NameError and require_api_key) ---
-app = Flask(__name__)
 
 
 # --- REDIS/RQ SETUP ---
