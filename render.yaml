@@ -52,7 +52,8 @@ services:
     name: shap-microservice-worker
     env: python
     plan: starter
-    buildCommand: pip install --force-reinstall --no-cache-dir -r requirements.txt
+    buildCommand: >-
+      pip install --force-reinstall --no-cache-dir -r requirements.txt
     startCommand: rq worker shap-jobs --url $REDIS_URL
     envVars:
       - key: REDIS_URL
