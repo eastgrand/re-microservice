@@ -19,13 +19,12 @@ logger = logging.getLogger("nesto-data-mapper")
 # Define the field mappings according to NESTO_FIELD_MAPPING.md
 FIELD_MAPPINGS = {
     # Geographic fields
-    # 'Forward Sortation Area' is the FSA (Canadian postal code prefix) and is mapped to 'zip_code'.
-    # 'ID' is a province code, not an FSA, and is mapped to 'Province_Code'.
+    # 'ID' is the FSA (Canadian postal code prefix) and is mapped to 'zip_code'.
+    # If you have a separate province code column, map it below as needed.
     # The following fields are mapped for reference but are always excluded from model features:
     #   'Object ID' -> 'Object_ID', 'Shape__Area' -> 'Geographic_Area', 'Shape__Length' -> 'Geographic_Length'
     # See train_model.py for enforced exclusion.
-    'Forward Sortation Area': 'zip_code',
-    'ID': 'Province_Code',
+    'ID': 'zip_code',
     'Object ID': 'Object_ID',
     'Shape__Area': 'Geographic_Area',
     'Shape__Length': 'Geographic_Length',
