@@ -25,7 +25,7 @@ from collections import defaultdict
 
 # --- REDIS/RQ IMPORTS FOR ASYNC JOBS ---
 import redis
-from rq import Queue, Connection, Worker, get_current_job
+from rq import Queue, get_current_job
 
 # --- PATHS FOR MODEL, FEATURE NAMES, AND DATASET ---
 MODEL_PATH = "models/xgboost_model.pkl"  # Update if your model file is named differently
