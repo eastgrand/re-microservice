@@ -29,6 +29,8 @@ services:
         value: true
       - key: API_KEY
         sync: false  # This indicates that the value is secret and should be set in the Render dashboard
+      - key: REDIS_URL
+        value: rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379
       - key: MODEL_PATH
         value: models/xgboost_model.pkl
       - key: FEATURE_NAMES_PATH
