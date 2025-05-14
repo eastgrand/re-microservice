@@ -43,11 +43,21 @@ def patch_file(file_path):
             r'try:\n    import pyspark\nexcept ImportError as e:\n    pyspark = None',
             patched_content
         )
-        
-        # Fix catboost import (anywhere in the file)
-        patched_content = patched_content.replace(
-            'import catboost',
-            'try:\n    import catboost\nexcept ImportError:\n    catboost = None'
+
+        # Fix catboost import, preserving indentation
+        def catboost_replacer(match):
+            indent = match.group(1)
+            return (
+                f"{indent}try:\n"
+                f"{indent}    import catboost\n"
+                f"{indent}except ImportError:\n"
+                f"{indent}    catboost = None"
+            )
+        patched_content = re.sub(
+            r'^(\s*)import catboost\s*$',
+            catboost_replacer,
+            patched_content,
+            flags=re.MULTILINE
         )
     
     # Only write back if changes were made
