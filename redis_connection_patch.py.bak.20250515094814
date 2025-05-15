@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 '''
-SHAP Microservice Redis Connection Patch (FIXED)
-- This version fixes the TypeError with connection_pool parameter
-- Updated: May 15, 2025
+SHAP Microservice Redis Connection Patch
 '''
 
 import os
@@ -44,28 +42,62 @@ def patch_redis_connection():
         if 'retry_on_timeout' not in kwargs:
             kwargs['retry_on_timeout'] = True
             
-        # FIXED: Do not create our own connection pool, let Redis handle it
-        # This avoids the TypeError with connection_pool parameter
+        # Use connection pooling
+        if 'connection_pool' not in kwargs:
+            from redis import ConnectionPool
+            # ConnectionPool.from_url doesn't accept the same parameters as redis.from_url
+            # We need to create a ConnectionPool with the parsed URL components
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(url)
+            
+            # Extract connection parameters from URL
+            db = 0
+            if parsed_url.path:
+                try:
+                    db = int(parsed_url.path.replace('/', ''))
+                except (ValueError, TypeError):
+                    pass
+                    
+            # Parse query parameters if present
+            socket_timeout = redis_timeout
+            socket_keepalive = redis_socket_keepalive
+            socket_connect_timeout = redis_timeout
+            health_check_interval = 30
+            retry_on_timeout = True
+            
+            if parsed_url.query:
+                query_params = dict(urllib.parse.parse_qsl(parsed_url.query))
+                if 'socket_timeout' in query_params:
+                    socket_timeout = float(query_params['socket_timeout'])
+                if 'socket_keepalive' in query_params:
+                    socket_keepalive = query_params['socket_keepalive'].lower() == 'true'
+                if 'socket_connect_timeout' in query_params:
+                    socket_connect_timeout = float(query_params['socket_connect_timeout'])
+                if 'health_check_interval' in query_params:
+                    health_check_interval = int(query_params['health_check_interval'])
+                if 'retry_on_timeout' in query_params:
+                    retry_on_timeout = query_params['retry_on_timeout'].lower() == 'true'
+            
+            # Create the connection pool with the correct parameters
+            pool = ConnectionPool(
+                host=parsed_url.hostname,
+                port=parsed_url.port or 6379,
+                db=db,
+                username=parsed_url.username,
+                password=parsed_url.password,
+                max_connections=redis_pool_size,
+                socket_timeout=socket_timeout,
+                socket_keepalive=socket_keepalive,
+                socket_connect_timeout=socket_connect_timeout,
+                health_check_interval=health_check_interval,
+                retry_on_timeout=retry_on_timeout
+            )
+            kwargs['connection_pool'] = pool
         
         # Create the Redis client with the enhanced settings
-        try:
-            client = original_from_url(url, **kwargs)
-            logger.info(f"Created enhanced Redis client with improved connection handling")
-            return client
-        except Exception as e:
-            logger.error(f"Error creating Redis client: {str(e)}")
-            # If failed with our settings, try with minimal settings
-            if len(kwargs) > 0:
-                logger.info("Attempting connection with minimal settings")
-                try:
-                    client = original_from_url(url)
-                    logger.info("Successfully connected with minimal settings")
-                    return client
-                except Exception as minimal_e:
-                    logger.error(f"Error with minimal settings: {str(minimal_e)}")
-                    raise
-            else:
-                raise
+        client = original_from_url(url, **kwargs)
+        logger.info(f"Created enhanced Redis client with improved connection handling")
+        return client
     
     # Replace the original from_url with our patched version
     redis.from_url = patched_from_url
@@ -117,33 +149,6 @@ def patch_redis_connection():
     
     return True
 
-def add_failsafe_methods():
-    '''Add failsafe methods to Redis to handle connection issues'''
-    import redis
-    
-    # Store original ping method
-    original_ping = redis.Redis.ping
-    
-    @wraps(original_ping)
-    def safe_ping(self):
-        '''Enhanced version of ping with better error handling'''
-        try:
-            return original_ping(self)
-        except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-            logger.error(f"Redis ping error: {str(e)}")
-            # Try to reconnect
-            try:
-                if hasattr(self, 'connection_pool'):
-                    self.connection_pool.disconnect()
-                return original_ping(self)
-            except Exception as retry_e:
-                logger.error(f"Redis ping retry failed: {str(retry_e)}")
-                return False
-    
-    # Replace with safer version
-    redis.Redis.ping = safe_ping
-    logger.info("Added failsafe methods to Redis client")
-
 def wrap_redis_queue_functions():
     '''Wrap Redis Queue functions with better error handling'''
     try:
@@ -187,7 +192,6 @@ def wrap_redis_queue_functions():
 def apply_all_patches():
     '''Apply all Redis-related patches'''
     patch_redis_connection()
-    add_failsafe_methods()
     wrap_redis_queue_functions()
     logger.info("All Redis patches applied successfully")
     

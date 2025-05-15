@@ -6,6 +6,7 @@ The SHAP microservice was experiencing issues with Redis connections:
 - Jobs getting stuck in the "started" state
 - Timeouts in the service's health check endpoints
 - Occasional Redis connection errors
+- Type error with connection_pool parameter (`TypeError: __init__() got an unexpected keyword argument 'connection_pool'`)
 
 ## Solution
 We've implemented several improvements to the Redis connection handling in the SHAP microservice:
@@ -79,6 +80,25 @@ If Redis connection issues persist:
 2. Verify the Redis service is running and accessible
 3. Check the logs for any connection errors
 4. Try increasing the `REDIS_TIMEOUT` value
+
+### Recent Connection Pool Error
+
+We encountered a specific error with the connection pool implementation:
+
+```
+TypeError: __init__() got an unexpected keyword argument 'connection_pool'
+```
+
+This error occurred because our implementation was trying to:
+1. Create a connection pool using `ConnectionPool.from_url()`
+2. Pass this pool to `redis.from_url()` which doesn't accept it
+
+The fix was to simplify our approach by:
+1. Removing the custom connection pool creation
+2. Using Redis's built-in connection pooling mechanism
+3. Adding better error handling and fallback mechanisms
+
+This fix has been deployed in the updated `redis_connection_patch.py` file.
 
 ## Technical Details
 
