@@ -355,9 +355,9 @@ def setup_environment():
             logger.error(f"Error during model training: {e}")
             logger.error(f"Error output: {e.stderr}")
             return False
-    except Exception as e:
-        logger.error(f"Unexpected error during model training: {e}")
-        return False
+        except Exception as e:
+            logger.error(f"Unexpected error during model training: {e}")
+            return False
     
     # Step 5: Verify that the model file exists
     model_path = 'models/xgboost_model.pkl'
