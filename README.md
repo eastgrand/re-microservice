@@ -67,6 +67,22 @@ Memory usage thresholds control different optimization strategies:
 - 400MB+: High - Skips cross-validation and reduces data size
 - 350MB+: Moderate - Reduces model complexity
 
+### Deployment Optimization
+
+The service includes a feature to skip model training during deployment for faster updates:
+
+1. **Training Toggle**: Control whether model training runs during deployment
+2. **Skip Training**: Enable with `python skip_training.py enable` for faster deployments
+3. **Re-enable Training**: Use `python skip_training.py disable` when data changes
+
+For detailed information about deployment optimization, see [DEPLOYMENT-OPTIMIZATION.md](./DEPLOYMENT-OPTIMIZATION.md).
+
+Benefits of skipping model training during deployment:
+- Significantly faster deployment times (5-10 minutes faster)
+- Reduced memory usage during deployment
+- Less strain on CI/CD resources
+- Improved reliability for code-only updates
+
 ## API Endpoints
 
 ### Health Check

@@ -26,6 +26,10 @@ ENV/
 
 # Model files
 models/*.pkl
+models/feature_names.txt
+
+# But never ignore the .skip_training flag 
+!.skip_training
 
 # Jupyter Notebooks
 .ipynb_checkpoints

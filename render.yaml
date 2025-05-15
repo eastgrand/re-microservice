@@ -3,7 +3,10 @@ services:
     name: nesto-mortgage-analytics
     env: python
     plan: starter
-    buildCommand: ./deploy_to_render.sh
+    buildCommand: >-
+      echo "Starting build process with skip-training check" && 
+      chmod +x ./deploy_to_render.sh && 
+      ./deploy_to_render.sh
     startCommand: >-
       echo "Starting server on port $PORT" &&
       python -c "import time; time.sleep(2); print('Pre-starting delay complete')" &&

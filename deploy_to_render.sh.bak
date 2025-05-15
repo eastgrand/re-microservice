@@ -5,7 +5,7 @@ set -e
 echo "Preparing for deployment to Render..."
 
 # Install dependencies
-python3 -m pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler
+python -m pip install --force-reinstall --no-cache-dir -r requirements.txt memory-profiler
 
 # Enable memory optimization environment variables
 export MEMORY_OPTIMIZATION=true
@@ -14,14 +14,14 @@ export AGGRESSIVE_MEMORY_MANAGEMENT=true
 
 # Apply compatibility patches
 echo "Applying compatibility patches..."
-python3 fix_flask_werkzeug.py
-python3 patch_shap.py
+python fix_flask_werkzeug.py
+python patch_shap.py
 
 # Run setup and data preparation scripts
 echo "Running setup script with memory optimization..."
-python3 setup_for_render.py
-python3 fix_categorical_types.py
-python3 fix_categorical_data.py
+python setup_for_render.py
+python fix_categorical_types.py
+python fix_categorical_data.py
 
 # Check if we should skip model training
 if [ -f ".skip_training" ]; then
@@ -34,14 +34,14 @@ if [ -f ".skip_training" ]; then
     else
         echo "⚠️  Warning: Model files not found but skip_training flag is set"
         echo "⚠️  Will create minimal model as fallback"
-        python3 create_minimal_model.py
+        python create_minimal_model.py
     fi
 else
     echo "🔄 Training model (use .skip_training file to skip this step)..."
     # Create minimal model as backup first
-    python3 create_minimal_model.py
+    python create_minimal_model.py
     # Train full model
-    python3 train_model.py
+    python train_model.py
 fi
 
 # Check if model was created successfully
