@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: nesto-mortgage-analytics
+    env: python
+    plan: starter
+    buildCommand: >-
+      echo "Starting build process with FORCED skip-training" && 
+      chmod +x ./deploy_to_render.sh &&
+      echo "This file indicates model training should be skipped during deployment" > .skip_training &&
+      export SKIP_MODEL_TRAINING=true &&
+      echo "⚡ SKIP TRAINING ENABLED - Model training will be bypassed" &&
+      ./deploy_to_render.sh
+    startCommand: >-
+      echo "Starting server on port $PORT" &&
+      python -c "import time; time.sleep(2); print('Pre-starting delay complete')" &&
+      gunicorn app:app -c gunicorn_config.py --preload
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.18
+      - key: DEBUG
+        value: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: REQUIRE_AUTH
+        value: true
+      - key: API_KEY
+        sync: false  # This indicates that the value is secret and should be set in the Render dashboard
+      - key: REDIS_URL
+        value: rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379
+      - key: MODEL_PATH
+        value: models/xgboost_model.pkl
+      - key: FEATURE_NAMES_PATH
+        value: models/feature_names.txt
+      - key: DATASET_PATH
+        value: data/cleaned_data.csv
+      - key: MEMORY_OPTIMIZATION
+        value: true
+      - key: MAX_MEMORY_MB
+        value: 400
+      - key: DEFAULT_TARGET
+        value: Mortgage_Approvals
+      - key: DEFAULT_ANALYSIS_TYPE
+        value: ranking
+      - key: AGGRESSIVE_MEMORY_MANAGEMENT
+        value: true
+      - key: SKIP_MODEL_TRAINING
+        value: true
+
+  - type: worker
+    name: shap-microservice-worker
+    env: python
+    plan: starter
+    buildCommand: python -m pip install --force-reinstall --no-cache-dir -r requirements.txt
+    startCommand: >-
+      echo "Starting worker with automatic job monitoring" &&
+      python3 -c "from worker_process_fix import apply_all_worker_patches; apply_all_worker_patches()" &&
+      python3 repair_stuck_jobs.py --force &&
+      rq worker --burst shap-jobs --url $REDIS_URL
+    envVars:
+      - key: REDIS_URL
+        value: rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379
+      - key: API_KEY
+        sync: false  # This indicates that the value is secret and should be set in the Render dashboard
