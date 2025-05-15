@@ -19,6 +19,8 @@ services:
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
     envVars:
+      - key: SHAP_MAX_BATCH_SIZE
+        value: "500"
       - key: REDIS_URL
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
