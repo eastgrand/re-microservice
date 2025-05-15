@@ -24,7 +24,7 @@ from redis_connection_patch import apply_all_patches
 from worker_process_fix import apply_all_worker_patches  # Added worker process fixes
 # Memory optimization for SHAP analysis
 try:
-    from shap_memory_fix import apply_all_patches as apply_memory_patches
+    from shap_memory_fix import apply_memory_patches
 except ImportError:
     print("SHAP memory optimization not available. For better performance, run ./deploy_shap_fix.sh")
 
