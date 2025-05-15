@@ -71,16 +71,23 @@ def patch_redis_connection():
     redis.from_url = patched_from_url
     logger.info("Redis connection handling has been patched")
     
-    # Add Redis health check endpoint to Flask app
+    # NO LONGER directly register the endpoint here
+    # This was causing the context error
+    
+    return True
+
+# Modified to be a standalone function rather than a nested one
+def register_redis_ping_endpoint(app):
+    '''Register the Redis ping endpoint with the Flask app'''
     try:
-        from flask import current_app, jsonify
+        from flask import jsonify
         
-        @current_app.route('/admin/redis_ping', methods=['GET'])
+        @app.route('/admin/redis_ping', methods=['GET'])
         def redis_ping():
             '''Test Redis connection with PING command'''
             try:
                 # Get the Redis connection from the app
-                redis_conn = current_app.config.get('redis_conn')
+                redis_conn = app.config.get('redis_conn')
                 if not redis_conn:
                     # Fall back to global redis_conn if available
                     import sys
@@ -112,10 +119,10 @@ def patch_redis_connection():
                 }), 500
         
         logger.info("Added Redis health check endpoint: /admin/redis_ping")
+        return True
     except Exception as e:
         logger.error(f"Could not add Redis health check endpoint: {str(e)}")
-    
-    return True
+        return False
 
 def add_failsafe_methods():
     '''Add failsafe methods to Redis to handle connection issues'''
@@ -184,11 +191,25 @@ def wrap_redis_queue_functions():
     except Exception as e:
         logger.error(f"Error patching RQ functions: {str(e)}")
 
-def apply_all_patches():
-    '''Apply all Redis-related patches'''
+def apply_all_patches(app=None):
+    '''
+    Apply all Redis-related patches
+    
+    Args:
+        app: Optional Flask application instance. If provided, Redis health check
+             endpoint will be registered with this app.
+    '''
     patch_redis_connection()
     add_failsafe_methods()
     wrap_redis_queue_functions()
+    
+    # If app is provided, register the Redis ping endpoint
+    if app is not None:
+        # Call the function directly since it's now a top-level function
+        # This ensures we're not trying to access it through module attributes
+        register_redis_ping_endpoint(app)
+        logger.info("Registered Redis health check endpoint with provided Flask app")
+    
     logger.info("All Redis patches applied successfully")
     
 if __name__ == "__main__":
