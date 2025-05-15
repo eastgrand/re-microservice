@@ -4,7 +4,14 @@ Setup script to prepare the environment for deployment to Render.com.
 This script ensures all data files and models are correctly prepared.
 """
 
+# SKIP TRAINING CHECK - Added May 15, 2025
 import os
+SKIP_TRAINING = os.path.exists(".skip_training") or os.environ.get("SKIP_MODEL_TRAINING") == "true"
+if SKIP_TRAINING:
+    print("⚡ SKIP TRAINING FLAG DETECTED - MODEL TRAINING WILL BE BYPASSED")
+    # Set environment variable to ensure other scripts know about this too
+    os.environ["SKIP_MODEL_TRAINING"] = "true"
+
 import sys
 import logging
 import subprocess
@@ -317,16 +324,37 @@ def setup_environment():
         logger.error(f"Error during data mapping: {e}")
         return False
     
-    # Step 4: Run the model training script
-    try:
-        logger.info("Training model...")
-        result = subprocess.run([sys.executable, 'train_model.py'], 
-                              capture_output=True, text=True, check=True)
-        logger.info("Model training completed successfully")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Error during model training: {e}")
-        logger.error(f"Error output: {e.stderr}")
-        return False
+    # Step 4: Run the model training script (unless skipped)
+    if SKIP_TRAINING:
+        logger.info("⚡ SKIPPING MODEL TRAINING due to skip_training flag")
+        logger.info("Using existing model files from repository")
+        
+        # Verify model files exist
+        if os.path.exists("models/xgboost_model.pkl") and os.path.exists("models/feature_names.txt"):
+            logger.info("✅ Model files found - proceeding without training")
+            return True
+        else:
+            logger.warning("⚠️ Model files not found but skip_training is enabled")
+            logger.info("Creating minimal model instead...")
+            try:
+                result = subprocess.run([sys.executable, 'create_minimal_model.py'], 
+                                  capture_output=True, text=True, check=True)
+                logger.info("Created minimal model successfully")
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Error creating minimal model: {e}")
+                logger.error(f"Error output: {e.stderr}")
+                return False
+    else:
+        try:
+            logger.info("Training model...")
+            result = subprocess.run([sys.executable, 'train_model.py'], 
+                                  capture_output=True, text=True, check=True)
+            logger.info("Model training completed successfully")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error during model training: {e}")
+            logger.error(f"Error output: {e.stderr}")
+            return False
     except Exception as e:
         logger.error(f"Unexpected error during model training: {e}")
         return False

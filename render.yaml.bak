@@ -51,11 +51,7 @@ services:
     env: python
     plan: starter
     buildCommand: python -m pip install --force-reinstall --no-cache-dir -r requirements.txt
-    startCommand: >-
-    echo "Starting worker with automatic job monitoring" &&
-    python3 -c "from worker_process_fix import apply_all_worker_patches; apply_all_worker_patches()" &&
-    python3 repair_stuck_jobs.py --force &&
-    rq worker --burst shap-jobs --url $REDIS_URL
+    startCommand: rq worker shap-jobs --url $REDIS_URL
     envVars:
       - key: REDIS_URL
         value: rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379

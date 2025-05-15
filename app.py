@@ -21,6 +21,7 @@ from collections import defaultdict
 
 # Redis connection patch for better stability
 from redis_connection_patch import apply_all_patches
+from worker_process_fix import apply_all_worker_patches  # Added worker process fixes
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
 CORS(app)
@@ -117,7 +118,7 @@ if not REDIS_URL:
 # First create a Flask application context
 with app.app_context():
     # Apply Redis connection patches for better stability - pass the app instance
-    apply_all_patches(app)
+    apply_all_worker_patches(app)
     
     # Create Redis connection - now patched version will be used
     redis_conn = redis.from_url(REDIS_URL)

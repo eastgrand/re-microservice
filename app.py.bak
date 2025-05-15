@@ -1,6 +1,3 @@
-
-
-
 # --- EARLY LOGGING SETUP (fixes NameError: logger not defined) ---
 import os
 import sys
@@ -21,6 +18,9 @@ from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
 
+
+# Redis connection patch for better stability
+from redis_connection_patch import apply_all_patches
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
 CORS(app)
@@ -113,8 +113,21 @@ if not REDIS_URL:
     # Final fallback for local dev
     REDIS_URL = 'redis://localhost:6379/0'
     logger.info(f"[DEBUG] REDIS_URL falling back to localhost: {REDIS_URL}")
-redis_conn = redis.from_url(REDIS_URL)
-queue = Queue('shap-jobs', connection=redis_conn)
+
+# First create a Flask application context
+with app.app_context():
+    # Apply Redis connection patches for better stability - pass the app instance
+    apply_all_patches(app)
+    
+    # Create Redis connection - now patched version will be used
+    redis_conn = redis.from_url(REDIS_URL)
+    
+    # Store Redis connection in app config for endpoint access
+    app.config['redis_conn'] = redis_conn
+    
+    # Initialize the job queue with the connection
+    logger.info("Initializing Redis Queue for job processing...")
+    queue = Queue('shap-jobs', connection=redis_conn)
 
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
@@ -404,13 +417,13 @@ def root():
 
 @app.route('/ping', methods=['GET'])
 def ping():
-    import sys
+    """Simple endpoint to check if service is running - no auth required."""
+    import datetime
     return jsonify({
-        "status": "OK",
-        "message": "SHAP microservice is responding",
-        "python_version": sys.version,
-        "is_render": 'RENDER' in os.environ,
-        "environment": {k: v for k, v in os.environ.items() if not k.startswith('_') and k.isupper()}
+        "status": "ok",
+        "message": "SHAP Microservice is running",
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "version": "1.2.0"  # Update this when making significant changes
     })
 
 @app.route('/versions', methods=['GET'])
@@ -452,6 +465,18 @@ def health_check():
         memory_usage = process.memory_info().rss / (1024 * 1024)
     except ImportError:
         memory_usage = "psutil not installed"
+    
+    # Check Redis connection
+    redis_status = {"connected": False, "error": None}
+    try:
+        redis_conn = app.config.get('redis_conn')
+        if redis_conn:
+            redis_status["connected"] = redis_conn.ping()
+        else:
+            redis_status["error"] = "Redis connection not found in app config"
+    except Exception as e:
+        redis_status["error"] = str(e)
+    
     model_version = version_tracker.get_latest_model()
     dataset_version = version_tracker.get_latest_dataset()
     model_version_info = None
@@ -482,10 +507,12 @@ def health_check():
             "version_info": model_version_info
         },
         "dataset": {
-        "shape": f"{dataset.shape[0]} rows, {dataset.shape[1]} columns" if dataset is not None else None,
-        "columns": list(dataset.columns) if dataset is not None else None,
+            "shape": f"{dataset.shape[0]} rows, {dataset.shape[1]} columns" if dataset is not None else None,
+            "columns": list(dataset.columns) if dataset is not None else None,
             "version_info": dataset_version_info
         },
+        "redis_connected": redis_status["connected"],
+        "redis_status": redis_status,
         "system_info": {
             "python_version": platform.python_version(),
             "system": platform.system(),
