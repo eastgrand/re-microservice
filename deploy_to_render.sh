@@ -23,21 +23,36 @@ python3 setup_for_render.py
 python3 fix_categorical_types.py
 python3 fix_categorical_data.py
 
-# Check if we should skip model training
+# Use both direct flag check and environment variable for flexibility
+SKIP_TRAINING=false
+
+# Check if skip flag file exists
 if [ -f ".skip_training" ]; then
     echo "🔄 Skip training flag detected (.skip_training file exists)"
+    SKIP_TRAINING=true
+fi
+
+# Also check for environment variable override
+if [ "$SKIP_MODEL_TRAINING" = "true" ]; then
+    echo "🔄 Skip training environment variable detected (SKIP_MODEL_TRAINING=true)"
+    SKIP_TRAINING=true
+fi
+
+# Apply the skipping logic
+if [ "$SKIP_TRAINING" = "true" ]; then
     echo "🔄 Skipping model training step..."
+    echo "🔄 This will make deployment much faster!"
     
     # Check if model file exists
     if [ -f "models/xgboost_model.pkl" ] && [ -f "models/feature_names.txt" ]; then
         echo "✅ Using existing model files from repository"
     else
-        echo "⚠️  Warning: Model files not found but skip_training flag is set"
+        echo "⚠️  Warning: Model files not found but skip_training is enabled"
         echo "⚠️  Will create minimal model as fallback"
         python3 create_minimal_model.py
     fi
 else
-    echo "🔄 Training model (use .skip_training file to skip this step)..."
+    echo "🔄 Training model (set SKIP_MODEL_TRAINING=true or create .skip_training to skip)..."
     # Create minimal model as backup first
     python3 create_minimal_model.py
     # Train full model

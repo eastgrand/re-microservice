@@ -5,7 +5,12 @@ services:
     plan: starter
     buildCommand: >-
       echo "Starting build process with skip-training check" && 
-      chmod +x ./deploy_to_render.sh && 
+      chmod +x ./deploy_to_render.sh &&
+      if [ -f ".skip_training" ]; then
+        echo "Skip training flag detected at deployment start - will bypass model training";
+      else
+        echo "No skip training flag found - model will be trained";
+      fi && 
       ./deploy_to_render.sh
     startCommand: >-
       echo "Starting server on port $PORT" &&
@@ -39,6 +44,8 @@ services:
       - key: DEFAULT_ANALYSIS_TYPE
         value: ranking
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
+        value: true
+      - key: SKIP_MODEL_TRAINING
         value: true
 
   - type: worker

@@ -83,6 +83,58 @@ Benefits of skipping model training during deployment:
 - Less strain on CI/CD resources
 - Improved reliability for code-only updates
 
+# Deployment Optimization: Model Training Skip Feature
+
+## Overview
+
+This feature allows you to skip the time-consuming model training step during deployment, making testing and deployment much faster. The model training step can take several minutes, which is unnecessary when you're just testing changes unrelated to the model.
+
+## How to Use
+
+### Option 1: Use the Deployment Script
+
+The easiest way to deploy with model training skipped:
+
+```sh
+./deploy_skip_trained_model.sh
+```
+
+This script will:
+1. Create the `.skip_training` flag file
+2. Ensure it's tracked in git
+3. Push changes to trigger deployment
+
+### Option 2: Manual Control
+
+You can manually control the model training skip feature:
+
+```sh
+# Enable skipping (will skip model training on next deployment)
+python3 skip_training.py enable
+
+# Disable skipping (will perform model training on next deployment)
+python3 skip_training.py disable
+
+# Check current status
+python3 skip_training.py status
+```
+
+### Option 3: Environment Variable
+
+Set `SKIP_MODEL_TRAINING=true` in your environment or in the Render dashboard.
+
+## How It Works
+
+The feature works by:
+1. Creating a `.skip_training` flag file which is tracked in git
+2. The deployment script checks for this flag or the `SKIP_MODEL_TRAINING` environment variable
+3. If either is present, model training is skipped and existing model files are used
+
+## Requirements
+
+- You must have trained the model at least once
+- Model files must exist in the `models/` directory
+
 ## API Endpoints
 
 ### Health Check
