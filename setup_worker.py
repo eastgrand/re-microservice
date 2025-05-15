@@ -283,7 +283,8 @@ def start_worker():
     
     try:
         import redis
-        from rq import Queue, Connection, Worker
+        # Modified import - removed Connection since it's not available in newer RQ versions
+        from rq import Queue, Worker
         from rq.job import Job
         
         # Connect to Redis with improved parameters
@@ -336,16 +337,16 @@ def start_worker():
         
         # Start worker with improved settings
         logger.info("Starting worker...")
-        with Connection(conn):
-            worker = Worker(['shap-jobs'], name=f"memory-optimized-worker-{os.getpid()}")
-            logger.info(f"Worker started with ID {worker.name}")
-            logger.info("Listening for jobs on queue: shap-jobs")
-            logger.info(f"Using max batch size: {MAX_ROWS_TO_PROCESS} rows")
-            
-            # Start working (with exception handling)
-            try:
-                worker.work(with_scheduler=True)
-            except KeyboardInterrupt:
+        # Create worker directly without Connection context manager
+        worker = Worker(['shap-jobs'], connection=conn, name=f"memory-optimized-worker-{os.getpid()}")
+        logger.info(f"Worker started with ID {worker.name}")
+        logger.info("Listening for jobs on queue: shap-jobs")
+        logger.info(f"Using max batch size: {MAX_ROWS_TO_PROCESS} rows")
+        
+        # Start working (with exception handling)
+        try:
+            worker.work(with_scheduler=True)
+        except KeyboardInterrupt:
                 logger.info("Worker stopped by user")
                 sys.exit(0)
             except Exception as e:
