@@ -30,10 +30,10 @@ AGGRESSIVE_MEMORY = os.environ.get('AGGRESSIVE_MEMORY_MANAGEMENT', 'false').lowe
 if AGGRESSIVE_MEMORY:
     logger.info("AGGRESSIVE memory optimization mode is ENABLED")
     # More aggressive thresholds for Render to start optimizing earlier
-    DEFAULT_MAX_MEMORY_MB = 400
+    DEFAULT_MAX_MEMORY_MB = 450  # Increased from 400 to allow more data processing
 else:
     # Standard memory optimization thresholds
-    DEFAULT_MAX_MEMORY_MB = 450
+    DEFAULT_MAX_MEMORY_MB = 475  # Increased from 450 to utilize more memory safely
 
 def get_memory_usage():
     """Get current process memory usage in megabytes."""

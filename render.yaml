@@ -54,11 +54,11 @@ services:
     plan: starter
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
-        value: "true"
+        value: "false"  # Changed from true to optimize performance
       - key: SHAP_BATCH_SIZE
         value: "500"
       - key: SHAP_MAX_BATCH_SIZE
-        value: "300"  # Smaller batch size for workers to avoid memory issues
+        value: "500"  # Increased from 300 to improve throughput
       - key: REDIS_URL
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
