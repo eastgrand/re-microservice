@@ -43,7 +43,8 @@ services:
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
-      python3 setup_worker.py
+      chmod +x ./simple_worker.py &&
+      ./simple_worker.py
     plan: starter
     envVars:
       - key: SHAP_MAX_BATCH_SIZE
