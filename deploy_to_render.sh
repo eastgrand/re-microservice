@@ -50,6 +50,10 @@ if [ "$SKIP_TRAINING" = "true" ]; then
         echo "⚠️  Warning: Model files not found but skip_training is enabled"
         echo "⚠️  Will create minimal model as fallback"
         python3 create_minimal_model.py
+        # Copy minimal model files to standard locations
+        cp models/xgboost_minimal.pkl models/xgboost_model.pkl
+        cp models/minimal_feature_names.txt models/feature_names.txt
+        echo "✅ Copied minimal model to standard location"
     fi
 else
     echo "🔄 Training model (set SKIP_MODEL_TRAINING=true or create .skip_training to skip)..."
