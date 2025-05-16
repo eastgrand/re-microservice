@@ -33,6 +33,8 @@ else
     
     # Check if minimal model can be created
     if [ -f "create_minimal_model.py" ]; then
+        echo "Ensuring dependencies for minimal model..."
+        pip install numpy pandas xgboost scikit-learn
         echo "Creating minimal model..."
         python3 create_minimal_model.py
         

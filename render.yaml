@@ -42,12 +42,12 @@ services:
     plan: starter
     buildCommand: >-
       echo "Building optimized worker service" &&
+      pip install numpy pandas xgboost scikit-learn psutil python-dotenv rq redis &&
       chmod +x ./render_pre_deploy.sh &&
       ./render_pre_deploy.sh &&
       chmod +x ./deploy_to_render.sh &&
       export SKIP_MODEL_TRAINING=true &&
-      ./deploy_to_render.sh &&
-      pip install psutil python-dotenv rq redis
+      ./deploy_to_render.sh
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
