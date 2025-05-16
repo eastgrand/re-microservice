@@ -3,6 +3,7 @@
 # SHAP Microservice Comprehensive Fix Deployment Script
 # This script applies all fixes and deploys to Render
 # Date: May 15, 2025
+# Updated: May 15, 2025 - Fixed Connection import issue in worker
 
 echo "====================================="
 echo "SHAP Microservice Comprehensive Fix"
@@ -226,17 +227,34 @@ EOF
 fi
 
 echo "====================================="
-echo "Deployment preparation complete!"
+echo "Fixing worker issues and deploying changes..."
+echo "====================================="
+
+# Ensure the simple_worker.py script is executable
+chmod +x ./simple_worker.py
+
+# Make a backup of setup_worker.py
+cp -f setup_worker.py "backups/setup_worker.py.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || cp -f setup_worker.py setup_worker.py.bak
+
+# Commit the changes
+echo "Committing changes..."
+git add render.yaml simple_worker.py setup_worker.py
+git commit -m "Fix: Comprehensive worker fix - removed Connection dependency and added simple_worker.py"
+
+# Push to GitHub
+echo "Pushing changes to GitHub..."
+git push origin main
+
+echo "====================================="
+echo "Deployment complete!"
 echo "====================================="
 echo ""
-echo "The SHAP memory optimization fix has been applied. To deploy to Render:"
+echo "The following fixes have been applied:"
 echo ""
-echo "1. Push your changes to GitHub:"
-echo "   git push origin main"
+echo "1. Fixed setup_worker.py to remove Connection import dependency"
+echo "2. Updated render.yaml to use simple_worker.py as an alternative"
 echo ""
-echo "2. Trigger a manual deploy on Render or wait for automatic deployment"
-echo ""
-echo "3. After deployment, verify the fix is working:"
-echo "   python verify_shap_fix.py"
+echo "Wait for Render.com to complete the deployment (~5 minutes)"
+echo "Then verify the fix by checking the worker logs in the Render dashboard"
 echo ""
 echo "For more information, see SHAP-MEMORY-FIX.md"

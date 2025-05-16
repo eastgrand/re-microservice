@@ -1,4 +1,3 @@
-# filepath: /Users/voldeck/code/shap-microservice/render.yaml
 services:
   # Main web service for the API endpoints
   - type: web
@@ -11,23 +10,16 @@ services:
       echo "This file indicates model training should be skipped during deployment" > .skip_training &&
       export SKIP_MODEL_TRAINING=true &&
       echo "⚡ SKIP TRAINING ENABLED - Model training will be bypassed" &&
-      ./deploy_to_render.sh &&
-      pip install psutil python-dotenv
+      ./deploy_to_render.sh
     startCommand: >-
       echo "Starting web service" &&
       python3 -c "import gc; gc.enable()" &&
       python3 -c "import sys; sys.path.append('.')" &&
       gunicorn --config=gunicorn_config.py app:app
     envVars:
-      - key: AGGRESSIVE_MEMORY_MANAGEMENT
-        value: "true"
-      - key: SHAP_BATCH_SIZE
-        value: "500"
       - key: SHAP_MAX_BATCH_SIZE
         value: "500"
       - key: REDIS_URL
-      - key: REDIS_HEALTH_CHECK_INTERVAL
-        value: "30"
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
@@ -45,23 +37,16 @@ services:
       chmod +x ./deploy_to_render.sh &&
       export SKIP_MODEL_TRAINING=true &&
       ./deploy_to_render.sh &&
-      pip install psutil python-dotenv rq redis
+      pip install psutil python-dotenv
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
-      chmod +x ./simple_worker.py &&
-      ./simple_worker.py
+      python3 setup_worker.py
     plan: starter
     envVars:
-      - key: AGGRESSIVE_MEMORY_MANAGEMENT
-        value: "true"
-      - key: SHAP_BATCH_SIZE
-        value: "500"
       - key: SHAP_MAX_BATCH_SIZE
         value: "300"  # Smaller batch size for workers to avoid memory issues
       - key: REDIS_URL
-      - key: REDIS_HEALTH_CHECK_INTERVAL
-        value: "30"
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
