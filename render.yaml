@@ -1,4 +1,4 @@
-# filepath: /Users/voldeck/code/shap-microservice/render.yaml
+# filepath: /Users/voldeck/code/shap-microservice/render.yaml.new
 services:
   # Main web service for the API endpoints
   - type: web
@@ -31,14 +31,15 @@ services:
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
       - key: API_KEY
-        sync: false  # This indicates that the value is secret and should be set in the Render dashboard
+        sync: false
       - key: PORT
         value: "10000"
-      
+  
   # Worker service for processing SHAP jobs
   - type: worker
     name: nesto-shap-worker
     env: python
+    plan: starter
     buildCommand: >-
       echo "Building optimized worker service" &&
       chmod +x ./render_pre_deploy.sh &&
@@ -52,17 +53,16 @@ services:
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
       chmod +x ./simple_worker.py &&
       ./simple_worker.py
-    plan: starter
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
-        value: "false"  # Changed from true to optimize performance
+        value: "false"
       - key: SHAP_BATCH_SIZE
         value: "500"
       - key: SHAP_MAX_BATCH_SIZE
-        value: "500"  # Increased from 300 to improve throughput
+        value: "500"
       - key: REDIS_URL
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
       - key: API_KEY
-        sync: false  # This indicates that the value is secret and should be set in the Render dashboard
+        sync: false
