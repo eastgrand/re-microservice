@@ -36,10 +36,26 @@ def main():
         json_fix.apply_json_patches()
         print("✅ Applied JSON serialization patches")
         
+        # Load and apply RQ serialization patch
+        try:
+            rq_fix = load_module_from_file("patch_rq_serialization.py", "patch_rq_serialization")
+            rq_fix.patch_rq_serialization()
+            print("✅ Applied RQ serialization patch")
+        except Exception as e:
+            print(f"Warning: Failed to apply RQ serialization patch: {str(e)}")
+        
         # Load and apply NaN JSON fix
         nan_fix = load_module_from_file("fix_nan_json.py", "fix_nan_json")
         nan_fix.fix_nan_in_json_result()
         print("✅ Applied NaN JSON fix")
+        
+        # Load and apply enhanced diagnostics
+        try:
+            diag = load_module_from_file("enhanced_diagnostics.py", "enhanced_diagnostics")
+            diag.install_diagnostic_hooks()
+            print("✅ Applied enhanced diagnostics")
+        except Exception as e:
+            print(f"Warning: Failed to apply enhanced diagnostics: {str(e)}")
         
         # Create flag file
         with open(PATCH_FLAG, "w") as f:
