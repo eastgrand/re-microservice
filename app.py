@@ -580,6 +580,89 @@ def get_metadata():
         logger.error(f"Error getting metadata: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# Add worker status endpoint
+@app.route('/worker-status', methods=['GET'])
+def worker_status():
+    """Check status of RQ workers"""
+    try:
+        # Get Redis connection
+        redis_conn = get_redis_connection() 
+        
+        if not redis_conn:
+            return jsonify({
+                'status': 'error',
+                'message': 'Redis connection not available'
+            }), 500
+        
+        # Get all workers
+        workers_key = 'rq:workers'
+        worker_keys = redis_conn.smembers(workers_key)
+        
+        # Check if there are any workers
+        if not worker_keys:
+            return jsonify({
+                'status': 'warning',
+                'message': 'No workers registered',
+                'workers': []
+            })
+            
+        workers_info = []
+        active_workers = 0
+        for worker_key in worker_keys:
+            try:
+                # Get worker info
+                worker_name = worker_key.decode('utf-8').replace('rq:worker:', '')
+                
+                # Check worker heartbeat
+                heartbeat_key = f"{worker_key.decode('utf-8')}:heartbeat"
+                last_heartbeat = redis_conn.get(heartbeat_key)
+                
+                if last_heartbeat:
+                    # Calculate time since last heartbeat
+                    last_beat_time = float(last_heartbeat.decode('utf-8'))
+                    time_since_beat = time.time() - last_beat_time
+                    is_active = time_since_beat < 60  # Consider active if heartbeat in last 60 seconds
+                    if is_active:
+                        active_workers += 1
+                else:
+                    time_since_beat = None
+                    is_active = False
+                
+                # Get current jobs
+                current_job_id = redis_conn.get(f"{worker_key.decode('utf-8')}:current_job")
+                if current_job_id:
+                    current_job = current_job_id.decode('utf-8')
+                else:
+                    current_job = None
+                
+                # Add to workers info
+                workers_info.append({
+                    'name': worker_name,
+                    'active': is_active,
+                    'last_heartbeat_seconds_ago': time_since_beat if time_since_beat else None,
+                    'current_job': current_job
+                })
+            except Exception as e:
+                logger.error(f"Error getting info for worker {worker_key}: {str(e)}")
+                workers_info.append({
+                    'name': worker_key.decode('utf-8'),
+                    'error': str(e)
+                })
+        
+        # Return worker status
+        return jsonify({
+            'status': 'ok' if active_workers > 0 else 'warning',
+            'active_workers': active_workers,
+            'total_workers': len(worker_keys),
+            'workers': workers_info
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking worker status: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 # Error handlers
 class APIError(Exception):
     def __init__(self, message, status_code=400):
@@ -600,6 +683,40 @@ def handle_generic_exception(error):
     response = jsonify({"success": False, "error": "An internal server error occurred. Please try again later."})
     response.status_code = 500
     return response
+
+def get_redis_connection():
+    """Get Redis connection from app config or create a new one"""
+    if hasattr(app, 'config') and 'redis_conn' in app.config:
+        return app.config['redis_conn']
+    
+    # Try to create a new connection
+    try:
+        import redis
+        import os
+        
+        redis_url = os.environ.get('REDIS_URL')
+        if not redis_url:
+            logger.error("REDIS_URL environment variable not set")
+            return None
+            
+        # Create Redis connection with improved parameters
+        redis_conn = redis.from_url(
+            redis_url,
+            socket_timeout=int(os.environ.get('REDIS_TIMEOUT', '10')),
+            socket_connect_timeout=int(os.environ.get('REDIS_CONNECT_TIMEOUT', '10')),
+            socket_keepalive=os.environ.get('REDIS_SOCKET_KEEPALIVE', 'true').lower() == 'true',
+            health_check_interval=int(os.environ.get('REDIS_HEALTH_CHECK_INTERVAL', '30')),
+            retry_on_timeout=True
+        )
+        
+        # Store in app config for future use
+        if hasattr(app, 'config'):
+            app.config['redis_conn'] = redis_conn
+            
+        return redis_conn
+    except Exception as e:
+        logger.error(f"Error creating Redis connection: {str(e)}")
+        return None
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

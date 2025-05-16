@@ -1,6 +1,7 @@
 #!/bin/bash
 # Post-Deployment Verification Script for SHAP Microservice
 # This script helps verify that the SHAP microservice has been deployed correctly
+# Updated May 15, 2025: Added worker registration check
 
 # Terminal colors
 GREEN='\033[0;32m'
@@ -49,7 +50,22 @@ else
     echo -e "${YELLOW}Check Redis connection settings in Render environment variables${NC}"
 fi
 
-# Step 3: Check memory usage
+# Step 3: Check worker status
+echo -e "${YELLOW}Checking worker status (via API)...${NC}"
+WORKER_CHECK=$(curl -s "$SERVICE_URL/worker-status" || echo "Failed to get worker status")
+if [[ "$WORKER_CHECK" == *"active"* ]]; then
+    echo -e "${GREEN}✅ Worker is active and processing jobs${NC}"
+    echo -e "$WORKER_CHECK"
+elif [[ "$WORKER_CHECK" == *"worker"* ]]; then
+    echo -e "${YELLOW}⚠️ Worker information available but status unclear${NC}"
+    echo -e "$WORKER_CHECK"
+else
+    echo -e "${RED}❌ Cannot verify worker status${NC}"
+    echo -e "${YELLOW}Check the worker logs in Render dashboard${NC}"
+    echo -e "${YELLOW}Make sure the worker service is running${NC}"
+fi
+
+# Step 4: Check memory usage
 echo -e "${YELLOW}Checking memory usage (via API)...${NC}"
 MEMORY_CHECK=$(curl -s "$SERVICE_URL/memory-stats" || echo "Failed to get memory stats")
 if [[ "$MEMORY_CHECK" == *"memory_usage_mb"* ]]; then
@@ -71,7 +87,7 @@ else
     echo -e "${YELLOW}Check logs in Render dashboard${NC}"
 fi
 
-# Step 4: Submit a test job
+# Step 5: Submit a test job
 echo -e "${YELLOW}Would you like to submit a test SHAP job? (y/n)${NC}"
 read -r response
 if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
@@ -136,15 +152,16 @@ else
     echo -e "${YELLOW}Skipping test job submission${NC}"
 fi
 
-# Step 5: Final verification summary
+# Step 6: Final verification summary
 echo -e "${BLUE}=================================================${NC}"
 echo -e "${BLUE}           Verification Summary                  ${NC}"
 echo -e "${BLUE}=================================================${NC}"
 echo -e "${YELLOW}1. Service Accessibility:${NC} Check if endpoints are accessible"
 echo -e "${YELLOW}2. Redis Connection:${NC} Verify Redis connection is stable"
-echo -e "${YELLOW}3. Memory Usage:${NC} Monitor in Render dashboard, should stay under 512MB"
-echo -e "${YELLOW}4. Job Processing:${NC} Ensure jobs progress from 'started' to 'completed'"
-echo -e "${YELLOW}5. Error Handling:${NC} Check logs for any recurring errors"
+echo -e "${YELLOW}3. Worker Status:${NC} Ensure worker is active and processing jobs"
+echo -e "${YELLOW}4. Memory Usage:${NC} Monitor in Render dashboard, should stay under 512MB"
+echo -e "${YELLOW}5. Job Processing:${NC} Ensure jobs progress from 'started' to 'completed'"
+echo -e "${YELLOW}6. Error Handling:${NC} Check logs for any recurring errors"
 echo -e ""
 echo -e "${GREEN}Verification process complete!${NC}"
 echo -e "${YELLOW}For ongoing monitoring, use the Render dashboard.${NC}"

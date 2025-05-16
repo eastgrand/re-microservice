@@ -1,5 +1,34 @@
 # SHAP Microservice Async Job Processing with RQ
 
+## Latest Updates (May 15, 2025)
+
+- **Worker Name Collision Fix**: Resolved an issue where workers would fail to start due to name collisions
+- **Memory Optimizations**: Increased thresholds and batch sizes for better performance
+- **Redis Connection Stability**: Enhanced error handling and retry mechanisms
+- **Deployment Scripts**: Added comprehensive deployment and verification scripts
+
+## Deployment to Render.com
+
+For detailed instructions on deploying to Render.com:
+1. See the [RENDER-DEPLOYMENT-GUIDE.md](RENDER-DEPLOYMENT-GUIDE.md)
+2. Use the provided deployment script:
+   ```sh
+   ./deploy_to_render_final.sh
+   ```
+3. Verify the deployment with:
+   ```sh
+   ./verify_render_deployment.sh
+   ```
+
+## Worker Name Collision Fix
+
+If you experience worker startup issues with the error `There exists an active worker named 'worker-name' already`, use the fix:
+```sh
+./fix_worker_name_collision.sh
+```
+
+This script enhances the worker naming scheme and cleans up stale worker registrations.
+
 ## How to run with RQ (Redis Queue)
 
 1. **Install dependencies:**
@@ -18,7 +47,11 @@
 
 4. **Start the RQ worker (in a new terminal):**
    ```sh
-   rq worker shap-tasks
+   # Use the enhanced worker script for better reliability:
+   ./simple_worker.py
+   
+   # Or the traditional RQ worker command:
+   rq worker shap-jobs
    ```
 
 5. **Submit jobs to `/analyze` and poll `/job_status/<job_id>` as before.**

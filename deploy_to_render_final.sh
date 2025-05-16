@@ -1,6 +1,7 @@
 #!/bin/bash
 # SHAP Microservice Deployment Script to Render.com
 # This script prepares and verifies all components before deployment
+# Updated May 15, 2025: Added worker name collision fix
 
 # Terminal colors
 GREEN='\033[0;32m'
@@ -34,18 +35,33 @@ for file in "${REQUIRED_FILES[@]}"; do
     fi
 done
 
-# Step 2: Create .skip_training file
+# Step 2: Apply worker name collision fix
+echo -e "${YELLOW}Applying worker name collision fix...${NC}"
+if [ -f "fix_worker_name_collision.sh" ]; then
+    chmod +x ./fix_worker_name_collision.sh
+    ./fix_worker_name_collision.sh
+    echo -e "${GREEN}✅ Worker name collision fix applied${NC}"
+else
+    echo -e "${RED}⚠️ Warning: fix_worker_name_collision.sh not found${NC}"
+    echo -e "${YELLOW}Will use existing simple_worker.py${NC}"
+    # Ensure unique worker name in render.yaml
+    TIMESTAMP=$(date +%m%d%y%H%M)
+    sed -i.bak "s/name: nesto-mortgage-analytics-worker/name: nesto-mortgage-analytics-worker-${TIMESTAMP}/g" render.yaml
+    echo -e "${GREEN}✅ Updated worker name in render.yaml to include timestamp${NC}"
+fi
+
+# Step 3: Create .skip_training file
 echo -e "${YELLOW}Creating .skip_training flag file...${NC}"
 echo "Skip model training during deployment - $(date)" > .skip_training
 echo -e "${GREEN}✅ Created .skip_training flag file${NC}"
 
-# Step 3: Create directories
+# Step 4: Create directories
 echo -e "${YELLOW}Creating required directories...${NC}"
 mkdir -p models
 mkdir -p data
 echo -e "${GREEN}✅ Created required directories${NC}"
 
-# Step 4: Check for model files or create minimal model
+# Step 5: Check for model files or create minimal model
 echo -e "${YELLOW}Checking for model files...${NC}"
 if [ -f "models/xgboost_model.pkl" ] && [ -f "models/feature_names.txt" ]; then
     echo -e "${GREEN}✅ Found existing model files${NC}"
@@ -64,7 +80,7 @@ else
     fi
 fi
 
-# Step 5: Set optimized environment variables
+# Step 6: Set optimized environment variables
 echo -e "${YELLOW}Setting optimized environment variables...${NC}"
 export MEMORY_OPTIMIZATION=true
 export MAX_MEMORY_MB=475  # Increased from 450
@@ -76,7 +92,7 @@ export REDIS_TIMEOUT=10
 export SKIP_MODEL_TRAINING=true
 echo -e "${GREEN}✅ Set optimized environment variables${NC}"
 
-# Step 6: Update render.yaml configuration
+# Step 7: Update render.yaml configuration
 echo -e "${YELLOW}Updating render.yaml with optimized settings...${NC}"
 # Ensure worker settings are correctly configured
 sed -i.bak 's/AGGRESSIVE_MEMORY_MANAGEMENT.*value: "true"/AGGRESSIVE_MEMORY_MANAGEMENT\n        value: "false"/g' render.yaml
@@ -89,13 +105,17 @@ else
     echo -e "${GREEN}✅ Updated render.yaml with optimized settings${NC}"
 fi
 
-# Step 7: Prepare deployment package
+# Step 8: Prepare deployment package
 echo -e "${YELLOW}Preparing deployment package...${NC}"
-chmod +x ./prepare_render_deployment.sh
-./prepare_render_deployment.sh
-echo -e "${GREEN}✅ Deployment package prepared${NC}"
+if [ -f "./prepare_render_deployment.sh" ]; then
+    chmod +x ./prepare_render_deployment.sh
+    ./prepare_render_deployment.sh
+    echo -e "${GREEN}✅ Deployment package prepared${NC}"
+else
+    echo -e "${YELLOW}prepare_render_deployment.sh not found - skipping package preparation${NC}"
+fi
 
-# Step 8: Deploy to Render.com
+# Step 9: Deploy to Render.com
 echo -e "${BLUE}======================================================${NC}"
 echo -e "${BLUE}           Ready to deploy to Render.com             ${NC}"
 echo -e "${BLUE}======================================================${NC}"
@@ -115,7 +135,7 @@ read -r response
 if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
     echo -e "${YELLOW}Committing changes...${NC}"
     git add .
-    git commit -m "Deploy optimized SHAP microservice with memory optimizations"
+    git commit -m "Deploy optimized SHAP microservice with worker name collision fix"
     echo -e "${YELLOW}Pushing changes to remote repository...${NC}"
     git push origin main
     echo -e "${GREEN}✅ Changes pushed! Render.com will now deploy automatically.${NC}"
@@ -123,7 +143,7 @@ else
     echo -e "${YELLOW}Please perform manual deployment through the Render Dashboard.${NC}"
 fi
 
-# Step 9: Instructions for verifying deployment
+# Step 10: Instructions for verifying deployment
 echo -e "${BLUE}======================================================${NC}"
 echo -e "${BLUE}           Post-deployment verification              ${NC}"
 echo -e "${BLUE}======================================================${NC}"

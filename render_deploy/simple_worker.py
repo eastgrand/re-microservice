@@ -13,6 +13,7 @@ import gc
 import logging
 import time
 import traceback
+import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +21,44 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("simple-worker")
+
+def cleanup_stale_workers(conn):
+    """Clean up stale worker registrations from Redis"""
+    try:
+        logger.info("Checking for stale worker registrations...")
+        existing_workers_key = 'rq:workers'
+        worker_keys = conn.smembers(existing_workers_key)
+        
+        if not worker_keys:
+            logger.info("No existing workers found.")
+            return
+            
+        logger.info(f"Found {len(worker_keys)} worker registrations.")
+        cleaned = 0
+        
+        for worker_key in worker_keys:
+            try:
+                # Check if the worker is still alive using its heartbeat
+                heartbeat_key = f"{worker_key.decode()}:heartbeat"
+                last_heartbeat = conn.get(heartbeat_key)
+                
+                # If no heartbeat or heartbeat is old (>60 seconds), clean up
+                if not last_heartbeat or (time.time() - float(last_heartbeat.decode())) > 60:
+                    logger.info(f"Cleaning up stale worker: {worker_key.decode()}")
+                    
+                    # Delete the worker key and remove from workers set
+                    conn.delete(worker_key)
+                    conn.srem(existing_workers_key, worker_key)
+                    cleaned += 1
+            except Exception as e:
+                logger.warning(f"Error checking worker {worker_key}: {str(e)}")
+                
+        if cleaned > 0:
+            logger.info(f"Cleaned up {cleaned} stale worker registrations")
+        else:
+            logger.info("No stale workers found")
+    except Exception as e:
+        logger.warning(f"Error during stale worker cleanup: {str(e)}")
 
 def main():
     """Run a simple RQ worker"""
@@ -89,9 +128,17 @@ def main():
             logger.error(f"Error repairing jobs: {str(e)}")
             logger.error("Will try to proceed anyway")
         
-        # Create and start worker
+        # Clean up any stale workers in Redis
+        cleanup_stale_workers(conn)
+        
+        # Create and start worker with unique name using timestamp
+        # Use hostname, PID, timestamp and random UUID to ensure uniqueness
+        hostname = os.environ.get('HOSTNAME', 'unknown')
+        unique_id = f"{hostname}-{os.getpid()}-{int(time.time())}-{str(uuid.uuid4())[:8]}"
+        worker_name = f"shap-worker-{unique_id}"
+        
         logger.info("Starting simple worker...")
-        worker = Worker(['shap-jobs'], connection=conn, name=f"simple-worker-{os.getpid()}")
+        worker = Worker(['shap-jobs'], connection=conn, name=worker_name)
         logger.info(f"Worker created with ID: {worker.name}")
         
         # Apply memory optimization if available
@@ -118,17 +165,46 @@ def main():
         except Exception as e:
             logger.warning(f"Error applying Redis patches: {str(e)}")
         
-        # Start working (with exception handling)
+        # Start working (with exception handling and retry logic)
         logger.info("Starting to process jobs...")
-        try:
-            worker.work(with_scheduler=True)
-        except KeyboardInterrupt:
-            logger.info("Worker stopped by user")
-            return 0
-        except Exception as e:
-            logger.error(f"Worker error: {str(e)}")
-            logger.error(traceback.format_exc())
-            return 1
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                if attempt > 1:
+                    logger.info(f"Retry attempt {attempt}/{max_retries}...")
+                    
+                    # Generate a new unique name for the retry
+                    unique_id = f"{hostname}-{os.getpid()}-{int(time.time())}-{str(uuid.uuid4())[:8]}"
+                    worker_name = f"shap-worker-retry-{unique_id}"
+                    worker = Worker(['shap-jobs'], connection=conn, name=worker_name)
+                    logger.info(f"Created new worker with ID: {worker.name}")
+                
+                worker.work(with_scheduler=True)
+                break  # If successful, exit the retry loop
+                
+            except ValueError as ve:
+                if "There exists an active worker" in str(ve) and attempt < max_retries:
+                    logger.warning(f"Worker name collision detected: {str(ve)}")
+                    logger.info(f"Waiting {retry_delay} seconds before retry...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(f"Worker error: {str(ve)}")
+                    if attempt >= max_retries:
+                        logger.error("Maximum retry attempts reached")
+                        logger.error(traceback.format_exc())
+                        return 1
+            except KeyboardInterrupt:
+                logger.info("Worker stopped by user")
+                return 0
+            except Exception as e:
+                logger.error(f"Worker error: {str(e)}")
+                logger.error(traceback.format_exc())
+                if attempt >= max_retries:
+                    return 1
+                logger.info(f"Waiting {retry_delay} seconds before retry...")
+                time.sleep(retry_delay)
     
     except ImportError as e:
         logger.error(f"Missing required module: {str(e)}")

@@ -1,3 +1,32 @@
+#!/bin/bash
+# Worker Name Collision Fix for Render Deployment
+# This script fixes the issue with worker name collisions in RQ
+
+# Terminal colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=================================================${NC}"
+echo -e "${BLUE}   SHAP Worker Name Collision Fix               ${NC}"
+echo -e "${BLUE}=================================================${NC}"
+
+# Check if the simple_worker.py file exists
+if [ ! -f "simple_worker.py" ]; then
+    echo -e "${RED}❌ simple_worker.py file not found${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Backing up original worker script...${NC}"
+cp simple_worker.py simple_worker.py.bak
+echo -e "${GREEN}✅ Backup created as simple_worker.py.bak${NC}"
+
+echo -e "${YELLOW}Deploying fixed worker script...${NC}"
+
+# Deploy the fixed worker script
+cat <<'EOF' > simple_worker.py
 #!/usr/bin/env python3
 # filepath: /Users/voldeck/code/shap-microservice/simple_worker.py
 """
@@ -217,3 +246,26 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+EOF
+
+# Make the worker script executable
+chmod +x simple_worker.py
+echo -e "${GREEN}✅ Fixed worker script deployed${NC}"
+
+# Update render.yaml to use the updated worker
+echo -e "${YELLOW}Updating Render.yaml with unique worker name settings...${NC}"
+sed -i.bak 's/name: nesto-mortgage-analytics-worker/name: nesto-mortgage-analytics-worker-'$(date +%s)'/g' render.yaml
+
+echo -e "${BLUE}=================================================${NC}"
+echo -e "${GREEN}✅ Worker name collision fix applied successfully!${NC}"
+echo -e "${BLUE}=================================================${NC}"
+echo -e ""
+echo -e "${YELLOW}Next steps:${NC}"
+echo -e "1. Run the deployment script to deploy changes to Render:"
+echo -e "   ./deploy_to_render_final.sh"
+echo -e ""
+echo -e "2. Monitor the worker logs in the Render dashboard"
+echo -e "   to ensure the worker starts correctly."
+echo -e ""
+echo -e "3. If needed, you can restart the worker service in"
+echo -e "   the Render dashboard to apply the changes immediately."
