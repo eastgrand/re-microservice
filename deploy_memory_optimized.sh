@@ -1,5 +1,22 @@
 #!/bin/bash
-# filepath: /Users/voldeck/code/shap-microservice/deploy_memory_optimized.sh
+# # SHAP Microservice Optimized Deployment to Render ${NC}"
+echo -e "${BLUE}=================================================${NC}"
+
+# Create .skip_training file to ensure we skip model training during deployment
+echo -e "${YELLOW}Creating .skip_training flag file...${NC}"
+echo "Skip model training during deployment - $(date)" > .skip_training
+echo -e "${GREEN}✅ Created .skip_training flag file${NC}"
+
+# Set optimized environment variables
+echo -e "${YELLOW}Setting optimized environment variables...${NC}"
+export MEMORY_OPTIMIZATION=true
+export MAX_MEMORY_MB=475  # Increased from 450
+export AGGRESSIVE_MEMORY_MANAGEMENT=false  # Disabled for better performance
+export SHAP_MAX_BATCH_SIZE=500  # Increased from 300
+export REDIS_HEALTH_CHECK_INTERVAL=30
+export REDIS_SOCKET_KEEPALIVE=true
+export REDIS_TIMEOUT=10
+export SKIP_MODEL_TRAINING=true  # Explicitly set environment variablesers/voldeck/code/shap-microservice/deploy_memory_optimized.sh
 
 # Enhanced deployment script with memory optimizations and Redis fixes
 set -e

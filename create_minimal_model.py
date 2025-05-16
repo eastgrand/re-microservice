@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
 Creates a minimal XGBoost model for fallback purposes.
-This is used when the full model can't be loaded on Render.
+This is used when the full model can't be loaded or created on Render.
+Updated for more reliable deployment - May 15, 2025
 """
 
 import pandas as pd
 import numpy as np
-import xgboost as xgb
-import pickle
 import os
 import sys
 import logging
+import pickle
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -19,16 +20,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger("minimal-model-creator")
 
+# Create standard directories
+os.makedirs('models', exist_ok=True)
+os.makedirs('data', exist_ok=True)
+logger.info("Ensured models and data directories exist")
+
 def create_minimal_model():
     """Create a minimal XGBoost model that can be used as fallback."""
     logger.info("Creating minimal XGBoost model for fallback purposes")
     
-    # Create a minimal dataset with key columns
+    try:
+        # Import XGBoost here to handle import errors gracefully
+        import xgboost as xgb
+        logger.info("Successfully imported XGBoost")
+    except ImportError:
+        logger.warning("XGBoost not available, creating fake model files instead")
+        return create_fake_model_files()
+    
+    # Create a minimal dataset with key columns (typical mortgage data)
     data = {
         "Income": np.random.normal(60000, 15000, 100),
         "Age": np.random.normal(40, 10, 100),
         "Credit_Score": np.random.normal(700, 50, 100),
         "Homeownership_Pct": np.random.normal(70, 15, 100),
+        "Employment_Years": np.random.normal(8, 4, 100),
+        "Debt_To_Income": np.random.normal(0.3, 0.1, 100),
         "Mortgage_Approvals": np.random.normal(50, 10, 100)
     }
     

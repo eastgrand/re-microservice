@@ -1,32 +1,63 @@
-# Deploying SHAP/XGBoost Microservice to Render.com
+# Deploying Optimized SHAP/XGBoost Microservice to Render.com
 
-This document provides a step-by-step guide for deploying the SHAP/XGBoost microservice to Render.com.
+This document provides a step-by-step guide for deploying the optimized SHAP/XGBoost microservice to Render.com. The optimizations include memory usage improvements, Redis connection stability fixes, and worker process enhancements to ensure reliable operation on Render's starter plan (512MB RAM, 0.5 CPU).
 
 ## Prerequisites
 
 - GitHub account with the SHAP/XGBoost microservice code pushed to a repository
 - Render.com account (create one at [https://render.com](https://render.com) if needed)
+- Access to terminal/command line interface
+
+## Optimization Summary
+
+The following optimizations have been applied:
+
+1. **Memory Usage Optimizations**
+   - Increased memory threshold from 450MB to 475MB
+   - Disabled aggressive memory management for the worker
+   - Increased batch size from 300 to 500 rows
+
+2. **Redis Connection Fixes**
+   - Enhanced Redis connection handling with better error recovery
+   - Added socket keepalive settings
+   - Improved timeout and retry mechanisms
+
+3. **Worker Process Enhancements**
+   - Updated worker configuration to use `simple_worker.py`
+   - Removed dependency on problematic `Connection` class
+   - Improved error handling in worker processes
 
 ## Deployment Steps
 
-### 1. Prepare Your Repository
+### 1. Use the Optimized Deployment Script
 
-Before deploying, ensure your GitHub repository has the following files:
-
-- `requirements.txt` - Lists all Python dependencies
-- `render.yaml` - Render configuration file
-- `.env.example` - Template for environment variables
-- All necessary code files (app.py, train_model.py, etc.)
-
-### 2. Set Up GitHub Repository
-
-1. Create a new GitHub repository (if you haven't already)
-2. Push your code to the repository:
+We've created a comprehensive deployment script that handles all the necessary steps for deploying to Render.com with our memory and stability optimizations:
 
 ```bash
-# Initialize Git repository
-git init
+# Make the deployment script executable
+chmod +x ./deploy_to_render_final.sh
 
+# Run the deployment script
+./deploy_to_render_final.sh
+```
+
+This script will:
+- Verify all required files are present
+- Create a `.skip_training` flag file to speed up deployment
+- Ensure model files exist (or create minimal models)
+- Set optimized environment variables
+- Update `render.yaml` with the optimized settings
+- Prepare the deployment package
+
+### 2. Deploy to Render.com
+
+You have two options for deploying to Render.com:
+
+#### Option A: Git-based Deployment (Recommended)
+
+1. Commit your optimized code to your Git repository:
+
+```bash
 # Add all files
 git add .
 
@@ -83,7 +114,24 @@ The build process will:
 
 ### 6. Verify Deployment
 
-After successful deployment:
+We've created a verification script to help you confirm that your deployment is successful:
+
+```bash
+# Make the verification script executable
+chmod +x ./verify_render_deployment.sh
+
+# Run the verification script
+./verify_render_deployment.sh
+```
+
+This script will:
+- Check if your service is responding
+- Verify Redis connection
+- Check memory usage
+- Submit a test SHAP job (optional)
+- Monitor job status to ensure proper processing
+
+Alternatively, you can manually verify the deployment:
 
 1. Get your service URL from the Render dashboard (e.g., `https://shap-analytics.onrender.com`)
 2. Test the API with curl:
@@ -109,21 +157,110 @@ Render offers various scaling options:
    - Use Render's built-in monitoring features to track performance
    - Set up Render alerts for service outages
 
+## Monitoring and Maintenance
+
+### Performance Monitoring
+
+To ensure your SHAP microservice continues to operate efficiently on Render's starter plan:
+
+1. **Regular Health Checks**
+   - Use the `/health` endpoint to verify service status
+   - Check the `/memory-stats` endpoint to monitor memory usage
+   - Verify Redis connection via the `/redis-check` endpoint
+
+2. **Job Processing Metrics**
+   - Monitor job completion times and success rates
+   - Watch for any increases in processing time
+   - Check for jobs that get stuck in the "started" state
+
+3. **Memory Optimization**
+   - Keep memory usage below 475MB to avoid OOM issues
+   - Consider implementing a cron job to restart the worker daily
+   - Monitor memory leaks by checking if usage steadily increases over time
+
+### Maintenance Tasks
+
+1. **Regular Updates**
+   - Periodically update dependencies in `requirements.txt`
+   - Test updates in a staging environment before production
+   - Keep an eye on SHAP library updates that might improve performance
+
+2. **Log Rotation**
+   - Render handles log rotation automatically
+   - Regularly review logs for recurring errors or warnings
+   - Set up log-based alerts for critical issues
+
+3. **Backup Strategy**
+   - Regularly backup your model files
+   - Consider version control for your models
+   - Document any manual configuration changes
+
+### Scaling Considerations
+
+As your usage grows, consider these scaling options:
+
+1. **Vertical Scaling**
+   - Upgrade to a larger Render plan for more memory and CPU
+   - Update memory thresholds in `optimize_memory.py` accordingly
+
+2. **Horizontal Scaling**
+   - Add more worker instances for parallel processing
+   - Implement a load balancer if needed
+
+3. **Data Optimizations**
+   - Implement feature selection to reduce dimensionality
+   - Consider downsampling large datasets
+   - Pre-process data to optimize for SHAP analysis
+
+## Conclusion
+
+With the optimizations implemented in this deployment, the SHAP microservice should now operate reliably on Render's starter plan. Regular monitoring and maintenance will ensure continued performance and stability.
+
+Remember to check the Render dashboard and logs periodically, and adjust the optimization parameters as needed based on your specific usage patterns.
+
 ## Troubleshooting
 
-If you encounter issues during deployment:
+If you encounter issues during deployment or operation:
 
 ### Build Failures
 
 - Check the build logs for specific error messages
 - Ensure all dependencies are correctly specified in `requirements.txt`
 - Verify that the Python version specified in `render.yaml` is supported
+- Check if the pre-deployment script (`render_pre_deploy.sh`) ran successfully
 
 ### Runtime Errors
 
 - Check the application logs in the Render dashboard
 - Verify that all environment variables are correctly set
-- Ensure the model training process completes successfully
+- Ensure that model files exist in the deployed environment
+
+### Memory Issues
+
+- Monitor memory usage via the `/memory-stats` endpoint or Render dashboard
+- If memory usage approaches 512MB:
+  - Reduce `SHAP_MAX_BATCH_SIZE` in environment variables (try 400 or 300)
+  - Enable `AGRESSIVE_MEMORY_MANAGEMENT` by setting it to "true"
+  - Consider increasing the `MAX_MEMORY_MB` threshold down to 450MB
+
+### Redis Connection Issues
+
+- Verify Redis connection via the `/redis-check` endpoint
+- Check Redis URL in environment variables
+- Look for Redis timeout errors in the logs
+- If you see connection errors:
+  - Increase `REDIS_TIMEOUT` value (try 15 or 20 seconds)
+  - Ensure `REDIS_SOCKET_KEEPALIVE` is set to "true"
+
+### Jobs Stuck in "Started" State
+
+- Check worker logs for any errors or exceptions
+- Verify that the Redis queue is functioning properly
+- Ensure that worker processes are running
+- If jobs remain stuck:
+  - Check memory usage (may be OOM issues)
+  - Verify model loading is successful
+  - Try restarting the worker service
 
 ### API Access Issues
 

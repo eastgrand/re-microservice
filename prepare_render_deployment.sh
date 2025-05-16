@@ -19,6 +19,7 @@ echo -e "${BLUE}=================================================${NC}"
 DEPLOY_DIR="render_deploy"
 echo -e "${YELLOW}Creating deployment directory...${NC}"
 mkdir -p $DEPLOY_DIR
+mkdir -p $DEPLOY_DIR/models
 
 # Copy essential files for deployment
 echo -e "${YELLOW}Copying essential files...${NC}"
@@ -31,6 +32,16 @@ cp setup_worker.py $DEPLOY_DIR/
 cp render.yaml $DEPLOY_DIR/
 cp requirements.txt $DEPLOY_DIR/
 cp gunicorn_config.py $DEPLOY_DIR/
+
+# Copy model files
+echo -e "${YELLOW}Copying model files...${NC}"
+if [ -f "models/xgboost_model.pkl" ] && [ -f "models/feature_names.txt" ]; then
+    cp models/xgboost_model.pkl $DEPLOY_DIR/models/
+    cp models/feature_names.txt $DEPLOY_DIR/models/
+    echo -e "${GREEN}✅ Copied model files to deployment package${NC}"
+else
+    echo -e "${YELLOW}⚠️ Model files not found, deployment package may require model training${NC}"
+fi
 
 # Worker and memory patches
 cp worker_process_fix.py $DEPLOY_DIR/ 2>/dev/null || :

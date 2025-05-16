@@ -43,9 +43,19 @@ if [ "$SKIP_TRAINING" = "true" ]; then
     echo "🔄 Skipping model training step..."
     echo "🔄 This will make deployment much faster!"
     
+    # Create models directory if it doesn't exist
+    if [ ! -d "models" ]; then
+        echo "📁 Creating models directory..."
+        mkdir -p models
+    fi
+    
     # Check if model file exists
     if [ -f "models/xgboost_model.pkl" ] && [ -f "models/feature_names.txt" ]; then
         echo "✅ Using existing model files from repository"
+        # Create a backup copy just to be safe
+        echo "📋 Creating backup of existing model files..."
+        cp models/xgboost_model.pkl models/xgboost_model.pkl.bak
+        cp models/feature_names.txt models/feature_names.txt.bak
     else
         echo "⚠️  Warning: Model files not found but skip_training is enabled"
         echo "⚠️  Will create minimal model as fallback"

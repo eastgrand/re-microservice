@@ -38,20 +38,49 @@ if [ $missing_files -eq 1 ]; then
     exit 1
 fi
 
+# Create .skip_training flag file to ensure we skip model training during deployment
+echo "Creating .skip_training flag file..."
+echo "Skip model training during deployment - $(date)" > .skip_training
+echo "✅ Created .skip_training flag file"
+export SKIP_MODEL_TRAINING=true
+
 # Check if models directory exists and contains model files
 if [ ! -d "models" ]; then
-    echo "⚠️  Models directory not found. Will be created during deployment."
+    echo "⚠️  Models directory not found. Creating it now..."
+    mkdir -p models
 else
-    if [ ! -f "models/xgboost_model.pkl" ]; then
-        echo "⚠️  Model file not found. Will be created during deployment."
+    echo "✅ Models directory found."
+fi
+
+# Check for model files
+if [ ! -f "models/xgboost_model.pkl" ] || [ ! -f "models/feature_names.txt" ]; then
+    echo "⚠️  Model files are missing. Attempting to create minimal model..."
+    
+    if [ -f "create_minimal_model.py" ]; then
+        python3 create_minimal_model.py
+        if [ -f "models/xgboost_minimal.pkl" ]; then
+            echo "Copying minimal model files to standard locations..."
+            cp models/xgboost_minimal.pkl models/xgboost_model.pkl
+            cp models/minimal_feature_names.txt models/feature_names.txt
+            echo "✅ Created and installed minimal model files."
+        else
+            echo "❌ Failed to create minimal model files."
+            exit 1
+        fi
     else
-        echo "✅ Model file found."
+        echo "❌ Cannot create model files (create_minimal_model.py not found)!"
+        exit 1
     fi
+else
+    echo "✅ Model files found and ready for deployment."
+    echo "   - models/xgboost_model.pkl"
+    echo "   - models/feature_names.txt"
 fi
 
 # Check if data directory exists
 if [ ! -d "data" ]; then
-    echo "⚠️  Data directory not found. Will be created during deployment."
+    echo "⚠️  Data directory not found. Creating it now..."
+    mkdir -p data
 else
     echo "✅ Data directory found."
 fi

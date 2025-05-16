@@ -6,11 +6,12 @@ services:
     env: python
     plan: starter
     buildCommand: >-
-      echo "Starting build process with FORCED skip-training" && 
+      echo "Starting optimized build process" && 
+      chmod +x ./render_pre_deploy.sh &&
+      echo "Running pre-deployment checks..." &&
+      ./render_pre_deploy.sh &&
+      echo "⚡ Pre-deployment successful - Model files verified" &&
       chmod +x ./deploy_to_render.sh &&
-      echo "This file indicates model training should be skipped during deployment" > .skip_training &&
-      export SKIP_MODEL_TRAINING=true &&
-      echo "⚡ SKIP TRAINING ENABLED - Model training will be bypassed" &&
       ./deploy_to_render.sh &&
       pip install psutil python-dotenv
     startCommand: >-
@@ -26,8 +27,6 @@ services:
       - key: SHAP_MAX_BATCH_SIZE
         value: "500"
       - key: REDIS_URL
-      - key: REDIS_HEALTH_CHECK_INTERVAL
-        value: "30"
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
@@ -41,7 +40,9 @@ services:
     name: nesto-mortgage-analytics-worker
     env: python
     buildCommand: >-
-      echo "Building worker service" &&
+      echo "Building optimized worker service" &&
+      chmod +x ./render_pre_deploy.sh &&
+      ./render_pre_deploy.sh &&
       chmod +x ./deploy_to_render.sh &&
       export SKIP_MODEL_TRAINING=true &&
       ./deploy_to_render.sh &&
@@ -60,8 +61,6 @@ services:
       - key: SHAP_MAX_BATCH_SIZE
         value: "500"  # Increased from 300 to improve throughput
       - key: REDIS_URL
-      - key: REDIS_HEALTH_CHECK_INTERVAL
-        value: "30"
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"

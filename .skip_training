@@ -1,2 +1,1 @@
-This file indicates that model training should be skipped during deployment.
-Delete this file to re-enable training, or run 'python skip_training.py disable'
+Skip model training during deployment - Thu May 15 21:21:17 EDT 2025
