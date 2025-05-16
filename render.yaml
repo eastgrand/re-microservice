@@ -15,7 +15,7 @@ services:
       ./deploy_to_render.sh &&
       pip install psutil python-dotenv
     startCommand: >-
-      echo "Starting web service" &&
+      ./render_startup_wrapper.sh echo "Starting web service" &&
       python3 -c "import gc; gc.enable()" &&
       python3 -c "import sys; sys.path.append('.')" &&
       gunicorn --config=gunicorn_config.py app:app
@@ -49,7 +49,7 @@ services:
       export SKIP_MODEL_TRAINING=true &&
       ./deploy_to_render.sh
     startCommand: >-
-      echo "Starting memory-optimized SHAP worker" &&
+      ./render_startup_wrapper.sh echo "Starting memory-optimized SHAP worker" &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
       chmod +x ./simple_worker.py &&
       ./simple_worker.py
