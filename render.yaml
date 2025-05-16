@@ -35,9 +35,9 @@ services:
       - key: PORT
         value: "10000"
       
-  # Worker service for processing SHAP jobs (with unique timestamp to prevent name collisions)
+  # Worker service for processing SHAP jobs
   - type: worker
-    name: nesto-mortgage-analytics-worker-1747359907-1747359755-05162025
+    name: nesto-shap-worker
     env: python
     buildCommand: >-
       echo "Building optimized worker service" &&
@@ -49,8 +49,6 @@ services:
       pip install psutil python-dotenv rq redis
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
-      python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
-      chmod +x ./simple_worker.py &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
       chmod +x ./simple_worker.py &&
       ./simple_worker.py
