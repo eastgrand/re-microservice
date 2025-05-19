@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import sys
+import re  # Add this import for regex
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -83,7 +84,7 @@ def init_redis(force_reconnect=False):
         logger.info("Initializing Redis connection...")
         
         # Log Redis configuration (with masked password)
-        masked_url = REDIS_URL.replace(/(rediss?:\/\/[^:]+:)([^@]+)(@.+)/, '$1***$3')
+        masked_url = re.sub(r'(rediss?://[^:]+:)([^@]+)(@.+)', r'\1***\3', REDIS_URL)
         logger.info(f"Redis URL: {masked_url}")
         logger.info(f"Redis settings: timeout={REDIS_TIMEOUT}s, max_retries={REDIS_MAX_RETRIES}")
         
