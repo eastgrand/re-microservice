@@ -337,6 +337,18 @@ def generate_cache_key(input_data: Dict[str, Any], model_type: str) -> str:
     json_str = json.dumps(key_data, sort_keys=True)
     return f"pred:{hashlib.md5(json_str.encode()).hexdigest()}"
 
+def to_python_type(obj):
+    if isinstance(obj, dict):
+        return {k: to_python_type(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_python_type(v) for v in obj]
+    elif isinstance(obj, np.ndarray):
+        return to_python_type(obj.tolist())
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    else:
+        return obj
+
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """
@@ -388,7 +400,7 @@ def predict():
             # Update the processing time to include cache retrieval
             cached_response['processing_time'] = time.time() - start_time
             cached_response['cached'] = True
-            return jsonify(cached_response)
+            return jsonify(to_python_type(cached_response))
         
         # No cache hit, perform the prediction
         logger.info(f"Cache miss or no Redis. Computing prediction with model: {model_type}")
@@ -404,13 +416,20 @@ def predict():
         explainer = shap_explainers.get(model_type)
         shap_values = explainer.shap_values(features_df)
         
+        # Convert any float32 values to Python float
+        prediction = prediction.tolist()
+        if isinstance(shap_values, list):
+            shap_values = [sv.tolist() for sv in shap_values]
+        else:
+            shap_values = shap_values.tolist()
+        
         # Format response
         response = {
-            'predictions': prediction.tolist(),
+            'predictions': prediction,
             'explanations': {
-                'shap_values': shap_values.tolist() if not isinstance(shap_values, list) else shap_values[0].tolist(),
+                'shap_values': shap_values,
                 'feature_names': feature_maps.get(model_type, []),
-                'base_value': explainer.expected_value if not isinstance(explainer.expected_value, list) else explainer.expected_value[0]
+                'base_value': float(explainer.expected_value) if not isinstance(explainer.expected_value, list) else [float(v) for v in explainer.expected_value]
             },
             'processing_time': time.time() - start_time,
             'model_version': '0.1.0',
@@ -428,7 +447,7 @@ def predict():
             except Exception as e:
                 logger.warning(f"Error caching result: {str(e)}")
         
-        return jsonify(response)
+        return jsonify(to_python_type(response))
     
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
