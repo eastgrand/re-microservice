@@ -190,6 +190,8 @@ def load_models():
 
 def get_cache(key):
     """Get data from cache with error handling"""
+    global redis_healthy, redis_last_error
+    
     if not redis_client or not redis_healthy:
         return None
     
@@ -201,13 +203,14 @@ def get_cache(key):
     except Exception as e:
         logger.warning(f"Error accessing Redis cache: {str(e)}")
         # Mark Redis as unhealthy but don't attempt immediate reconnect
-        global redis_healthy, redis_last_error
         redis_healthy = False
         redis_last_error = str(e)
         return None
 
 def set_cache(key, data, ttl=None):
     """Set data in cache with error handling"""
+    global redis_healthy, redis_last_error
+    
     if not redis_client or not redis_healthy:
         return False
     
@@ -220,7 +223,6 @@ def set_cache(key, data, ttl=None):
     except Exception as e:
         logger.warning(f"Error writing to Redis cache: {str(e)}")
         # Mark Redis as unhealthy but don't attempt immediate reconnect
-        global redis_healthy, redis_last_error
         redis_healthy = False
         redis_last_error = str(e)
         return False
