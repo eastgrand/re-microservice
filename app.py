@@ -132,42 +132,15 @@ feature_maps = {}
 shap_explainers = {}
 
 def load_models():
-    """Load all XGBoost models into memory with improved path handling"""
+    """Load all XGBoost models into memory from a single standardized path"""
     global models, feature_maps, shap_explainers
     
-    # Define possible model paths to check
-    possible_paths = [
-        os.path.join('/opt/render/project/src', 'models'),
-        'models',
-        os.path.join('.', 'models'),
-        os.path.join('..', 'models'),
-        '.',  # Current directory
-        '/opt/render/project/src'  # Render root directory
-    ]
+    # Standardized model path
+    model_path = os.path.join(os.path.dirname(__file__), 'models')
+    logger.info(f"Using standardized model directory: {model_path}")
     
-    # Log paths being checked
-    logger.info(f"Checking for model files in: {', '.join(possible_paths)}")
-    
-    # Find a valid model directory
-    model_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            logger.info(f"Found potential model directory: {path}")
-            
-            # Check if there are model files in this directory
-            try:
-                files = os.listdir(path)
-                pkl_files = [f for f in files if f.endswith('.pkl') and os.path.isfile(os.path.join(path, f))]
-                if pkl_files:
-                    model_path = path
-                    logger.info(f"Using model directory: {model_path}")
-                    logger.info(f"Found model files: {pkl_files}")
-                    break
-            except Exception as e:
-                logger.warning(f"Error checking directory {path}: {str(e)}")
-    
-    if not model_path:
-        logger.error(f"No valid model directory found. Tried: {possible_paths}")
+    if not os.path.exists(model_path):
+        logger.error(f"Model directory does not exist: {model_path}")
         return
     
     # Model types to look for
@@ -184,84 +157,54 @@ def load_models():
     model_files = [f for f in os.listdir(model_path) if f.endswith('.pkl') and os.path.isfile(os.path.join(model_path, f))]
     logger.info(f"Found model files: {model_files}")
     
-    # Check if we have a generic model that can be used as fallback
-    generic_model_path = None
-    for generic_name in ['xgboost_model.pkl', 'model.pkl', 'xgboost_minimal.pkl']:
-        if generic_name in model_files:
-            generic_model_path = os.path.join(model_path, generic_name)
-            logger.info(f"Found generic model: {generic_model_path}")
-            break
+    # Load feature names (must exist)
+    feature_names_path = os.path.join(model_path, 'feature_names.txt')
+    if not os.path.exists(feature_names_path):
+        logger.error(f"Feature names file not found: {feature_names_path}")
+        return
+    with open(feature_names_path, 'r') as f:
+        feature_names = [name.strip() for name in f.read().strip().split(',')]
+    logger.info(f"Loaded feature names: {feature_names}")
     
-    # Try to load feature names
-    feature_names = None
-    for feature_filename in ['feature_names.txt', 'features.txt']:
-        feature_path = os.path.join(model_path, feature_filename)
-        if os.path.exists(feature_path):
-            try:
-                with open(feature_path, 'r') as f:
-                    feature_names = f.read().strip().split(',')
-                    logger.info(f"Loaded feature names: {feature_names}")
-                    break
-            except Exception as e:
-                logger.warning(f"Error loading feature names from {feature_path}: {str(e)}")
-    
-    # If no feature names file found, create default ones
-    if not feature_names:
-        feature_names = [f'feature_{i}' for i in range(10)]
-        logger.info(f"Using default feature names: {feature_names}")
-    
-    # Try to load specific models or fall back to generic
+    # Try to load specific models
     loaded_count = 0
     for model_type in model_types:
         try:
-            model_loaded = False
-            
             # Check for type-specific model file
             type_specific_files = [f for f in model_files if model_type.lower() in f.lower()]
             if type_specific_files:
                 model_file = os.path.join(model_path, type_specific_files[0])
                 logger.info(f"Loading {model_type} model from {model_file}")
-                
                 try:
-                    # Load model based on file extension
-                    if model_file.endswith('.pkl'):
-                        with open(model_file, 'rb') as f:
-                            models[model_type] = pickle.load(f)
-                    else:
-                        models[model_type] = xgb.Booster()
-                        models[model_type].load_model(model_file)
+                    with open(model_file, 'rb') as f:
+                        model_data = pickle.load(f)
+                        if isinstance(model_data, dict):
+                            if 'model' in model_data:
+                                models[model_type] = model_data['model']
+                            else:
+                                models[model_type] = model_data
+                            if 'feature_names' in model_data:
+                                feature_maps[model_type] = model_data['feature_names']
+                            else:
+                                feature_maps[model_type] = feature_names
+                        else:
+                            models[model_type] = model_data
+                            feature_maps[model_type] = feature_names
+                    logger.info(f"Successfully loaded {model_type} model with features: {feature_maps.get(model_type, [])}")
                     
-                    feature_maps[model_type] = feature_names
-                    model_loaded = True
-                    logger.info(f"Successfully loaded {model_type} model")
+                    # Create SHAP explainer
+                    try:
+                        X_sample = pd.DataFrame(np.random.rand(10, len(feature_maps[model_type])), columns=feature_maps[model_type])
+                        shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
+                        loaded_count += 1
+                        logger.info(f"Created SHAP explainer for {model_type}")
+                    except Exception as e:
+                        logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
+                        logger.error(traceback.format_exc())
                 except Exception as e:
                     logger.error(f"Failed to load {model_type} model: {str(e)}")
-            
-            # Fall back to generic model if type-specific not loaded
-            if not model_loaded and generic_model_path:
-                logger.info(f"Using generic model for {model_type}")
-                try:
-                    with open(generic_model_path, 'rb') as f:
-                        models[model_type] = pickle.load(f)
-                    
-                    feature_maps[model_type] = feature_names
-                    model_loaded = True
-                    logger.info(f"Successfully loaded generic model for {model_type}")
-                except Exception as e:
-                    logger.error(f"Failed to load generic model for {model_type}: {str(e)}")
-            
-            # Create SHAP explainer if model loaded
-            if model_loaded:
-                try:
-                    # Create a sample feature matrix for the SHAP explainer
-                    X_sample = pd.DataFrame(np.random.rand(10, len(feature_names)), columns=feature_names)
-                    shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
-                    loaded_count += 1
-                    logger.info(f"Created SHAP explainer for {model_type}")
-                except Exception as e:
-                    logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
-                    logger.error(traceback.format_exc())
-        
+            else:
+                logger.error(f"No model file found for {model_type}")
         except Exception as e:
             logger.error(f"Error processing {model_type} model: {str(e)}")
             logger.error(traceback.format_exc())
@@ -309,29 +252,28 @@ def set_cache(key, data, ttl=None):
 
 def get_feature_vector(input_data: Dict[str, Any], model_type: str) -> pd.DataFrame:
     """
-    Convert input data to feature vector for model prediction
+    Convert input data to feature vector for model prediction using the model's feature map
     """
-    # In a real implementation, this would transform the geospatial data
-    # into features the model expects
-    
-    # For this skeleton, we'll create dummy features
-    features = {}
+    # Get the feature list for this model type
     feature_list = feature_maps.get(model_type, [])
     
-    # Create random features for demonstration
+    if not feature_list:
+        logger.warning(f"No feature map found for model type: {model_type}")
+        return pd.DataFrame()
+    
+    # Create feature dictionary with default values
+    features = {feature: 0.0 for feature in feature_list}
+    
+    # Update features from input data if available
     for feature in feature_list:
-        features[feature] = np.random.rand()
+        if feature in input_data:
+            try:
+                features[feature] = float(input_data[feature])
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert feature {feature} to float, using default value")
     
-    # Add some basic features from the input
-    if 'query' in input_data:
-        query = input_data['query'].lower()
-        features['query_length'] = len(query)
-        features['has_predict'] = 'predict' in query
-        features['has_correlation'] = 'correlation' in query
-    
-    if 'visualizationType' in input_data:
-        viz_type = input_data['visualizationType']
-        features['is_complex_viz'] = viz_type in ['HOTSPOT', 'MULTIVARIATE', 'BIVARIATE', 'NETWORK']
+    # Log the features being used
+    logger.info(f"Using features for {model_type} model: {list(features.keys())}")
     
     return pd.DataFrame([features])
 
