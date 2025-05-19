@@ -30,6 +30,14 @@ services:
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
+      - key: REDIS_TIMEOUT
+        value: "10"
+      - key: REDIS_GRACEFUL_FALLBACK
+        value: "true"
+      - key: REDIS_MAX_RETRIES
+        value: "3"
+      - key: REDIS_RETRY_BACKOFF
+        value: "0.5"
       - key: API_KEY
         sync: false
       - key: PORT
@@ -64,5 +72,13 @@ services:
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
+      - key: REDIS_TIMEOUT
+        value: "10"
+      - key: REDIS_GRACEFUL_FALLBACK
+        value: "true"
+      - key: REDIS_MAX_RETRIES
+        value: "3"
+      - key: REDIS_RETRY_BACKOFF
+        value: "0.5"
       - key: API_KEY
         sync: false

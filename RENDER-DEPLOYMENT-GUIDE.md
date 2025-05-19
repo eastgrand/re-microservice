@@ -267,3 +267,46 @@ If you encounter issues during deployment or operation:
 - Confirm that the `X-API-KEY` header is included in all requests
 - Verify that the API key used matches the one set in environment variables
 - Check if `REQUIRE_AUTH` is set to `true`
+
+## Troubleshooting Worker Name Collisions
+
+If you encounter worker name collision errors during deployment, follow these steps:
+
+### Symptoms
+- Error messages like: `ValueError: There exists an active worker named 'simple-worker-65' already`
+- Multiple worker services in Render dashboard
+- Workers failing to start
+
+### Solution
+
+1. **Update Worker Naming**
+   - The worker script has been updated to use unique identifiers
+   - Includes hostname, PID, timestamp, and random UUID
+
+2. **Clean Up Redis Worker Registrations**
+   - Use the cleanup function in `simple_worker.py`
+   - Removes stale worker registrations from Redis
+
+3. **Update Render Configuration**
+   - Ensure only one worker service is defined in render.yaml
+   - Use a clean, simple name like `nesto-shap-worker`
+   - Remove any duplicate start commands
+
+4. **Execute the Fix Script**
+   ```bash
+   ./deploy_fix_to_render.sh
+   ```
+   This script:
+   - Verifies and updates render.yaml
+   - Commits and pushes changes
+   - Provides instructions for Render dashboard cleanup
+
+### Verification
+After applying the fix:
+1. Delete existing worker services in Render dashboard
+2. Deploy the updated configuration
+3. Verify only one worker is created
+4. Check worker logs for successful startup
+5. Submit a test job to verify it processes correctly
+
+For more details, see [WORKER-NAME-COLLISION-FIX.md](WORKER-NAME-COLLISION-FIX.md)

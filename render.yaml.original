@@ -1,0 +1,67 @@
+services:
+  # Main web service for the API endpoints
+  - type: web
+    name: nesto-mortgage-analytics
+    env: python
+    plan: starter
+    buildCommand: >-
+      echo "Starting optimized build process" && 
+      chmod +x ./render_pre_deploy.sh &&
+      echo "Running pre-deployment checks..." &&
+      ./render_pre_deploy.sh &&
+      echo "⚡ Pre-deployment successful - Model files verified" &&
+      chmod +x ./deploy_to_render.sh &&
+      ./deploy_to_render.sh &&
+      pip install psutil python-dotenv
+    startCommand: >-
+      echo "Starting web service" &&
+      python3 -c "import gc; gc.enable()" &&
+      python3 -c "import sys; sys.path.append('.')" &&
+      gunicorn --config=gunicorn_config.py app:app
+    envVars:
+      - key: AGGRESSIVE_MEMORY_MANAGEMENT
+        value: "true"
+      - key: SHAP_BATCH_SIZE
+        value: "500"
+      - key: SHAP_MAX_BATCH_SIZE
+        value: "500"
+      - key: REDIS_URL
+        value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
+      - key: REDIS_HEALTH_CHECK_INTERVAL
+        value: "30"
+      - key: API_KEY
+        sync: false  # This indicates that the value is secret and should be set in the Render dashboard
+      - key: PORT
+        value: "10000"
+      
+  # Worker service for processing SHAP jobs
+  - type: worker
+    name: nesto-shap-worker
+    env: python
+    buildCommand: >-
+      echo "Building optimized worker service" &&
+      chmod +x ./render_pre_deploy.sh &&
+      ./render_pre_deploy.sh &&
+      chmod +x ./deploy_to_render.sh &&
+      export SKIP_MODEL_TRAINING=true &&
+      ./deploy_to_render.sh &&
+      pip install psutil python-dotenv rq redis
+    startCommand: >-
+      echo "Starting memory-optimized SHAP worker" &&
+      python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
+      chmod +x ./simple_worker.py &&
+      ./simple_worker.py
+    plan: starter
+    envVars:
+      - key: AGGRESSIVE_MEMORY_MANAGEMENT
+        value: "false"  # Changed from true to optimize performance
+      - key: SHAP_BATCH_SIZE
+        value: "500"
+      - key: SHAP_MAX_BATCH_SIZE
+        value: "500"  # Increased from 300 to improve throughput
+      - key: REDIS_URL
+        value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
+      - key: REDIS_HEALTH_CHECK_INTERVAL
+        value: "30"
+      - key: API_KEY
+        sync: false  # This indicates that the value is secret and should be set in the Render dashboard
