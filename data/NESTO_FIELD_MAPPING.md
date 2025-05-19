@@ -1,9 +1,14 @@
 # Nesto Data Field Mapping
 
-This document maps the field names in the Nesto dataset (`nesto_merge_0.csv`) to model feature names. The file already contains descriptive field names, making it easier to understand the data and create interpretable model results.
+This document maps the field names in the Nesto dataset (`nesto_training_data_0.csv`) to model feature names. The file already contains descriptive field names, making it easier to understand the data and create interpretable model results.
 
 ## Field Mapping Table
 
+### Target Variable
+
+| Original Field Name | Mapped Name | Description | Type | Category |
+|---------------------|-------------|-------------|------|----------|
+| `CONVERSION_RATE` | `Conversion_Rate` | Rate of successful mortgage applications (conversions) | numeric | Target |
 
 ### Geographic Fields
 
@@ -257,7 +262,7 @@ For example, while knowing the total number of rental units in an area is useful
 
 To add new fields to the mapping:
 
-1. Identify the original field name in nesto_merge_0.csv
+1. Identify the original field name in nesto_training_data_0.csv
 2. Choose an intuitive, descriptive mapped name:
    - For percentage fields, add a `_Pct` suffix
    - For absolute counts, use clear descriptive names
@@ -302,7 +307,7 @@ For example, while knowing the total number of rental units in an area is useful
 
 To add new fields to the mapping:
 
-1. Identify the original field name in nesto_merge_0.csv
+1. Identify the original field name in nesto_training_data_0.csv
 2. Choose an intuitive, descriptive mapped name:
    - For percentage fields, add a `_Pct` suffix
    - For absolute counts, use clear descriptive names
