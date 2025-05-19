@@ -4,6 +4,8 @@ import json
 import logging
 import sys
 import re  # Add this import for regex
+import traceback
+import pickle
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -14,7 +16,6 @@ import shap
 from typing import Dict, Any, List, Optional
 import redis
 import hashlib
-import traceback
 import ssl
 
 # Setup logging
@@ -131,9 +132,45 @@ feature_maps = {}
 shap_explainers = {}
 
 def load_models():
-    """Load all XGBoost models into memory"""
+    """Load all XGBoost models into memory with improved path handling"""
     global models, feature_maps, shap_explainers
     
+    # Define possible model paths to check
+    possible_paths = [
+        os.path.join('/opt/render/project/src', 'models'),
+        'models',
+        os.path.join('.', 'models'),
+        os.path.join('..', 'models'),
+        '.',  # Current directory
+        '/opt/render/project/src'  # Render root directory
+    ]
+    
+    # Log paths being checked
+    logger.info(f"Checking for model files in: {', '.join(possible_paths)}")
+    
+    # Find a valid model directory
+    model_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            logger.info(f"Found potential model directory: {path}")
+            
+            # Check if there are model files in this directory
+            try:
+                files = os.listdir(path)
+                pkl_files = [f for f in files if f.endswith('.pkl') and os.path.isfile(os.path.join(path, f))]
+                if pkl_files:
+                    model_path = path
+                    logger.info(f"Using model directory: {model_path}")
+                    logger.info(f"Found model files: {pkl_files}")
+                    break
+            except Exception as e:
+                logger.warning(f"Error checking directory {path}: {str(e)}")
+    
+    if not model_path:
+        logger.error(f"No valid model directory found. Tried: {possible_paths}")
+        return
+    
+    # Model types to look for
     model_types = [
         'hotspot',
         'multivariate',
@@ -143,50 +180,93 @@ def load_models():
         'correlation'
     ]
     
+    # Get a list of all model files
+    model_files = [f for f in os.listdir(model_path) if f.endswith('.pkl') and os.path.isfile(os.path.join(model_path, f))]
+    logger.info(f"Found model files: {model_files}")
+    
+    # Check if we have a generic model that can be used as fallback
+    generic_model_path = None
+    for generic_name in ['xgboost_model.pkl', 'model.pkl', 'xgboost_minimal.pkl']:
+        if generic_name in model_files:
+            generic_model_path = os.path.join(model_path, generic_name)
+            logger.info(f"Found generic model: {generic_model_path}")
+            break
+    
+    # Try to load feature names
+    feature_names = None
+    for feature_filename in ['feature_names.txt', 'features.txt']:
+        feature_path = os.path.join(model_path, feature_filename)
+        if os.path.exists(feature_path):
+            try:
+                with open(feature_path, 'r') as f:
+                    feature_names = f.read().strip().split(',')
+                    logger.info(f"Loaded feature names: {feature_names}")
+                    break
+            except Exception as e:
+                logger.warning(f"Error loading feature names from {feature_path}: {str(e)}")
+    
+    # If no feature names file found, create default ones
+    if not feature_names:
+        feature_names = [f'feature_{i}' for i in range(10)]
+        logger.info(f"Using default feature names: {feature_names}")
+    
+    # Try to load specific models or fall back to generic
+    loaded_count = 0
     for model_type in model_types:
         try:
-            logger.info(f"Loading {model_type} model...")
+            model_loaded = False
             
-            # In a real implementation, load the model from a file
-            # models[model_type] = xgb.Booster()
-            # models[model_type].load_model(f"models/{model_type}.model")
+            # Check for type-specific model file
+            type_specific_files = [f for f in model_files if model_type.lower() in f.lower()]
+            if type_specific_files:
+                model_file = os.path.join(model_path, type_specific_files[0])
+                logger.info(f"Loading {model_type} model from {model_file}")
+                
+                try:
+                    # Load model based on file extension
+                    if model_file.endswith('.pkl'):
+                        with open(model_file, 'rb') as f:
+                            models[model_type] = pickle.load(f)
+                    else:
+                        models[model_type] = xgb.Booster()
+                        models[model_type].load_model(model_file)
+                    
+                    feature_maps[model_type] = feature_names
+                    model_loaded = True
+                    logger.info(f"Successfully loaded {model_type} model")
+                except Exception as e:
+                    logger.error(f"Failed to load {model_type} model: {str(e)}")
             
-            # For this skeleton, we'll create a dummy model
-            if model_type == 'prediction':
-                # Create a simple regressor
-                X = np.random.rand(100, 10)
-                y = np.random.rand(100) * 10
-                dtrain = xgb.DMatrix(X, label=y)
-                params = {
-                    'max_depth': 3,
-                    'eta': 0.1,
-                    'objective': 'reg:squarederror',
-                    'eval_metric': 'rmse'
-                }
-                models[model_type] = xgb.train(params, dtrain, num_boost_round=10)
-            else:
-                # Create a simple classifier
-                X = np.random.rand(100, 10)
-                y = np.random.randint(0, 2, 100)
-                dtrain = xgb.DMatrix(X, label=y)
-                params = {
-                    'max_depth': 3,
-                    'eta': 0.1,
-                    'objective': 'binary:logistic',
-                    'eval_metric': 'logloss'
-                }
-                models[model_type] = xgb.train(params, dtrain, num_boost_round=10)
+            # Fall back to generic model if type-specific not loaded
+            if not model_loaded and generic_model_path:
+                logger.info(f"Using generic model for {model_type}")
+                try:
+                    with open(generic_model_path, 'rb') as f:
+                        models[model_type] = pickle.load(f)
+                    
+                    feature_maps[model_type] = feature_names
+                    model_loaded = True
+                    logger.info(f"Successfully loaded generic model for {model_type}")
+                except Exception as e:
+                    logger.error(f"Failed to load generic model for {model_type}: {str(e)}")
             
-            # Create SHAP explainer for the model
-            X_shap = pd.DataFrame(X, columns=[f'feature_{i}' for i in range(X.shape[1])])
-            feature_maps[model_type] = X_shap.columns.tolist()
-            shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
-            
-            logger.info(f"Successfully loaded {model_type} model")
+            # Create SHAP explainer if model loaded
+            if model_loaded:
+                try:
+                    # Create a sample feature matrix for the SHAP explainer
+                    X_sample = pd.DataFrame(np.random.rand(10, len(feature_names)), columns=feature_names)
+                    shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
+                    loaded_count += 1
+                    logger.info(f"Created SHAP explainer for {model_type}")
+                except Exception as e:
+                    logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
+                    logger.error(traceback.format_exc())
+        
         except Exception as e:
-            logger.error(f"Failed to load {model_type} model: {str(e)}")
-            # Log the full traceback for debugging
+            logger.error(f"Error processing {model_type} model: {str(e)}")
             logger.error(traceback.format_exc())
+    
+    logger.info(f"Model loading complete. Loaded {loaded_count} of {len(model_types)} models.")
 
 def get_cache(key):
     """Get data from cache with error handling"""
@@ -500,9 +580,41 @@ def diagnostics():
         "features": {model: len(features) for model, features in feature_maps.items()}
     }
     
+    # Check model directories
+    model_dir_info = {}
+    paths_to_check = [
+        os.path.join('/opt/render/project/src', 'models'),
+        'models',
+        os.path.join('.', 'models'),
+        os.path.join('..', 'models'),
+        '.',
+        '/opt/render/project/src'
+    ]
+    
+    for path in paths_to_check:
+        try:
+            if os.path.exists(path):
+                files = os.listdir(path)
+                pkl_files = [f for f in files if f.endswith('.pkl') and os.path.isfile(os.path.join(path, f))]
+                model_dir_info[path] = {
+                    "exists": True,
+                    "is_dir": os.path.isdir(path),
+                    "file_count": len(files),
+                    "pkl_files": pkl_files
+                }
+            else:
+                model_dir_info[path] = {
+                    "exists": False
+                }
+        except Exception as e:
+            model_dir_info[path] = {
+                "exists": "error",
+                "error": str(e)
+            }
+    
     # System info
     system_info = {
-        "start_time": os.environ.get("START_TIME", "unknown"),
+        "start_time": os.environ.get("START_TIME", datetime.now().isoformat()),
         "python_version": sys.version,
         "environment": "production" if not DEBUG else "development"
     }
@@ -511,7 +623,8 @@ def diagnostics():
         "timestamp": datetime.now().isoformat(),
         "redis": redis_info,
         "models": model_info,
-        "system": system_info
+        "system": system_info,
+        "directories": model_dir_info
     }
     
     return jsonify(response)
@@ -582,6 +695,43 @@ def clear_cache():
     except Exception as e:
         logger.error(f"Cache clear error: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/models/load', methods=['POST'])
+def load_models_endpoint():
+    """
+    Custom endpoint to load models on demand
+    """
+    # API key validation
+    if API_KEY and request.headers.get('x-api-key') != API_KEY:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        # Get current state
+        before_models = list(models.keys())
+        
+        # Force reload models
+        load_models()
+        
+        # Get new state
+        after_models = list(models.keys())
+        new_models = [m for m in after_models if m not in before_models]
+        
+        return jsonify({
+            'status': 'ok',
+            'models_before': before_models,
+            'models_after': after_models,
+            'new_models': new_models,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Model loading error: {str(e)}")
+        traceback_str = traceback.format_exc()
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback_str,
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 # Set start time env var for uptime calculation
 os.environ['START_TIME'] = datetime.now().isoformat()
