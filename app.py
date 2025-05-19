@@ -163,11 +163,36 @@ def load_models():
         logger.error(f"Feature names file not found: {feature_names_path}")
         return
     with open(feature_names_path, 'r') as f:
-        feature_names = [name.strip() for name in f.read().strip().split(',')]
+        # Read the file and split by newlines, then strip each line
+        feature_names = [name.strip() for name in f.read().split('\n') if name.strip()]
     logger.info(f"Loaded feature names: {feature_names}")
     
     # Try to load specific models
     loaded_count = 0
+    generic_model_loaded = False
+    
+    # First try to load the generic model
+    generic_model = 'xgboost_model.pkl'
+    if generic_model in model_files:
+        try:
+            model_file = os.path.join(model_path, generic_model)
+            logger.info(f"Loading generic model from {model_file}")
+            with open(model_file, 'rb') as f:
+                model_data = pickle.load(f)
+                if isinstance(model_data, dict):
+                    if 'model' in model_data:
+                        generic_model_data = model_data['model']
+                    else:
+                        generic_model_data = model_data
+                else:
+                    generic_model_data = model_data
+                generic_model_loaded = True
+                logger.info("Successfully loaded generic model")
+        except Exception as e:
+            logger.error(f"Failed to load generic model: {str(e)}")
+            logger.error(traceback.format_exc())
+    
+    # Now try to load type-specific models or use generic model
     for model_type in model_types:
         try:
             # First try to find type-specific model file
@@ -177,17 +202,6 @@ def load_models():
             if type_specific_files:
                 model_file = os.path.join(model_path, type_specific_files[0])
                 logger.info(f"Loading {model_type} model from {model_file}")
-            else:
-                # Fall back to generic model
-                generic_model = 'xgboost_model.pkl'
-                if generic_model in model_files:
-                    model_file = os.path.join(model_path, generic_model)
-                    logger.info(f"No type-specific model found for {model_type}, using generic model: {model_file}")
-                else:
-                    logger.error(f"No model file found for {model_type} and no generic model available")
-                    continue
-            
-            try:
                 with open(model_file, 'rb') as f:
                     model_data = pickle.load(f)
                     if isinstance(model_data, dict):
@@ -195,26 +209,28 @@ def load_models():
                             models[model_type] = model_data['model']
                         else:
                             models[model_type] = model_data
-                        if 'feature_names' in model_data:
-                            feature_maps[model_type] = model_data['feature_names']
-                        else:
-                            feature_maps[model_type] = feature_names
                     else:
                         models[model_type] = model_data
-                        feature_maps[model_type] = feature_names
-                logger.info(f"Successfully loaded {model_type} model with features: {feature_maps.get(model_type, [])}")
-                
-                # Create SHAP explainer
-                try:
-                    X_sample = pd.DataFrame(np.random.rand(10, len(feature_maps[model_type])), columns=feature_maps[model_type])
-                    shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
-                    loaded_count += 1
-                    logger.info(f"Created SHAP explainer for {model_type}")
-                except Exception as e:
-                    logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
-                    logger.error(traceback.format_exc())
+            elif generic_model_loaded:
+                # Use generic model if type-specific model not found
+                models[model_type] = generic_model_data
+                logger.info(f"Using generic model for {model_type}")
+            else:
+                logger.error(f"No model file found for {model_type} and no generic model available")
+                continue
+            
+            # Set feature map for this model type
+            feature_maps[model_type] = feature_names
+            
+            # Create SHAP explainer
+            try:
+                X_sample = pd.DataFrame(np.random.rand(10, len(feature_maps[model_type])), columns=feature_maps[model_type])
+                shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
+                loaded_count += 1
+                logger.info(f"Created SHAP explainer for {model_type}")
             except Exception as e:
-                logger.error(f"Failed to load {model_type} model: {str(e)}")
+                logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
+                logger.error(traceback.format_exc())
         except Exception as e:
             logger.error(f"Error processing {model_type} model: {str(e)}")
             logger.error(traceback.format_exc())
