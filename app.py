@@ -170,41 +170,51 @@ def load_models():
     loaded_count = 0
     for model_type in model_types:
         try:
-            # Check for type-specific model file
+            # First try to find type-specific model file
             type_specific_files = [f for f in model_files if model_type.lower() in f.lower()]
+            model_file = None
+            
             if type_specific_files:
                 model_file = os.path.join(model_path, type_specific_files[0])
                 logger.info(f"Loading {model_type} model from {model_file}")
-                try:
-                    with open(model_file, 'rb') as f:
-                        model_data = pickle.load(f)
-                        if isinstance(model_data, dict):
-                            if 'model' in model_data:
-                                models[model_type] = model_data['model']
-                            else:
-                                models[model_type] = model_data
-                            if 'feature_names' in model_data:
-                                feature_maps[model_type] = model_data['feature_names']
-                            else:
-                                feature_maps[model_type] = feature_names
+            else:
+                # Fall back to generic model
+                generic_model = 'xgboost_model.pkl'
+                if generic_model in model_files:
+                    model_file = os.path.join(model_path, generic_model)
+                    logger.info(f"No type-specific model found for {model_type}, using generic model: {model_file}")
+                else:
+                    logger.error(f"No model file found for {model_type} and no generic model available")
+                    continue
+            
+            try:
+                with open(model_file, 'rb') as f:
+                    model_data = pickle.load(f)
+                    if isinstance(model_data, dict):
+                        if 'model' in model_data:
+                            models[model_type] = model_data['model']
                         else:
                             models[model_type] = model_data
+                        if 'feature_names' in model_data:
+                            feature_maps[model_type] = model_data['feature_names']
+                        else:
                             feature_maps[model_type] = feature_names
-                    logger.info(f"Successfully loaded {model_type} model with features: {feature_maps.get(model_type, [])}")
-                    
-                    # Create SHAP explainer
-                    try:
-                        X_sample = pd.DataFrame(np.random.rand(10, len(feature_maps[model_type])), columns=feature_maps[model_type])
-                        shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
-                        loaded_count += 1
-                        logger.info(f"Created SHAP explainer for {model_type}")
-                    except Exception as e:
-                        logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
-                        logger.error(traceback.format_exc())
+                    else:
+                        models[model_type] = model_data
+                        feature_maps[model_type] = feature_names
+                logger.info(f"Successfully loaded {model_type} model with features: {feature_maps.get(model_type, [])}")
+                
+                # Create SHAP explainer
+                try:
+                    X_sample = pd.DataFrame(np.random.rand(10, len(feature_maps[model_type])), columns=feature_maps[model_type])
+                    shap_explainers[model_type] = shap.TreeExplainer(models[model_type])
+                    loaded_count += 1
+                    logger.info(f"Created SHAP explainer for {model_type}")
                 except Exception as e:
-                    logger.error(f"Failed to load {model_type} model: {str(e)}")
-            else:
-                logger.error(f"No model file found for {model_type}")
+                    logger.error(f"Failed to create SHAP explainer for {model_type}: {str(e)}")
+                    logger.error(traceback.format_exc())
+            except Exception as e:
+                logger.error(f"Failed to load {model_type} model: {str(e)}")
         except Exception as e:
             logger.error(f"Error processing {model_type} model: {str(e)}")
             logger.error(traceback.format_exc())
