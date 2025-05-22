@@ -358,6 +358,21 @@ def to_python_type(obj):
     else:
         return obj
 
+def rename_conversion_rate_keys(obj):
+    """
+    Recursively rename all keys 'CONVERSION_RATE' to 'CONVERSIONRATE' in dicts/lists.
+    """
+    if isinstance(obj, dict):
+        new_obj = {}
+        for k, v in obj.items():
+            new_key = 'CONVERSIONRATE' if k == 'CONVERSION_RATE' else k
+            new_obj[new_key] = rename_conversion_rate_keys(v)
+        return new_obj
+    elif isinstance(obj, list):
+        return [rename_conversion_rate_keys(item) for item in obj]
+    else:
+        return obj
+
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """
@@ -406,10 +421,10 @@ def predict():
         
         # If we have a cache hit, return the cached response
         if cache_hit and cached_response:
-            # Update the processing time to include cache retrieval
             cached_response['processing_time'] = time.time() - start_time
             cached_response['cached'] = True
-            return jsonify(to_python_type(cached_response))
+            renamed_response = rename_conversion_rate_keys(to_python_type(cached_response))
+            return jsonify(renamed_response)
         
         # No cache hit, perform the prediction
         logger.info(f"Cache miss or no Redis. Computing prediction with model: {model_type}")
@@ -456,7 +471,8 @@ def predict():
             except Exception as e:
                 logger.warning(f"Error caching result: {str(e)}")
         
-        return jsonify(to_python_type(response))
+        renamed_response = rename_conversion_rate_keys(to_python_type(response))
+        return jsonify(renamed_response)
     
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
