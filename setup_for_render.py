@@ -67,6 +67,18 @@ def setup_environment():
         from map_nesto_data import map_nesto_data
         mapped_data = map_nesto_data(nesto_data_path, 'data/cleaned_data.csv')
         logger.info("Data mapping completed successfully")
+
+        # --- AUTOMATION: Rename CONVERSION_RATE to CONVERSIONRATE in cleaned_data.csv ---
+        cleaned_path = 'data/cleaned_data.csv'
+        df = pd.read_csv(cleaned_path)
+        if 'CONVERSION_RATE' in df.columns:
+            logger.info("Renaming 'CONVERSION_RATE' column to 'CONVERSIONRATE' for blob export compatibility.")
+            df.rename(columns={'CONVERSION_RATE': 'CONVERSIONRATE'}, inplace=True)
+            df.to_csv(cleaned_path, index=False)
+            logger.info("Column rename complete. Saved updated cleaned_data.csv.")
+        else:
+            logger.info("No 'CONVERSION_RATE' column found to rename.")
+        # --- END AUTOMATION ---
     except Exception as e:
         logger.error(f"Error during data mapping: {e}")
         return False
