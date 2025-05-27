@@ -30,8 +30,21 @@ except ImportError:
 
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
-# Explicit CORS configuration for /analyze
-CORS(app, resources={r"/analyze": {"origins": "*"}}, supports_credentials=True, methods=["POST", "OPTIONS"], allow_headers=["Content-Type", "X-API-KEY"])
+# Explicit CORS configuration for /analyze and /job_status paths
+CORS(app, resources={
+    r"/analyze": {
+        "origins": "*", 
+        "methods": ["POST", "OPTIONS"], 
+        "allow_headers": ["Content-Type", "X-API-KEY"],
+        "supports_credentials": True
+    },
+    r"/job_status/*": { # Added for the polling endpoint
+        "origins": "*", 
+        "methods": ["GET", "OPTIONS"], 
+        "allow_headers": ["X-API-KEY"], # Only API key needed for GET
+        "supports_credentials": True
+    }
+}, supports_credentials=True) # Global supports_credentials just in case
 
 # --- /analyze GET handler (added for friendly error) ---
 @app.route('/analyze', methods=['GET'])
