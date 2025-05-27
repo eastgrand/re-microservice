@@ -30,7 +30,8 @@ except ImportError:
 
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
-CORS(app)
+# Explicit CORS configuration for /analyze
+CORS(app, resources={r"/analyze": {"origins": "*"}}, supports_credentials=True, methods=["POST", "OPTIONS"], allow_headers=["Content-Type", "X-API-KEY"])
 
 # --- /analyze GET handler (added for friendly error) ---
 @app.route('/analyze', methods=['GET'])
