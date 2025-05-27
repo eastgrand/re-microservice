@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import shap
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from functools import wraps
 from dotenv import load_dotenv
 from data_versioning import DataVersionTracker
@@ -30,8 +30,6 @@ except ImportError:
 
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
-# Revert to the simplest global CORS configuration
-CORS(app)
 
 # --- /analyze GET handler (added for friendly error) ---
 @app.route('/analyze', methods=['GET'])
@@ -246,6 +244,7 @@ def analysis_worker(query):
 
 
 # --- ASYNC /analyze ENDPOINT FOR RENDER ---
+@cross_origin(origins="*", methods=['POST', 'OPTIONS'], headers=['Content-Type', 'X-API-KEY'], supports_credentials=True)
 @app.route('/analyze', methods=['POST'])
 @require_api_key
 def analyze():

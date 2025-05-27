@@ -8,7 +8,7 @@ import traceback
 import pickle
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -17,6 +17,8 @@ from typing import Dict, Any, List, Optional
 import redis
 import hashlib
 import ssl
+from functools import wraps
+from dotenv import load_dotenv
 
 # Setup logging
 logging.basicConfig(
@@ -28,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 # Create Flask app
 app = Flask(__name__)
-CORS(app)
 
 # Load environment variables
 API_KEY = os.environ.get('API_KEY')
@@ -744,6 +745,26 @@ def load_models_endpoint():
             'traceback': traceback_str,
             'timestamp': datetime.now().isoformat()
         }), 500
+
+@app.route('/analyze', methods=['POST'])
+@cross_origin(origins="*", methods=['POST', 'OPTIONS'], headers=['Content-Type', 'X-API-KEY'], supports_credentials=True)
+@require_api_key
+def analyze():
+    # Existing POST logic
+    logger.info("/analyze endpoint called (ASYNC POST)")
+    query = request.json
+    if not query:
+        return jsonify({"error": "No query provided"}), 400
+    try:
+        # Ensure queue is accessible; might need app.config['queue'] if not global
+        job = queue.enqueue(analysis_worker, query, job_timeout=600)
+        logger.info(f"Enqueued job {job.id}")
+        return jsonify({"job_id": job.id, "status": "queued"}), 202
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"[ANALYZE ENQUEUE ERROR] Exception: {e}\nTraceback:\n{tb}")
+        return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
 
 # Set start time env var for uptime calculation
 os.environ['START_TIME'] = datetime.now().isoformat()
