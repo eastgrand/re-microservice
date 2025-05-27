@@ -285,11 +285,6 @@ def analysis_worker(query):
 @app.route('/analyze', methods=['POST', 'OPTIONS'])
 @require_api_key
 def analyze():
-    if request.method == 'OPTIONS':
-        # Explicitly handle OPTIONS requests to ensure a 200 OK response.
-        # flask-cors should ideally handle adding the Access-Control-* headers.
-        return jsonify(success=True), 200
-
     # Existing POST logic
     logger.info("/analyze endpoint called (ASYNC POST)")
     query = request.json
