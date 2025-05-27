@@ -47,29 +47,6 @@ def analyze_get():
     }), 405
 
 
-
-
-
-# --- EARLY LOGGING SETUP (fixes NameError: logger not defined) ---
-import os
-import sys
-import logging
-import traceback
-import gc
-import pickle
-import platform
-import shutil
-import numpy as np
-import pandas as pd
-import shap
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from functools import wraps
-from dotenv import load_dotenv
-from data_versioning import DataVersionTracker
-import uuid
-from collections import defaultdict
-
 # --- REDIS/RQ IMPORTS FOR ASYNC JOBS ---
 import redis
 from rq import Queue, get_current_job
