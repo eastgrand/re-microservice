@@ -31,6 +31,10 @@ except ImportError:
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
 
+@app.route('/')
+def hello_world():
+    return jsonify({"message": "SHAP Microservice is running", "status": "healthy"}), 200
+
 # --- /analyze GET handler (added for friendly error) ---
 @app.route('/analyze', methods=['GET'])
 def analyze_get():
