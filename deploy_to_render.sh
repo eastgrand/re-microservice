@@ -86,7 +86,7 @@ fi
 echo "Testing application startup and port binding..."
 export PORT=10000
 export FLASK_ENV=development
-timeout 10 gunicorn app:app --bind 0.0.0.0:$PORT --timeout 10 &
+timeout 10 gunicorn --chdir render_deploy app:app --bind 0.0.0.0:$PORT --timeout 10 &
 GUNICORN_PID=$!
 sleep 5
 
