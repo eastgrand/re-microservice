@@ -282,15 +282,21 @@ def analysis_worker(query):
 
 
 # --- ASYNC /analyze ENDPOINT FOR RENDER ---
-@app.route('/analyze', methods=['POST'])
+@app.route('/analyze', methods=['POST', 'OPTIONS'])
 @require_api_key
 def analyze():
-    logger.info("/analyze endpoint called (ASYNC)")
+    if request.method == 'OPTIONS':
+        # Explicitly handle OPTIONS requests to ensure a 200 OK response.
+        # flask-cors should ideally handle adding the Access-Control-* headers.
+        return jsonify(success=True), 200
+
+    # Existing POST logic
+    logger.info("/analyze endpoint called (ASYNC POST)")
     query = request.json
     if not query:
         return jsonify({"error": "No query provided"}), 400
     try:
-        # Enqueue the analysis job
+        # Ensure queue is accessible; might need app.config['queue'] if not global
         job = queue.enqueue(analysis_worker, query, job_timeout=600)
         logger.info(f"Enqueued job {job.id}")
         return jsonify({"job_id": job.id, "status": "queued"}), 202
