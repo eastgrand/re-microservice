@@ -15,10 +15,9 @@ services:
       ./deploy_to_render.sh &&
       pip install psutil python-dotenv
     startCommand: >-
-      echo "Starting web service" &&
+      echo "Starting web service from render_deploy directory" &&
       python3 -c "import gc; gc.enable()" &&
-      python3 -c "import sys; sys.path.append('.')" &&
-      gunicorn --config=gunicorn_config.py app:app
+      gunicorn --chdir render_deploy --config=gunicorn_config.py app:app
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
         value: "true"
