@@ -21,7 +21,7 @@ from collections import defaultdict
 
 # Redis connection patch for better stability
 from redis_connection_patch import apply_all_patches
-from worker_process_fix import apply_all_worker_patches  # Added worker process fixes
+from worker_process_fix import apply_all_worker_patches
 # Memory optimization for SHAP analysis
 try:
     from shap_memory_fix import apply_memory_patches
@@ -252,13 +252,12 @@ def analysis_worker(query):
 @app.route('/analyze', methods=['POST'])
 @require_api_key
 def analyze():
-    # Existing POST logic
     logger.info("/analyze endpoint called (ASYNC POST)")
     query = request.json
     if not query:
         return jsonify({"error": "No query provided"}), 400
     try:
-        # Ensure queue is accessible; might need app.config['queue'] if not global
+        # Ensure 'analysis_worker' is defined later in the file
         job = queue.enqueue(analysis_worker, query, job_timeout=600)
         logger.info(f"Enqueued job {job.id}")
         return jsonify({"job_id": job.id, "status": "queued"}), 202
