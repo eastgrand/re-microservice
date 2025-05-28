@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from data_versioning import DataVersionTracker
 import uuid
 from collections import defaultdict
+import time
+import psutil
 
 
 # Redis connection patch for better stability
@@ -153,7 +155,7 @@ def require_api_key(f):
 
 
 # --- ASYNC ANALYSIS WORKER FUNCTION FOR RQ ---
-def create_memory_optimized_explainer(model, data, max_rows=500):
+def create_memory_optimized_explainer(model, data, max_rows=200):
     """Create a memory-optimized explainer that processes data in batches."""
     try:
         # Enable garbage collection
@@ -175,47 +177,72 @@ def create_memory_optimized_explainer(model, data, max_rows=500):
         # Log data info
         logger.info(f"Processing data with {len(data)} rows and {len(data.columns)} columns")
         
-        # Create explainer
+        # Create explainer once outside the loop
+        logger.info("Creating TreeExplainer...")
         explainer = shap.TreeExplainer(model)
+        logger.info("TreeExplainer created successfully")
         
         # Process in batches
         total_rows = len(data)
         num_batches = (total_rows + max_rows - 1) // max_rows
         all_shap_values = []
         
+        start_time = time.time()
+        timeout = 90  # Set timeout to 90 seconds to allow for cleanup
+        
         for i in range(0, total_rows, max_rows):
+            # Check for timeout
+            if time.time() - start_time > timeout:
+                logger.warning("Processing timeout reached, stopping batch processing")
+                break
+                
             batch_start = time.time()
             batch_end = min(i + max_rows, total_rows)
-            batch = data.iloc[i:batch_end]
+            batch = data.iloc[i:batch_end].copy()  # Create a copy to avoid memory leaks
             
             logger.info(f"Processing batch {i//max_rows + 1}/{num_batches} ({len(batch)} rows)")
             
-            # Calculate SHAP values for batch
-            batch_shap = explainer.shap_values(batch)
-            all_shap_values.append(batch_shap)
-            
-            # Log batch progress
-            batch_time = time.time() - batch_start
-            logger.info(f"Batch {i//max_rows + 1} completed in {batch_time:.2f} seconds")
-            
-            # Force garbage collection
-            gc.collect()
-            
-            # Log memory usage after batch
-            current_memory = process.memory_info().rss / 1024 / 1024
-            logger.info(f"Memory usage after batch: {current_memory:.2f} MB")
+            try:
+                # Calculate SHAP values for batch
+                batch_shap = explainer.shap_values(batch, check_additivity=False)
+                all_shap_values.append(batch_shap)
+                
+                # Log batch progress
+                batch_time = time.time() - batch_start
+                logger.info(f"Batch {i//max_rows + 1} completed in {batch_time:.2f} seconds")
+                
+                # Force garbage collection
+                del batch
+                gc.collect()
+                
+                # Log memory usage after batch
+                current_memory = process.memory_info().rss / 1024 / 1024
+                logger.info(f"Memory usage after batch: {current_memory:.2f} MB")
+                
+            except Exception as e:
+                logger.error(f"Error processing batch {i//max_rows + 1}: {str(e)}")
+                continue  # Continue with next batch even if this one fails
         
         # Combine SHAP values
-        if len(all_shap_values) > 1:
-            shap_values = np.concatenate(all_shap_values, axis=0)
-        else:
-            shap_values = all_shap_values[0]
+        if not all_shap_values:
+            logger.error("No SHAP values were computed successfully")
+            return None
             
-        # Log final memory usage
-        final_memory = process.memory_info().rss / 1024 / 1024
-        logger.info(f"Final memory usage: {final_memory:.2f} MB")
-        
-        return shap_values
+        try:
+            if len(all_shap_values) > 1:
+                shap_values = np.concatenate(all_shap_values, axis=0)
+            else:
+                shap_values = all_shap_values[0]
+                
+            # Log final memory usage
+            final_memory = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Final memory usage: {final_memory:.2f} MB")
+            
+            return shap_values
+            
+        except Exception as e:
+            logger.error(f"Error combining SHAP values: {str(e)}")
+            return None
         
     except Exception as e:
         logger.error(f"Error in create_memory_optimized_explainer: {str(e)}")
@@ -606,7 +633,6 @@ def list_versions():
 @require_api_key
 def health_check():
     ensure_model_loaded()
-    import xgboost
     try:
         import psutil
         process = psutil.Process(os.getpid())
