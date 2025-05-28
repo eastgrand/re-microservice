@@ -2,6 +2,7 @@
 import requests
 import json
 import sys
+import os
 from urllib.parse import urljoin
 
 def test_cors(base_url, api_key):
@@ -62,5 +63,5 @@ if __name__ == "__main__":
     base_url = sys.argv[1]
     api_key = sys.argv[2]
     
-    print(f"Testing CORS for {base_url}")
+    print(f"\nTesting CORS for {base_url}")
     test_cors(base_url, api_key) 

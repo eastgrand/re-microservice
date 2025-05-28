@@ -31,6 +31,16 @@ except ImportError:
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
 
+# Initialize CORS with proper configuration
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "X-API-KEY"],
+        "supports_credentials": True
+    }
+})
+
 @app.route('/')
 def hello_world():
     return jsonify({"message": "SHAP Microservice is running", "status": "healthy"}), 200
@@ -82,39 +92,44 @@ logger.setLevel(numeric_level)
 
 
 # --- REDIS/RQ SETUP ---
-# Prefer Render/Upstash REDIS_URL, fallback to localhost only for local dev
-
-# --- REDIS/RQ SETUP ---
-REDIS_URL = os.getenv('REDIS_URL')
-import logging
-logging.basicConfig(level=logging.INFO)
+REDIS_URL = os.getenv('REDIS_URL', 'rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379')
 logger = logging.getLogger("shap-microservice")
-logger.info(f"[DEBUG] REDIS_URL at startup: {REDIS_URL}")
-if not REDIS_URL:
-    # Try to load from .env if not set
-    from dotenv import load_dotenv
-    load_dotenv()
-    REDIS_URL = os.getenv('REDIS_URL')
-    logger.info(f"[DEBUG] REDIS_URL after load_dotenv: {REDIS_URL}")
-if not REDIS_URL:
-    # Final fallback for local dev
-    REDIS_URL = 'redis://localhost:6379/0'
-    logger.info(f"[DEBUG] REDIS_URL falling back to localhost: {REDIS_URL}")
+logger.info(f"[DEBUG] Using Redis URL: {REDIS_URL}")
 
 # First create a Flask application context
 with app.app_context():
-    # Apply Redis connection patches for better stability - pass the app instance
-    apply_all_worker_patches(app)
-    
-    # Create Redis connection - now patched version will be used
-    redis_conn = redis.from_url(REDIS_URL)
-    
-    # Store Redis connection in app config for endpoint access
-    app.config['redis_conn'] = redis_conn
-    
-    # Initialize the job queue with the connection
-    logger.info("Initializing Redis Queue for job processing...")
-    queue = Queue('shap-jobs', connection=redis_conn)
+    try:
+        # Apply Redis connection patches for better stability
+        apply_all_worker_patches(app)
+        
+        # Create Redis connection with improved parameters
+        redis_conn = redis.from_url(
+            REDIS_URL,
+            socket_timeout=10,
+            socket_connect_timeout=10,
+            socket_keepalive=True,
+            health_check_interval=30,
+            retry_on_timeout=True,
+            ssl_cert_reqs=None  # Don't verify SSL certificate
+        )
+        
+        # Test the connection
+        if redis_conn.ping():
+            logger.info("Successfully connected to Redis")
+        else:
+            logger.error("Failed to ping Redis server")
+            raise Exception("Redis connection test failed")
+        
+        # Store Redis connection in app config for endpoint access
+        app.config['redis_conn'] = redis_conn
+        
+        # Initialize the job queue with the connection
+        logger.info("Initializing Redis Queue for job processing...")
+        queue = Queue('shap-jobs', connection=redis_conn)
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis connection: {str(e)}")
+        raise
 
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
