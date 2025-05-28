@@ -153,8 +153,78 @@ def require_api_key(f):
 
 
 # --- ASYNC ANALYSIS WORKER FUNCTION FOR RQ ---
+def create_memory_optimized_explainer(model, X, max_rows=1000):
+    """
+    Creates a memory-optimized explainer by processing data in batches
+    
+    Args:
+        model: The trained model to explain
+        X: Input features to explain
+        max_rows: Maximum number of rows to process in one batch
+        
+    Returns:
+        ShapValuesWrapper containing the computed SHAP values
+    """
+    import shap
+    
+    # Start with garbage collection to ensure we have maximum memory available
+    gc.collect()
+    
+    logger.info(f"Creating memory-optimized explainer for {len(X)} rows")
+    logger.info(f"Using max batch size of {max_rows} rows")
+    
+    # Check if the dataset is small enough to process in one go
+    if len(X) <= max_rows:
+        logger.info("Dataset small enough for direct processing")
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer(X)
+        return shap_values
+    
+    # Process in batches for large datasets
+    logger.info(f"Processing large dataset in batches")
+    all_shap_values = []
+    total_rows = len(X)
+    chunks = (total_rows + max_rows - 1) // max_rows  # Ceiling division
+    
+    for i in range(chunks):
+        start_idx = i * max_rows
+        end_idx = min((i + 1) * max_rows, total_rows)
+        
+        logger.info(f"Processing batch {i+1}/{chunks} (rows {start_idx}-{end_idx})")
+        
+        # Extract this chunk of data
+        X_chunk = X.iloc[start_idx:end_idx]
+        
+        # Create explainer and get SHAP values for this chunk
+        explainer = shap.TreeExplainer(model)
+        chunk_shap_values = explainer(X_chunk)
+        
+        # Extract values (handle different return types from different SHAP versions)
+        if hasattr(chunk_shap_values, 'values'):
+            all_shap_values.append(chunk_shap_values.values)
+        else:
+            all_shap_values.append(chunk_shap_values)
+            
+        # Force cleanup to free memory
+        del explainer
+        del chunk_shap_values
+        del X_chunk
+        gc.collect()
+        
+    # Combine all chunks
+    logger.info("Combining SHAP values from all batches")
+    try:
+        combined_values = np.vstack(all_shap_values)
+        return shap.Explanation(combined_values)
+    except:
+        logger.warning("Could not combine values using np.vstack, returning list")
+        return shap.Explanation(np.array(all_shap_values))
+
 def analysis_worker(query):
     import time
+    import shap
+    import gc
+    
     logger.info(f"[RQ WORKER] analysis_worker called")
     ensure_model_loaded()
     try:
@@ -196,8 +266,12 @@ def analysis_worker(query):
             if feature not in X.columns:
                 X[feature] = 0
         X = X[model_features]
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer(X)
+        
+        # Replace the direct SHAP computation with the memory-optimized version
+        logger.info("Starting SHAP computation with memory optimization")
+        shap_values = create_memory_optimized_explainer(model, X)
+        logger.info("SHAP computation completed successfully")
+        
         feature_importance = []
         for i, feature in enumerate(model_features):
             importance = abs(shap_values.values[:, i]).mean()
