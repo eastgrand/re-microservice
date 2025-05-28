@@ -46,11 +46,11 @@ def run_tests():
     test_data.to_csv(test_dataset_path, index=False)
     
     # Register dataset
-    dataset_version_id = tracker.track_dataset(
-        test_dataset_path,
-        description="Test dataset for versioning",
-        source="Test script"
-    )
+    dataset_version_id = tracker.track_dataset({
+        "path": test_dataset_path,
+        "description": "Test dataset for versioning",
+        "source": "Test script"
+    })
     
     if dataset_version_id and dataset_version_id.startswith('dataset_'):
         print_success(f"Dataset registered with ID: {dataset_version_id}")

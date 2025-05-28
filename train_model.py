@@ -264,11 +264,11 @@ df.to_csv(cleaned_data_path, index=False)
 logger.info("Cleaned data saved")
 
 # Register cleaned dataset in version tracker
-dataset_version_id = version_tracker.track_dataset(
-    cleaned_data_path,
-    description=f"Cleaned {data_description}",
-    source=data_source
-)
+dataset_version_id = version_tracker.track_dataset({
+    "path": cleaned_data_path,
+    "description": f"Cleaned {data_description}",
+    "source": data_source
+})
 logger.info(f"Registered cleaned dataset with version ID: {dataset_version_id}")
 
 # Prepare features and target
@@ -550,11 +550,11 @@ def train_and_save_model():
         df.to_csv(dataset_path, index=False)
     
     # Register the dataset
-    dataset_version_id = version_tracker.track_dataset(
-        dataset_path,
-        description="Dataset for model training",
-        source="Train_and_save_model function"
-    )
+    dataset_version_id = version_tracker.track_dataset({
+        "path": dataset_path,
+        "description": "Dataset for model training",
+        "source": "Train_and_save_model function"
+    })
     
     # Identify target variable
     target_variable = os.getenv('DEFAULT_TARGET', 'Mortgage_Approvals')
