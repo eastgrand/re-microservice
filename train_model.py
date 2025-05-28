@@ -455,7 +455,7 @@ metrics = {
 if cv_metrics and len(cv_metrics) > 0:
     metrics.update(cv_metrics)
 
-model_version_id = version_tracker.register_model(
+model_version_id = version_tracker.track_model(
     model_path, 
     dataset_version_id, 
     feature_names_path=feature_names_path,
@@ -639,7 +639,7 @@ def train_and_save_model():
         "test_size": len(y_test),
     }
     
-    model_version_id = version_tracker.register_model(
+    model_version_id = version_tracker.track_model(
         model_path, 
         dataset_version_id, 
         feature_names_path=feature_names_path,

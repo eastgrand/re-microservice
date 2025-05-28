@@ -78,7 +78,7 @@ def run_tests():
         f.write("Income\n")
         
     # Register model
-    model_version_id = tracker.register_model(
+    model_version_id = tracker.track_model(
         test_model_path,
         dataset_version_id,
         feature_names_path=test_feature_names_path,
