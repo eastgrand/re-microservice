@@ -63,13 +63,44 @@ def main():
         df = process_features(features)
         
         if not df.empty:
-            # Add layer name as a prefix to columns
-            df.columns = [f"{layer_name}_{col}" for col in df.columns]
+            # Validate ID field exists
+            if 'ID' not in df.columns:
+                logger.error(f"Layer {layer_name} missing required ID field")
+                continue
+                
+            # Validate ID field is unique
+            if df['ID'].duplicated().any():
+                logger.error(f"Layer {layer_name} has duplicate IDs")
+                continue
+                
+            # Add layer name as a prefix to columns except ID
+            rename_dict = {col: f"{layer_name}_{col}" for col in df.columns if col != 'ID'}
+            df = df.rename(columns=rename_dict)
             all_data.append(df)
     
-    # Merge all data
+    # Merge all data using ID as join key
     if all_data:
-        final_df = pd.concat(all_data, axis=1)
+        # Start with first dataset
+        final_df = all_data[0]
+        logger.info(f"Starting merge with {len(final_df)} rows from first layer")
+        
+        # Join subsequent datasets
+        for i, df in enumerate(all_data[1:], 1):
+            logger.info(f"Merging layer {i+1} with {len(df)} rows")
+            final_df = final_df.merge(df, on='ID', how='inner')
+            logger.info(f"After merge: {len(final_df)} rows")
+            
+            # Validate merge
+            if len(final_df) == 0:
+                logger.error("Merge resulted in empty dataset - no matching IDs")
+                return
+                
+        # Validate final dataset
+        logger.info(f"Final dataset has {len(final_df)} rows and {len(final_df.columns)} columns")
+        if len(final_df) > 2000:  # Sanity check
+            logger.warning(f"Final dataset has more rows than expected: {len(final_df)}")
+            
+        # Save merged data
         output_path = 'data/nesto_merge_0.csv'
         final_df.to_csv(output_path, index=False)
         logger.info(f"Data saved to {output_path}")

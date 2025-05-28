@@ -153,101 +153,73 @@ def require_api_key(f):
 
 
 # --- ASYNC ANALYSIS WORKER FUNCTION FOR RQ ---
-def create_memory_optimized_explainer(model, X, max_rows=500):
-    """
-    Creates a memory-optimized explainer by processing data in batches
-    
-    Args:
-        model: The trained model to explain
-        X: Input features to explain
-        max_rows: Maximum number of rows to process in one batch
+def create_memory_optimized_explainer(model, data, max_rows=500):
+    """Create a memory-optimized explainer that processes data in batches."""
+    try:
+        # Enable garbage collection
+        gc.enable()
         
-    Returns:
-        ShapValuesWrapper containing the computed SHAP values
-    """
-    import shap
-    import psutil
-    import time
-    
-    # Start with garbage collection to ensure we have maximum memory available
-    gc.collect()
-    
-    # Log initial memory usage
-    process = psutil.Process()
-    initial_memory = process.memory_info().rss / (1024 * 1024)  # MB
-    logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
-    
-    logger.info(f"Creating memory-optimized explainer for {len(X)} rows")
-    logger.info(f"Using max batch size of {max_rows} rows")
-    
-    # Check if the dataset is small enough to process in one go
-    if len(X) <= max_rows:
-        logger.info("Dataset small enough for direct processing")
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer(X)
-        return shap_values
-    
-    # Process in batches for large datasets
-    logger.info(f"Processing large dataset in batches")
-    all_shap_values = []
-    total_rows = len(X)
-    chunks = (total_rows + max_rows - 1) // max_rows  # Ceiling division
-    
-    # Create explainer once outside the loop
-    logger.info("Creating TreeExplainer...")
-    explainer = shap.TreeExplainer(model)
-    logger.info("TreeExplainer created successfully")
-    
-    start_time = time.time()
-    for i in range(chunks):
-        batch_start_time = time.time()
-        start_idx = i * max_rows
-        end_idx = min((i + 1) * max_rows, total_rows)
+        # Log initial memory usage
+        process = psutil.Process()
+        initial_memory = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
         
-        logger.info(f"Processing batch {i+1}/{chunks} (rows {start_idx}-{end_idx})")
-        
-        # Extract this chunk of data
-        X_chunk = X.iloc[start_idx:end_idx].copy()  # Make a copy to ensure memory is freed
-        
-        # Create explainer and get SHAP values for this chunk
-        try:
-            chunk_shap_values = explainer(X_chunk)
+        # Validate data
+        if 'ID' not in data.columns:
+            raise ValueError("Data missing required ID field")
             
-            # Extract values (handle different return types from different SHAP versions)
-            if hasattr(chunk_shap_values, 'values'):
-                all_shap_values.append(chunk_shap_values.values)
-            else:
-                all_shap_values.append(chunk_shap_values)
-                
-            # Force cleanup to free memory
-            del chunk_shap_values
-            del X_chunk
+        if data['ID'].duplicated().any():
+            logger.warning("Data contains duplicate IDs - removing duplicates")
+            data = data.drop_duplicates(subset=['ID'])
+            
+        # Log data info
+        logger.info(f"Processing data with {len(data)} rows and {len(data.columns)} columns")
+        
+        # Create explainer
+        explainer = shap.TreeExplainer(model)
+        
+        # Process in batches
+        total_rows = len(data)
+        num_batches = (total_rows + max_rows - 1) // max_rows
+        all_shap_values = []
+        
+        for i in range(0, total_rows, max_rows):
+            batch_start = time.time()
+            batch_end = min(i + max_rows, total_rows)
+            batch = data.iloc[i:batch_end]
+            
+            logger.info(f"Processing batch {i//max_rows + 1}/{num_batches} ({len(batch)} rows)")
+            
+            # Calculate SHAP values for batch
+            batch_shap = explainer.shap_values(batch)
+            all_shap_values.append(batch_shap)
+            
+            # Log batch progress
+            batch_time = time.time() - batch_start
+            logger.info(f"Batch {i//max_rows + 1} completed in {batch_time:.2f} seconds")
+            
+            # Force garbage collection
             gc.collect()
             
-            # Log progress and memory usage
-            current_memory = process.memory_info().rss / (1024 * 1024)  # MB
-            batch_time = time.time() - batch_start_time
-            logger.info(f"Batch {i+1} completed in {batch_time:.2f}s. Memory usage: {current_memory:.2f} MB")
+            # Log memory usage after batch
+            current_memory = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory usage after batch: {current_memory:.2f} MB")
+        
+        # Combine SHAP values
+        if len(all_shap_values) > 1:
+            shap_values = np.concatenate(all_shap_values, axis=0)
+        else:
+            shap_values = all_shap_values[0]
             
-        except Exception as e:
-            logger.error(f"Error processing batch {i+1}: {str(e)}")
-            # Try to continue with remaining batches
-            continue
-    
-    total_time = time.time() - start_time
-    logger.info(f"Total processing time: {total_time:.2f}s")
-    
-    # Combine all chunks
-    logger.info("Combining SHAP values from all batches")
-    try:
-        combined_values = np.vstack(all_shap_values)
-        final_memory = process.memory_info().rss / (1024 * 1024)  # MB
+        # Log final memory usage
+        final_memory = process.memory_info().rss / 1024 / 1024
         logger.info(f"Final memory usage: {final_memory:.2f} MB")
-        return shap.Explanation(combined_values)
+        
+        return shap_values
+        
     except Exception as e:
-        logger.error(f"Error combining SHAP values: {str(e)}")
-        logger.warning("Could not combine values using np.vstack, returning list")
-        return shap.Explanation(np.array(all_shap_values))
+        logger.error(f"Error in create_memory_optimized_explainer: {str(e)}")
+        raise
 
 def analysis_worker(query):
     import time
@@ -261,7 +233,7 @@ def analysis_worker(query):
     try:
         # Log initial memory usage
         process = psutil.Process()
-        initial_memory = process.memory_info().rss / (1024 * 1024)  # MB
+        initial_memory = process.memory_info().rss / (1024 * 1024)
         logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
         
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
@@ -294,6 +266,12 @@ def analysis_worker(query):
         
         logger.info(f"Data filtered. Shape: {filtered_data.shape}")
         
+        # Limit the number of rows for analysis
+        MAX_ANALYSIS_ROWS = 2000
+        if len(filtered_data) > MAX_ANALYSIS_ROWS:
+            logger.warning(f"Limiting analysis to {MAX_ANALYSIS_ROWS} rows")
+            filtered_data = filtered_data.sample(n=MAX_ANALYSIS_ROWS, random_state=42)
+        
         # Optimize data preparation
         top_data = filtered_data.sort_values(by=target_variable, ascending=False)
         X = top_data.copy()
@@ -310,11 +288,21 @@ def analysis_worker(query):
         # Replace the direct SHAP computation with the memory-optimized version
         logger.info("Starting SHAP computation with memory optimization")
         shap_values = create_memory_optimized_explainer(model, X)
+        
+        if shap_values is None:
+            logger.error("SHAP computation failed")
+            return {
+                "success": False,
+                "error": "SHAP computation failed due to timeout or memory constraints",
+                "results": [],
+                "summary": "Analysis could not be completed due to resource constraints."
+            }
+            
         logger.info("SHAP computation completed successfully")
         
         feature_importance = []
         for i, feature in enumerate(model_features):
-            importance = abs(shap_values.values[:, i]).mean()
+            importance = abs(shap_values[:, i]).mean()
             feature_importance.append({'feature': feature, 'importance': float(importance)})
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
         results = []
@@ -355,7 +343,7 @@ def analysis_worker(query):
             summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
         shap_values_dict = {}
         for i, feature in enumerate(model_features):
-            shap_values_dict[feature] = shap_values.values[:, i].tolist()[:10]
+            shap_values_dict[feature] = shap_values[:, i].tolist()[:10]
         model_version = version_tracker.get_latest_model()
         dataset_version = version_tracker.get_latest_dataset()
         version_info = {}
@@ -500,6 +488,7 @@ def load_model():
         is_render = 'RENDER' in os.environ
         if is_render:
             gc.enable()
+            
         # Try to load model
         if os.path.exists(MODEL_PATH):
             model = pickle.load(open(MODEL_PATH, 'rb'))
@@ -508,13 +497,52 @@ def load_model():
                     feature_names = [line.strip() for line in f.readlines()]
             else:
                 feature_names = []
+                
+            # Load and validate dataset
             cleaned_data_path = 'data/cleaned_data.csv'
             if os.path.exists(cleaned_data_path):
-                dataset = pd.read_csv(cleaned_data_path, nrows=10000 if is_render else 20000)
+                logger.info(f"Loading cleaned data from {cleaned_data_path}")
+                dataset = pd.read_csv(cleaned_data_path)
+                
+                # Validate dataset
+                if 'ID' not in dataset.columns:
+                    raise ValueError("Dataset missing required ID field")
+                    
+                if dataset['ID'].duplicated().any():
+                    logger.warning("Dataset contains duplicate IDs - removing duplicates")
+                    dataset = dataset.drop_duplicates(subset=['ID'])
+                    
+                # Log dataset info
+                logger.info(f"Loaded dataset with {len(dataset)} rows and {len(dataset.columns)} columns")
+                
+                # Sample if needed (for Render)
+                if is_render and len(dataset) > 10000:
+                    logger.info("Sampling dataset for Render environment")
+                    dataset = dataset.sample(n=10000, random_state=42)
+                    
             elif os.path.exists(DATASET_PATH):
-                dataset = pd.read_csv(DATASET_PATH, nrows=10000 if is_render else 20000)
+                logger.info(f"Loading dataset from {DATASET_PATH}")
+                dataset = pd.read_csv(DATASET_PATH)
+                
+                # Validate dataset
+                if 'ID' not in dataset.columns:
+                    raise ValueError("Dataset missing required ID field")
+                    
+                if dataset['ID'].duplicated().any():
+                    logger.warning("Dataset contains duplicate IDs - removing duplicates")
+                    dataset = dataset.drop_duplicates(subset=['ID'])
+                    
+                # Log dataset info
+                logger.info(f"Loaded dataset with {len(dataset)} rows and {len(dataset.columns)} columns")
+                
+                # Sample if needed (for Render)
+                if is_render and len(dataset) > 10000:
+                    logger.info("Sampling dataset for Render environment")
+                    dataset = dataset.sample(n=10000, random_state=42)
             else:
+                logger.warning("No dataset found, creating empty DataFrame")
                 dataset = pd.DataFrame()
+                
             return model, dataset, feature_names
         else:
             raise FileNotFoundError("Model not found, please train the model first.")
