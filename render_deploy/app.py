@@ -123,6 +123,9 @@ REQUIRE_AUTH = True  # Re-enable API key requirement for Render
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Allow OPTIONS requests to pass through without API key check for CORS preflight
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
         if not REQUIRE_AUTH:
             return f(*args, **kwargs)
         api_key = request.headers.get('X-API-KEY')
