@@ -16,7 +16,9 @@ services:
       pip install psutil python-dotenv
     startCommand: >-
       echo "Starting web service..." &&
-      gunicorn --chdir render_deploy --config render_deploy/gunicorn_config.py render_deploy.app:app --bind 0.0.0.0:$PORT
+      export PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/render_deploy &&
+      cd render_deploy &&
+      gunicorn --config gunicorn_config.py app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
         value: "true"
