@@ -587,23 +587,18 @@ model = None
 dataset = None
 feature_names = None
 def ensure_model_loaded():
-    global model, dataset, feature_names
+    global model, feature_names
     try:
-        if model is None or dataset is None or feature_names is None:
-            logger.info("Lazy-loading model and dataset...")
-            model_, dataset_, feature_names_ = load_model()
+        if model is None or feature_names is None:  # Remove dataset check since it's created per query
+            logger.info("Lazy-loading model and feature names...")
+            model_, feature_names_ = load_model()
             if model_ is None:
                 raise RuntimeError("Model failed to load (model_ is None)")
-            if dataset_ is None:
-                raise RuntimeError("Dataset failed to load (dataset_ is None)")
             if not feature_names_:
                 raise RuntimeError("Feature names failed to load (feature_names_ is empty or None)")
             model = model_
-            dataset = dataset_
             feature_names = feature_names_
-            logger.info(f"Model and dataset loaded successfully (lazy): model={type(model)}, dataset_shape={dataset.shape}, features={len(feature_names)}")
-            # Immediately set job_store status to 'running' if called from a job thread
-            # (This is a no-op here, but you can add more logic if needed)
+            logger.info(f"Model and feature names loaded successfully (lazy): model={type(model)}, features={len(feature_names)}")
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -629,7 +624,7 @@ def load_model():
             else:
                 feature_names = []
                 
-            return model, None, feature_names  # Return None for dataset as it will be created per query
+            return model, feature_names  # Return None for dataset as it will be created per query
         else:
             raise FileNotFoundError("Model not found, please train the model first.")
     except Exception as e:
