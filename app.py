@@ -153,7 +153,7 @@ def require_api_key(f):
 
 
 # --- ASYNC ANALYSIS WORKER FUNCTION FOR RQ ---
-def create_memory_optimized_explainer(model, X, max_rows=1000):
+def create_memory_optimized_explainer(model, X, max_rows=500):
     """
     Creates a memory-optimized explainer by processing data in batches
     
@@ -166,9 +166,16 @@ def create_memory_optimized_explainer(model, X, max_rows=1000):
         ShapValuesWrapper containing the computed SHAP values
     """
     import shap
+    import psutil
+    import time
     
     # Start with garbage collection to ensure we have maximum memory available
     gc.collect()
+    
+    # Log initial memory usage
+    process = psutil.Process()
+    initial_memory = process.memory_info().rss / (1024 * 1024)  # MB
+    logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
     
     logger.info(f"Creating memory-optimized explainer for {len(X)} rows")
     logger.info(f"Using max batch size of {max_rows} rows")
@@ -186,37 +193,59 @@ def create_memory_optimized_explainer(model, X, max_rows=1000):
     total_rows = len(X)
     chunks = (total_rows + max_rows - 1) // max_rows  # Ceiling division
     
+    # Create explainer once outside the loop
+    logger.info("Creating TreeExplainer...")
+    explainer = shap.TreeExplainer(model)
+    logger.info("TreeExplainer created successfully")
+    
+    start_time = time.time()
     for i in range(chunks):
+        batch_start_time = time.time()
         start_idx = i * max_rows
         end_idx = min((i + 1) * max_rows, total_rows)
         
         logger.info(f"Processing batch {i+1}/{chunks} (rows {start_idx}-{end_idx})")
         
         # Extract this chunk of data
-        X_chunk = X.iloc[start_idx:end_idx]
+        X_chunk = X.iloc[start_idx:end_idx].copy()  # Make a copy to ensure memory is freed
         
         # Create explainer and get SHAP values for this chunk
-        explainer = shap.TreeExplainer(model)
-        chunk_shap_values = explainer(X_chunk)
-        
-        # Extract values (handle different return types from different SHAP versions)
-        if hasattr(chunk_shap_values, 'values'):
-            all_shap_values.append(chunk_shap_values.values)
-        else:
-            all_shap_values.append(chunk_shap_values)
+        try:
+            chunk_shap_values = explainer(X_chunk)
             
-        # Force cleanup to free memory
-        del explainer
-        del chunk_shap_values
-        del X_chunk
-        gc.collect()
-        
+            # Extract values (handle different return types from different SHAP versions)
+            if hasattr(chunk_shap_values, 'values'):
+                all_shap_values.append(chunk_shap_values.values)
+            else:
+                all_shap_values.append(chunk_shap_values)
+                
+            # Force cleanup to free memory
+            del chunk_shap_values
+            del X_chunk
+            gc.collect()
+            
+            # Log progress and memory usage
+            current_memory = process.memory_info().rss / (1024 * 1024)  # MB
+            batch_time = time.time() - batch_start_time
+            logger.info(f"Batch {i+1} completed in {batch_time:.2f}s. Memory usage: {current_memory:.2f} MB")
+            
+        except Exception as e:
+            logger.error(f"Error processing batch {i+1}: {str(e)}")
+            # Try to continue with remaining batches
+            continue
+    
+    total_time = time.time() - start_time
+    logger.info(f"Total processing time: {total_time:.2f}s")
+    
     # Combine all chunks
     logger.info("Combining SHAP values from all batches")
     try:
         combined_values = np.vstack(all_shap_values)
+        final_memory = process.memory_info().rss / (1024 * 1024)  # MB
+        logger.info(f"Final memory usage: {final_memory:.2f} MB")
         return shap.Explanation(combined_values)
-    except:
+    except Exception as e:
+        logger.error(f"Error combining SHAP values: {str(e)}")
         logger.warning("Could not combine values using np.vstack, returning list")
         return shap.Explanation(np.array(all_shap_values))
 
@@ -224,48 +253,59 @@ def analysis_worker(query):
     import time
     import shap
     import gc
+    import psutil
     
     logger.info(f"[RQ WORKER] analysis_worker called")
     ensure_model_loaded()
+    
     try:
+        # Log initial memory usage
+        process = psutil.Process()
+        initial_memory = process.memory_info().rss / (1024 * 1024)  # MB
+        logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
+        
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
         target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
         filters = query.get('demographic_filters', [])
+        
+        # Optimize data loading and filtering
+        logger.info("Loading and filtering data...")
         filtered_data = dataset.copy()
+        
+        # Apply filters more efficiently
         for filter_item in filters:
-            if isinstance(filter_item, str) and '>' in filter_item:
-                feature, value = filter_item.split('>')
-                feature = feature.strip()
-                value = float(value.strip())
-                filtered_data = filtered_data[filtered_data[feature] > value]
-            elif isinstance(filter_item, str) and '<' in filter_item:
-                feature, value = filter_item.split('<')
-                feature = feature.strip()
-                value = float(value.strip())
-                filtered_data = filtered_data[filtered_data[feature] < value]
-            elif isinstance(filter_item, str):
-                if 'high' in filter_item.lower():
+            if isinstance(filter_item, str):
+                if '>' in filter_item:
+                    feature, value = filter_item.split('>')
+                    feature = feature.strip()
+                    value = float(value.strip())
+                    filtered_data = filtered_data[filtered_data[feature] > value]
+                elif '<' in filter_item:
+                    feature, value = filter_item.split('<')
+                    feature = feature.strip()
+                    value = float(value.strip())
+                    filtered_data = filtered_data[filtered_data[feature] < value]
+                elif 'high' in filter_item.lower():
                     feature = filter_item.lower().replace('high', '').strip()
                     feature = ''.join([w.capitalize() for w in feature.split(' ')])
                     if feature in filtered_data.columns:
                         threshold = filtered_data[feature].quantile(0.75)
                         filtered_data = filtered_data[filtered_data[feature] > threshold]
+        
+        logger.info(f"Data filtered. Shape: {filtered_data.shape}")
+        
+        # Optimize data preparation
         top_data = filtered_data.sort_values(by=target_variable, ascending=False)
         X = top_data.copy()
-        for col in ['zip_code', 'latitude', 'longitude']:
-            if col in X.columns:
-                X = X.drop(col, axis=1)
-        if target_variable in X.columns:
-            X = X.drop(target_variable, axis=1)
-        model_features = feature_names
-        X_cols = list(X.columns)
-        for col in X_cols:
-            if col not in model_features:
-                X = X.drop(col, axis=1)
-        for feature in model_features:
-            if feature not in X.columns:
-                X[feature] = 0
-        X = X[model_features]
+        
+        # Drop unnecessary columns more efficiently
+        columns_to_drop = ['zip_code', 'latitude', 'longitude', target_variable]
+        X = X.drop(columns=[col for col in columns_to_drop if col in X.columns], axis=1)
+        
+        # Align columns with model features more efficiently
+        X = X.reindex(columns=model_features, fill_value=0)
+        
+        logger.info(f"Data prepared. Shape: {X.shape}")
         
         # Replace the direct SHAP computation with the memory-optimized version
         logger.info("Starting SHAP computation with memory optimization")
