@@ -8,13 +8,13 @@ services:
     buildCommand: >-
       echo "Starting optimized build process" && 
       cd render_deploy &&
+      pip install -r requirements.txt &&
       chmod +x ./render_pre_deploy.sh &&
       echo "Running pre-deployment checks..." &&
       ./render_pre_deploy.sh &&
       echo "⚡ Pre-deployment successful - Model files verified" &&
       chmod +x ./deploy_to_render.sh &&
-      ./deploy_to_render.sh &&
-      pip install psutil python-dotenv
+      ./deploy_to_render.sh
     startCommand: >-
       echo "Starting web service..." &&
       cd render_deploy &&
@@ -43,12 +43,12 @@ services:
     buildCommand: >-
       echo "Building optimized worker service" &&
       cd render_deploy &&
+      pip install -r requirements.txt &&
       chmod +x ./render_pre_deploy.sh &&
       ./render_pre_deploy.sh &&
       chmod +x ./deploy_to_render.sh &&
       export SKIP_MODEL_TRAINING=true &&
-      ./deploy_to_render.sh &&
-      pip install psutil python-dotenv rq redis
+      ./deploy_to_render.sh
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
       cd render_deploy &&
