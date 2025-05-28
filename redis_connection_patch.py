@@ -23,7 +23,7 @@ def patch_redis_connection():
     original_from_url = redis.from_url
     
     # Get Redis configuration from environment or use defaults
-    redis_timeout = int(os.environ.get('REDIS_TIMEOUT', '5'))
+    redis_timeout = int(os.environ.get('REDIS_TIMEOUT', '10'))
     redis_socket_keepalive = os.environ.get('REDIS_SOCKET_KEEPALIVE', 'true').lower() == 'true'
     redis_pool_size = int(os.environ.get('REDIS_CONNECTION_POOL_SIZE', '10'))
     
@@ -44,9 +44,12 @@ def patch_redis_connection():
         if 'retry_on_timeout' not in kwargs:
             kwargs['retry_on_timeout'] = True
             
-        # FIXED: Do not create our own connection pool, let Redis handle it
-        # This avoids the TypeError with connection_pool parameter
-        
+        # Handle SSL connections
+        if url.startswith('rediss://'):
+            kwargs['ssl_cert_reqs'] = None  # Don't verify SSL certificate
+            if 'ssl' in kwargs:
+                del kwargs['ssl']  # Remove ssl parameter if present
+            
         # Create the Redis client with the enhanced settings
         try:
             client = original_from_url(url, **kwargs)

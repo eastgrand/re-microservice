@@ -18,7 +18,7 @@ keepalive = 65  # How long to keep connections open
 # Render has memory constraints, so configure for that
 max_requests = 10
 max_requests_jitter = 5
-preload_app = True  # Preload the app to avoid loading the model multiple times
+preload_app = False  # MODIFIED: Set to False for testing CORS issue
 worker_tmp_dir = "/tmp"  # Ensure we can create worker temp directories
 
 # Log configuration
