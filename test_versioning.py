@@ -46,7 +46,7 @@ def run_tests():
     test_data.to_csv(test_dataset_path, index=False)
     
     # Register dataset
-    dataset_version_id = tracker.register_dataset(
+    dataset_version_id = tracker.track_dataset(
         test_dataset_path,
         description="Test dataset for versioning",
         source="Test script"
