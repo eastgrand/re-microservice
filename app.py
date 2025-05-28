@@ -256,7 +256,7 @@ def analysis_worker(query):
     import psutil
     from fetch_data import fetch_arcgis_data, process_features
     
-    logger.info(f"[RQ WORKER] analysis_worker called")
+    logger.info(f"[RQ WORKER] analysis_worker called with query: {query}")
     ensure_model_loaded()
     
     try:
@@ -272,34 +272,42 @@ def analysis_worker(query):
         # Read layer configurations
         try:
             layers_df = pd.read_csv('nesto.csv')
+            logger.info(f"Successfully loaded nesto.csv with {len(layers_df)} layers")
         except Exception as e:
             logger.error(f"Error reading nesto.csv: {str(e)}")
-            return {"success": False, "error": "Failed to read layer configurations"}
+            return {"success": False, "error": f"Failed to read layer configurations: {str(e)}"}
         
         # Process each layer
         for _, row in layers_df.iterrows():
             layer_name = row['Layer Name']
             url = row['URL']
             
-            logger.info(f"Processing layer: {layer_name}")
-            features = fetch_arcgis_data(url)
-            df = process_features(features)
+            logger.info(f"Processing layer: {layer_name} with URL: {url}")
+            try:
+                features = fetch_arcgis_data(url)
+                logger.info(f"Fetched {len(features)} features from {layer_name}")
+                df = process_features(features)
+                logger.info(f"Processed features into dataframe with shape: {df.shape}")
+            except Exception as e:
+                logger.error(f"Error processing layer {layer_name}: {str(e)}")
+                continue
             
             if not df.empty:
                 # Validate ID field exists
                 if 'ID' not in df.columns:
-                    logger.error(f"Layer {layer_name} missing required ID field")
+                    logger.error(f"Layer {layer_name} missing required ID field. Available columns: {list(df.columns)}")
                     continue
                     
                 # Validate ID field is unique
                 if df['ID'].duplicated().any():
-                    logger.error(f"Layer {layer_name} has duplicate IDs")
+                    logger.error(f"Layer {layer_name} has duplicate IDs. Total rows: {len(df)}, Unique IDs: {df['ID'].nunique()}")
                     continue
                     
                 # Add layer name as a prefix to columns except ID
                 rename_dict = {col: f"{layer_name}_{col}" for col in df.columns if col != 'ID'}
                 df = df.rename(columns=rename_dict)
                 all_data.append(df)
+                logger.info(f"Added {layer_name} data with shape: {df.shape}")
         
         # Merge all data using ID as join key
         if all_data:
@@ -310,8 +318,12 @@ def analysis_worker(query):
             # Join subsequent datasets
             for i, df in enumerate(all_data[1:], 1):
                 logger.info(f"Merging layer {i+1} with {len(df)} rows")
-                dataset = dataset.merge(df, on='ID', how='inner')
-                logger.info(f"After merge: {len(dataset)} rows")
+                try:
+                    dataset = dataset.merge(df, on='ID', how='inner')
+                    logger.info(f"After merge: {len(dataset)} rows")
+                except Exception as e:
+                    logger.error(f"Error merging layer {i+1}: {str(e)}")
+                    return {"success": False, "error": f"Failed to merge data: {str(e)}"}
                 
                 # Validate merge
                 if len(dataset) == 0:
@@ -325,12 +337,21 @@ def analysis_worker(query):
                 
             # Save joined data
             output_path = 'data/joined_data.csv'
-            dataset.to_csv(output_path, index=False)
-            logger.info(f"Joined data saved to {output_path}")
+            try:
+                dataset.to_csv(output_path, index=False)
+                logger.info(f"Joined data saved to {output_path}")
+            except Exception as e:
+                logger.error(f"Error saving joined data: {str(e)}")
+                return {"success": False, "error": f"Failed to save joined data: {str(e)}"}
             
             # Load the saved data for analysis
             logger.info("Loading saved joined data for analysis...")
-            dataset = pd.read_csv(output_path)
+            try:
+                dataset = pd.read_csv(output_path)
+                logger.info(f"Successfully loaded data with shape: {dataset.shape}")
+            except Exception as e:
+                logger.error(f"Error loading saved data: {str(e)}")
+                return {"success": False, "error": f"Failed to load saved data: {str(e)}"}
         else:
             logger.error("No data was collected from any layer")
             return {"success": False, "error": "No data collected from any layer"}
@@ -343,6 +364,13 @@ def analysis_worker(query):
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
         target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
         filters = query.get('demographic_filters', [])
+        
+        logger.info(f"Analysis parameters - type: {analysis_type}, target: {target_variable}, filters: {filters}")
+        
+        # Validate target variable exists
+        if target_variable not in dataset.columns:
+            logger.error(f"Target variable {target_variable} not found in dataset. Available columns: {list(dataset.columns)}")
+            return {"success": False, "error": f"Target variable {target_variable} not found in dataset"}
         
         # Optimize data loading and filtering
         logger.info("Loading and filtering data...")
