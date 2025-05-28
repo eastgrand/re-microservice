@@ -101,9 +101,9 @@ def main():
             logger.warning(f"Final dataset has more rows than expected: {len(final_df)}")
             
         # Save merged data
-        output_path = 'data/nesto_merge_0.csv'
+        output_path = 'data/joined_data.csv'
         final_df.to_csv(output_path, index=False)
-        logger.info(f"Data saved to {output_path}")
+        logger.info(f"Joined data saved to {output_path}")
     else:
         logger.warning("No data was collected from any layer")
 

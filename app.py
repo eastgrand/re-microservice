@@ -68,7 +68,8 @@ from rq import Queue, get_current_job
 # --- PATHS FOR MODEL, FEATURE NAMES, AND DATASET ---
 MODEL_PATH = "models/xgboost_model.pkl"  # Update if your model file is named differently
 FEATURE_NAMES_PATH = "models/feature_names.txt"  # Update if your feature names file is named differently
-DATASET_PATH = "data/cleaned_data.csv"  # Fallback dataset path
+TRAINING_DATASET_PATH = "data/nesto_merge_0.csv"  # Training dataset
+JOINED_DATASET_PATH = "data/joined_data.csv"  # Joined dataset for analysis
 
 # --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
 DEFAULT_ANALYSIS_TYPE = 'correlation'
@@ -262,6 +263,11 @@ def analysis_worker(query):
         process = psutil.Process()
         initial_memory = process.memory_info().rss / (1024 * 1024)
         logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
+        
+        # Log dataset info
+        logger.info(f"Dataset shape: {dataset.shape}")
+        logger.info(f"Dataset columns: {list(dataset.columns)}")
+        logger.info(f"Dataset memory usage: {dataset.memory_usage(deep=True).sum() / (1024 * 1024):.2f} MB")
         
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
         target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
@@ -526,10 +532,9 @@ def load_model():
                 feature_names = []
                 
             # Load and validate dataset
-            cleaned_data_path = 'data/cleaned_data.csv'
-            if os.path.exists(cleaned_data_path):
-                logger.info(f"Loading cleaned data from {cleaned_data_path}")
-                dataset = pd.read_csv(cleaned_data_path)
+            if os.path.exists(JOINED_DATASET_PATH):
+                logger.info(f"Loading joined dataset from {JOINED_DATASET_PATH}")
+                dataset = pd.read_csv(JOINED_DATASET_PATH)
                 
                 # Validate dataset
                 if 'ID' not in dataset.columns:
@@ -540,34 +545,14 @@ def load_model():
                     dataset = dataset.drop_duplicates(subset=['ID'])
                     
                 # Log dataset info
-                logger.info(f"Loaded dataset with {len(dataset)} rows and {len(dataset.columns)} columns")
-                
-                # Sample if needed (for Render)
-                if is_render and len(dataset) > 10000:
-                    logger.info("Sampling dataset for Render environment")
-                    dataset = dataset.sample(n=10000, random_state=42)
-                    
-            elif os.path.exists(DATASET_PATH):
-                logger.info(f"Loading dataset from {DATASET_PATH}")
-                dataset = pd.read_csv(DATASET_PATH)
-                
-                # Validate dataset
-                if 'ID' not in dataset.columns:
-                    raise ValueError("Dataset missing required ID field")
-                    
-                if dataset['ID'].duplicated().any():
-                    logger.warning("Dataset contains duplicate IDs - removing duplicates")
-                    dataset = dataset.drop_duplicates(subset=['ID'])
-                    
-                # Log dataset info
-                logger.info(f"Loaded dataset with {len(dataset)} rows and {len(dataset.columns)} columns")
+                logger.info(f"Loaded joined dataset with {len(dataset)} rows and {len(dataset.columns)} columns")
                 
                 # Sample if needed (for Render)
                 if is_render and len(dataset) > 10000:
                     logger.info("Sampling dataset for Render environment")
                     dataset = dataset.sample(n=10000, random_state=42)
             else:
-                logger.warning("No dataset found, creating empty DataFrame")
+                logger.warning("No joined dataset found, creating empty DataFrame")
                 dataset = pd.DataFrame()
                 
             return model, dataset, feature_names
