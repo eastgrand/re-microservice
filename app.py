@@ -254,7 +254,6 @@ def analysis_worker(query):
     import shap
     import gc
     import psutil
-    from fetch_data import fetch_arcgis_data, process_features
     
     logger.info(f"[RQ WORKER] analysis_worker called with query: {query}")
     ensure_model_loaded()
@@ -265,96 +264,19 @@ def analysis_worker(query):
         initial_memory = process.memory_info().rss / (1024 * 1024)
         logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
         
-        # Fetch and join data based on query
-        logger.info("Fetching and joining data based on query...")
-        all_data = []
-        
-        # Read layer configurations
+        # Load the dataset
+        logger.info("Loading dataset...")
         try:
-            layers_df = pd.read_csv('nesto.csv')
-            logger.info(f"Successfully loaded nesto.csv with {len(layers_df)} layers")
+            # Try nesto_merge_0.csv first
+            dataset_path = 'data/nesto_merge_0.csv'
+            if not os.path.exists(dataset_path):
+                dataset_path = 'data/cleaned_data.csv'
+            
+            dataset = pd.read_csv(dataset_path)
+            logger.info(f"Successfully loaded dataset from {dataset_path} with shape: {dataset.shape}")
         except Exception as e:
-            logger.error(f"Error reading nesto.csv: {str(e)}")
-            return {"success": False, "error": f"Failed to read layer configurations: {str(e)}"}
-        
-        # Process each layer
-        for _, row in layers_df.iterrows():
-            layer_name = row['Layer Name']
-            url = row['URL']
-            
-            logger.info(f"Processing layer: {layer_name} with URL: {url}")
-            try:
-                features = fetch_arcgis_data(url)
-                logger.info(f"Fetched {len(features)} features from {layer_name}")
-                df = process_features(features)
-                logger.info(f"Processed features into dataframe with shape: {df.shape}")
-            except Exception as e:
-                logger.error(f"Error processing layer {layer_name}: {str(e)}")
-                continue
-            
-            if not df.empty:
-                # Validate ID field exists
-                if 'ID' not in df.columns:
-                    logger.error(f"Layer {layer_name} missing required ID field. Available columns: {list(df.columns)}")
-                    continue
-                    
-                # Validate ID field is unique
-                if df['ID'].duplicated().any():
-                    logger.error(f"Layer {layer_name} has duplicate IDs. Total rows: {len(df)}, Unique IDs: {df['ID'].nunique()}")
-                    continue
-                    
-                # Add layer name as a prefix to columns except ID
-                rename_dict = {col: f"{layer_name}_{col}" for col in df.columns if col != 'ID'}
-                df = df.rename(columns=rename_dict)
-                all_data.append(df)
-                logger.info(f"Added {layer_name} data with shape: {df.shape}")
-        
-        # Merge all data using ID as join key
-        if all_data:
-            # Start with first dataset
-            dataset = all_data[0]
-            logger.info(f"Starting merge with {len(dataset)} rows from first layer")
-            
-            # Join subsequent datasets
-            for i, df in enumerate(all_data[1:], 1):
-                logger.info(f"Merging layer {i+1} with {len(df)} rows")
-                try:
-                    dataset = dataset.merge(df, on='ID', how='inner')
-                    logger.info(f"After merge: {len(dataset)} rows")
-                except Exception as e:
-                    logger.error(f"Error merging layer {i+1}: {str(e)}")
-                    return {"success": False, "error": f"Failed to merge data: {str(e)}"}
-                
-                # Validate merge
-                if len(dataset) == 0:
-                    logger.error("Merge resulted in empty dataset - no matching IDs")
-                    return {"success": False, "error": "No matching IDs found across layers"}
-                    
-            # Validate final dataset
-            logger.info(f"Final dataset has {len(dataset)} rows and {len(dataset.columns)} columns")
-            if len(dataset) > 2000:  # Sanity check
-                logger.warning(f"Final dataset has more rows than expected: {len(dataset)}")
-                
-            # Save joined data
-            output_path = 'data/joined_data.csv'
-            try:
-                dataset.to_csv(output_path, index=False)
-                logger.info(f"Joined data saved to {output_path}")
-            except Exception as e:
-                logger.error(f"Error saving joined data: {str(e)}")
-                return {"success": False, "error": f"Failed to save joined data: {str(e)}"}
-            
-            # Load the saved data for analysis
-            logger.info("Loading saved joined data for analysis...")
-            try:
-                dataset = pd.read_csv(output_path)
-                logger.info(f"Successfully loaded data with shape: {dataset.shape}")
-            except Exception as e:
-                logger.error(f"Error loading saved data: {str(e)}")
-                return {"success": False, "error": f"Failed to load saved data: {str(e)}"}
-        else:
-            logger.error("No data was collected from any layer")
-            return {"success": False, "error": "No data collected from any layer"}
+            logger.error(f"Error loading dataset: {str(e)}")
+            return {"success": False, "error": f"Failed to load dataset: {str(e)}"}
         
         # Log dataset info
         logger.info(f"Dataset shape: {dataset.shape}")
@@ -398,22 +320,12 @@ def analysis_worker(query):
         
         logger.info(f"Data filtered. Shape: {filtered_data.shape}")
         
-        # Limit the number of rows for analysis
-        MAX_ANALYSIS_ROWS = 2000
-        if len(filtered_data) > MAX_ANALYSIS_ROWS:
-            logger.warning(f"Limiting analysis to {MAX_ANALYSIS_ROWS} rows")
-            filtered_data = filtered_data.sample(n=MAX_ANALYSIS_ROWS, random_state=42)
-        
         # Optimize data preparation
         top_data = filtered_data.sort_values(by=target_variable, ascending=False)
         X = top_data.copy()
         
-        # Drop unnecessary columns more efficiently
-        columns_to_drop = ['zip_code', 'latitude', 'longitude', target_variable]
-        X = X.drop(columns=[col for col in columns_to_drop if col in X.columns], axis=1)
-        
-        # Align columns with model features more efficiently
-        X = X.reindex(columns=model_features, fill_value=0)
+        # Only keep columns that are used by the model
+        X = X[model_features]
         
         logger.info(f"Data prepared. Shape: {X.shape}")
         
