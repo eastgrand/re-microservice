@@ -254,6 +254,7 @@ def analysis_worker(query):
     import shap
     import gc
     import psutil
+    from fetch_data import fetch_arcgis_data, process_features
     
     logger.info(f"[RQ WORKER] analysis_worker called")
     ensure_model_loaded()
@@ -263,6 +264,76 @@ def analysis_worker(query):
         process = psutil.Process()
         initial_memory = process.memory_info().rss / (1024 * 1024)
         logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
+        
+        # Fetch and join data based on query
+        logger.info("Fetching and joining data based on query...")
+        all_data = []
+        
+        # Read layer configurations
+        try:
+            layers_df = pd.read_csv('nesto.csv')
+        except Exception as e:
+            logger.error(f"Error reading nesto.csv: {str(e)}")
+            return {"success": False, "error": "Failed to read layer configurations"}
+        
+        # Process each layer
+        for _, row in layers_df.iterrows():
+            layer_name = row['Layer Name']
+            url = row['URL']
+            
+            logger.info(f"Processing layer: {layer_name}")
+            features = fetch_arcgis_data(url)
+            df = process_features(features)
+            
+            if not df.empty:
+                # Validate ID field exists
+                if 'ID' not in df.columns:
+                    logger.error(f"Layer {layer_name} missing required ID field")
+                    continue
+                    
+                # Validate ID field is unique
+                if df['ID'].duplicated().any():
+                    logger.error(f"Layer {layer_name} has duplicate IDs")
+                    continue
+                    
+                # Add layer name as a prefix to columns except ID
+                rename_dict = {col: f"{layer_name}_{col}" for col in df.columns if col != 'ID'}
+                df = df.rename(columns=rename_dict)
+                all_data.append(df)
+        
+        # Merge all data using ID as join key
+        if all_data:
+            # Start with first dataset
+            dataset = all_data[0]
+            logger.info(f"Starting merge with {len(dataset)} rows from first layer")
+            
+            # Join subsequent datasets
+            for i, df in enumerate(all_data[1:], 1):
+                logger.info(f"Merging layer {i+1} with {len(df)} rows")
+                dataset = dataset.merge(df, on='ID', how='inner')
+                logger.info(f"After merge: {len(dataset)} rows")
+                
+                # Validate merge
+                if len(dataset) == 0:
+                    logger.error("Merge resulted in empty dataset - no matching IDs")
+                    return {"success": False, "error": "No matching IDs found across layers"}
+                    
+            # Validate final dataset
+            logger.info(f"Final dataset has {len(dataset)} rows and {len(dataset.columns)} columns")
+            if len(dataset) > 2000:  # Sanity check
+                logger.warning(f"Final dataset has more rows than expected: {len(dataset)}")
+                
+            # Save joined data
+            output_path = 'data/joined_data.csv'
+            dataset.to_csv(output_path, index=False)
+            logger.info(f"Joined data saved to {output_path}")
+            
+            # Load the saved data for analysis
+            logger.info("Loading saved joined data for analysis...")
+            dataset = pd.read_csv(output_path)
+        else:
+            logger.error("No data was collected from any layer")
+            return {"success": False, "error": "No data collected from any layer"}
         
         # Log dataset info
         logger.info(f"Dataset shape: {dataset.shape}")
@@ -515,9 +586,8 @@ def ensure_model_loaded():
 
 def load_model():
     try:
-        logger.info("Loading model and dataset...")
+        logger.info("Loading model and feature names...")
         import xgboost as xgb
-        from train_model import DATA_PATHS
         is_render = 'RENDER' in os.environ
         if is_render:
             gc.enable()
@@ -531,31 +601,7 @@ def load_model():
             else:
                 feature_names = []
                 
-            # Load and validate dataset
-            if os.path.exists(JOINED_DATASET_PATH):
-                logger.info(f"Loading joined dataset from {JOINED_DATASET_PATH}")
-                dataset = pd.read_csv(JOINED_DATASET_PATH)
-                
-                # Validate dataset
-                if 'ID' not in dataset.columns:
-                    raise ValueError("Dataset missing required ID field")
-                    
-                if dataset['ID'].duplicated().any():
-                    logger.warning("Dataset contains duplicate IDs - removing duplicates")
-                    dataset = dataset.drop_duplicates(subset=['ID'])
-                    
-                # Log dataset info
-                logger.info(f"Loaded joined dataset with {len(dataset)} rows and {len(dataset.columns)} columns")
-                
-                # Sample if needed (for Render)
-                if is_render and len(dataset) > 10000:
-                    logger.info("Sampling dataset for Render environment")
-                    dataset = dataset.sample(n=10000, random_state=42)
-            else:
-                logger.warning("No joined dataset found, creating empty DataFrame")
-                dataset = pd.DataFrame()
-                
-            return model, dataset, feature_names
+            return model, None, feature_names  # Return None for dataset as it will be created per query
         else:
             raise FileNotFoundError("Model not found, please train the model first.")
     except Exception as e:
