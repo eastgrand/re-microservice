@@ -7,7 +7,8 @@ services:
     plan: starter
     buildCommand: >-
       echo "Starting optimized build process" && 
-      pip install -r requirements.txt &&
+      pip install -r render_deploy/requirements.txt &&
+      cd render_deploy &&
       chmod +x ./render_pre_deploy.sh &&
       echo "Running pre-deployment checks..." &&
       ./render_pre_deploy.sh &&
@@ -16,6 +17,7 @@ services:
       ./deploy_to_render.sh
     startCommand: >-
       echo "Starting web service..." &&
+      cd render_deploy &&
       export PYTHONPATH=$PYTHONPATH:$(pwd) &&
       gunicorn --config gunicorn_config.py app:app --bind 0.0.0.0:$PORT
     envVars:
@@ -40,7 +42,8 @@ services:
     env: python
     buildCommand: >-
       echo "Building optimized worker service" &&
-      pip install -r requirements.txt &&
+      pip install -r render_deploy/requirements.txt &&
+      cd render_deploy &&
       chmod +x ./render_pre_deploy.sh &&
       ./render_pre_deploy.sh &&
       chmod +x ./deploy_to_render.sh &&
@@ -48,6 +51,7 @@ services:
       ./deploy_to_render.sh
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
+      cd render_deploy &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
       chmod +x ./simple_worker.py &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
