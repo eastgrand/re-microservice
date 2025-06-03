@@ -349,36 +349,47 @@ def analysis_worker(query):
         X = top_data.copy()
         
         # Apply field mappings to match model expectations
-        logger.info("Applying field mappings to match model features...")
-        mapped_data = {}
+        logger.info("Checking if dataset columns match model features directly...")
         
-        # Apply field mappings from FIELD_MAPPINGS
-        for orig_field, mapped_field in FIELD_MAPPINGS.items():
-            if orig_field in X.columns:
-                mapped_data[mapped_field] = X[orig_field]
-                logger.info(f"Mapped '{orig_field}' to '{mapped_field}'")
+        # Check if dataset columns already match model features (they should!)
+        matching_features = [feat for feat in model_features if feat in X.columns]
+        logger.info(f"Direct matches between model and dataset: {len(matching_features)} of {len(model_features)}")
         
-        # Create DataFrame with mapped columns
-        X_mapped = pd.DataFrame(mapped_data)
-        logger.info(f"Created mapped dataset with columns: {list(X_mapped.columns)}")
-        
-        # Only keep columns that are used by the model
-        available_features = [feat for feat in model_features if feat in X_mapped.columns]
-        missing_features = [feat for feat in model_features if feat not in X_mapped.columns]
-        
-        if missing_features:
-            logger.warning(f"Missing model features: {missing_features}")
-        if not available_features:
-            logger.error("No model features available in mapped data")
-            return {
-                "success": False,
-                "error": f"No model features found. Model expects: {model_features}, Available: {list(X_mapped.columns)}",
-                "results": [],
-                "summary": "Analysis failed due to feature mismatch."
-            }
-        
-        logger.info(f"Using {len(available_features)} of {len(model_features)} model features: {available_features}")
-        X = X_mapped[available_features]
+        if len(matching_features) >= len(model_features) * 0.8:  # If 80%+ features match directly
+            logger.info("Dataset columns match model features directly - using without mapping")
+            available_features = matching_features
+            X = X[available_features]
+        else:
+            # Apply field mappings only if direct match fails
+            logger.info("Applying field mappings to match model features...")
+            mapped_data = {}
+            
+            # Apply field mappings from FIELD_MAPPINGS
+            for orig_field, mapped_field in FIELD_MAPPINGS.items():
+                if orig_field in X.columns:
+                    mapped_data[mapped_field] = X[orig_field]
+                    logger.info(f"Mapped '{orig_field}' to '{mapped_field}'")
+            
+            # Create DataFrame with mapped columns
+            X_mapped = pd.DataFrame(mapped_data)
+            logger.info(f"Created mapped dataset with columns: {list(X_mapped.columns)}")
+            
+            # Only keep columns that are used by the model
+            available_features = [feat for feat in model_features if feat in X_mapped.columns]
+            missing_features = [feat for feat in model_features if feat not in X_mapped.columns]
+            
+            if missing_features:
+                logger.warning(f"Missing model features: {missing_features}")
+            if not available_features:
+                logger.error("No model features available in mapped data")
+                return {
+                    "success": False,
+                    "error": f"No model features found. Model expects: {model_features}, Available: {list(X_mapped.columns)}",
+                    "results": [],
+                    "summary": "Analysis failed due to feature mismatch."
+                }
+            
+            X = X_mapped[available_features]
         
         logger.info(f"Data prepared. Shape: {X.shape}")
         
