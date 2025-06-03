@@ -73,7 +73,6 @@ JOINED_DATASET_PATH = "data/joined_data.csv"  # Joined dataset for analysis
 
 # --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
 DEFAULT_ANALYSIS_TYPE = 'correlation'
-DEFAULT_TARGET = 'Mortgage_Approvals'  # Set to actual default target column name for production
 
 
 
@@ -249,6 +248,8 @@ def create_memory_optimized_explainer(model, data, max_rows=200):
         logger.error(f"Error in create_memory_optimized_explainer: {str(e)}")
         raise
 
+from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
+
 def analysis_worker(query):
     import time
     import shap
@@ -284,15 +285,26 @@ def analysis_worker(query):
         logger.info(f"Dataset memory usage: {dataset.memory_usage(deep=True).sum() / (1024 * 1024):.2f} MB")
         
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
-        target_variable = query.get('target_variable', query.get('target', DEFAULT_TARGET))
+        target_variable = query.get('target_variable', query.get('target', TARGET_VARIABLE))
+        
+        # Map target variable to dataset field name
+        target_field = None
+        for orig_field, mapped_field in FIELD_MAPPINGS.items():
+            if mapped_field == target_variable:
+                target_field = orig_field
+                break
+        
+        if not target_field:
+            target_field = target_variable  # Use original if no mapping found
+            
         filters = query.get('demographic_filters', [])
         
-        logger.info(f"Analysis parameters - type: {analysis_type}, target: {target_variable}, filters: {filters}")
+        logger.info(f"Analysis parameters - type: {analysis_type}, target: {target_field}, filters: {filters}")
         
         # Validate target variable exists
-        if target_variable not in dataset.columns:
-            logger.error(f"Target variable {target_variable} not found in dataset. Available columns: {list(dataset.columns)}")
-            return {"success": False, "error": f"Target variable {target_variable} not found in dataset"}
+        if target_field not in dataset.columns:
+            logger.error(f"Target variable {target_field} not found in dataset. Available columns: {list(dataset.columns)}")
+            return {"success": False, "error": f"Target variable {target_field} not found in dataset"}
         
         # Optimize data loading and filtering
         logger.info("Loading and filtering data...")
@@ -321,7 +333,7 @@ def analysis_worker(query):
         logger.info(f"Data filtered. Shape: {filtered_data.shape}")
         
         # Optimize data preparation
-        top_data = filtered_data.sort_values(by=target_variable, ascending=False)
+        top_data = filtered_data.sort_values(by=target_field, ascending=False)
         X = top_data.copy()
         
         # Only keep columns that are used by the model
@@ -357,11 +369,11 @@ def analysis_worker(query):
             if 'latitude' in row and 'longitude' in row:
                 result['latitude'] = float(row['latitude'])
                 result['longitude'] = float(row['longitude'])
-            target_var_lower = target_variable.lower()
-            if target_variable in row:
-                result[target_var_lower] = float(row[target_variable])
+            target_var_lower = target_field.lower()
+            if target_field in row:
+                result[target_var_lower] = float(row[target_field])
             for col in row.index:
-                if col not in ['zip_code', 'latitude', 'longitude', target_variable]:
+                if col not in ['zip_code', 'latitude', 'longitude', target_field]:
                     try:
                         result[col.lower()] = float(row[col])
                     except (ValueError, TypeError):
@@ -372,18 +384,18 @@ def analysis_worker(query):
             results.append(result)
         if analysis_type == 'correlation':
             if len(feature_importance) > 0:
-                summary = f"Analysis shows a strong correlation between {target_variable} and {feature_importance[0]['feature']}."
+                summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
             else:
-                summary = f"Analysis complete for {target_variable}, but no clear correlations found."
+                summary = f"Analysis complete for {target_field}, but no clear correlations found."
         elif analysis_type == 'ranking':
             if len(results) > 0:
-                summary = f"The top area for {target_variable} has a value of {results[0][target_variable.lower()]:.2f}."
+                summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
             else:
-                summary = f"No results found for {target_variable} with the specified filters."
+                summary = f"No results found for {target_field} with the specified filters."
         else:
-            summary = f"Analysis complete for {target_variable}."
+            summary = f"Analysis complete for {target_field}."
         if len(feature_importance) >= 3:
-            summary += f" The top 3 factors influencing {target_variable} are {feature_importance[0]['feature']}, "
+            summary += f" The top 3 factors influencing {target_field} are {feature_importance[0]['feature']}, "
             summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
         shap_values_dict = {}
         for i, feature in enumerate(model_features):
@@ -683,11 +695,11 @@ def get_metadata():
                     "std": float(dataset[column].std())
                 }
                 summary_stats[column] = column_stats
-        if DEFAULT_TARGET in dataset.columns:
+        if TARGET_VARIABLE in dataset.columns:
             correlations = {}
             for column in dataset.columns:
-                if column != DEFAULT_TARGET and np.issubdtype(dataset[column].dtype, np.number):
-                    correlations[column] = float(dataset[column].corr(dataset[DEFAULT_TARGET]))
+                if column != TARGET_VARIABLE and np.issubdtype(dataset[column].dtype, np.number):
+                    correlations[column] = float(dataset[column].corr(dataset[TARGET_VARIABLE]))
         else:
             correlations = None
         dataset_version = version_tracker.get_latest_dataset()
