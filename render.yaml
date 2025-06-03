@@ -34,9 +34,9 @@ services:
       - key: PORT
         value: "10000"
       
-  # Worker service for processing SHAP jobs (with unique timestamp to prevent name collisions)
+  # Worker service for processing SHAP jobs
   - type: worker
-    name: nesto-mortgage-analytics-worker-1747359907-1747359755-05162025
+    name: nesto-mortgage-analytics-worker
     env: python
     buildCommand: >-
       echo "Building optimized worker service" &&
