@@ -257,7 +257,7 @@ def analysis_worker(query):
     import psutil
     
     logger.info(f"[RQ WORKER] analysis_worker called with query: {query}")
-    ensure_model_loaded()
+    model, model_features = ensure_model_loaded()
     
     try:
         # Log initial memory usage
@@ -523,6 +523,7 @@ def ensure_model_loaded():
             model = model_
             feature_names = feature_names_
             logger.info(f"Model and feature names loaded successfully (lazy): model={type(model)}, features={len(feature_names)}")
+        return model, feature_names
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
