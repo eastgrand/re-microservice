@@ -296,9 +296,19 @@ def analysis_worker(query):
                 target_field = orig_field
                 break
         
+        # If no mapping found, try to find the field directly or with common variations
         if not target_field:
-            target_field = target_variable  # Use original if no mapping found
-            
+            # Check if the target variable exists directly in the dataset
+            if target_variable in dataset.columns:
+                target_field = target_variable
+            # Try common variations for CONVERSIONRATE
+            elif target_variable == 'CONVERSIONRATE' and 'CONVERSION_RATE' in dataset.columns:
+                target_field = 'CONVERSION_RATE'
+            elif target_variable == 'CONVERSION_RATE' and 'CONVERSIONRATE' in dataset.columns:
+                target_field = 'CONVERSIONRATE'
+            else:
+                target_field = target_variable  # Use original if no mapping found
+        
         filters = query.get('demographic_filters', [])
         
         logger.info(f"Analysis parameters - type: {analysis_type}, target: {target_field}, filters: {filters}")

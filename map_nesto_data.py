@@ -186,7 +186,8 @@ FIELD_MAPPINGS = {
     
     # Mortgage data
     'FREQUENCY': 'Mortgage_Applications',
-    'SUM_FUNDED': 'Mortgage_Approvals'
+    'SUM_FUNDED': 'Mortgage_Approvals',
+    'CONVERSION_RATE': 'CONVERSIONRATE'  # Map CONVERSION_RATE to CONVERSIONRATE for frontend compatibility
 }
 
 # Target variable for the model
