@@ -381,15 +381,21 @@ def analysis_worker(query):
         
         if len(matching_features) >= len(model_features) * 0.8:  # If 80%+ features match directly
             logger.info("Dataset columns match model features directly - using without mapping")
-            available_features = matching_features
             
-            # Preserve non-model columns like ID for results processing
+            # Use ALL model features that are available in the dataset
+            available_features = matching_features.copy()
+            
+            # Preserve additional non-model columns like ID for results processing
             preserved_cols = ['ID', 'OBJECTID', 'Shape__Area', 'Shape__Length']
             for col in preserved_cols:
                 if col in X.columns and col not in available_features:
                     available_features.append(col)
             
             X = X[available_features]
+            
+            # Set model_only_features to be the matched model features (not the preserved columns)
+            model_only_features = matching_features
+            preserved_only_cols = [col for col in available_features if col not in model_features]
         else:
             # Apply field mappings only if direct match fails
             logger.info("Applying field mappings to match model features...")
@@ -421,12 +427,12 @@ def analysis_worker(query):
                 }
             
             X = X_mapped[available_features]
+            
+            # Set model_only_features and preserved_only_cols for the mapping case
+            model_only_features = available_features  # For mapped case, available_features are model features
+            preserved_only_cols = []  # No preserved columns in mapping case
         
         logger.info(f"Data prepared. Shape: {X.shape}")
-        
-        # Separate model features from preserved columns for SHAP computation
-        model_only_features = [feat for feat in available_features if feat in model_features]
-        preserved_only_cols = [col for col in available_features if col not in model_features]
         
         logger.info(f"Model features for SHAP: {len(model_only_features)} features")
         logger.info(f"Preserved columns: {preserved_only_cols}")
