@@ -53,7 +53,7 @@ services:
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
       chmod +x ./simple_worker.py &&
       ./simple_worker.py
-    plan: standard
+    plan: starter
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
         value: "false"  # Changed from true to optimize performance
