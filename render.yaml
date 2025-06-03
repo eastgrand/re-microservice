@@ -36,7 +36,7 @@ services:
       
   # Worker service for processing SHAP jobs
   - type: worker
-    name: nesto-mortgage-analytics-worker
+    name: nesto-shap-worker
     env: python
     buildCommand: >-
       echo "Building optimized worker service" &&
