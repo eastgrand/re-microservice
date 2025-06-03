@@ -13,6 +13,8 @@ import sys
 import time
 import logging
 from redis_connection_patch import apply_all_patches
+import gc
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -41,14 +43,33 @@ def patch_job_handling():
         job.connection.hset(job.key, 'worker_start_time', time.time())
         job.connection.hset(job.key, 'worker_name', self.name)
         
-        # Call original method with all its error handling
-        result = original_perform_job(self, job, queue)
-        
-        # Add end timestamp
-        job.connection.hset(job.key, 'worker_end_time', time.time())
-        
-        logger.info(f"Worker {self.name} completed job {job.id}")
-        return result
+        try:
+            # Call original method with all its error handling
+            result = original_perform_job(self, job, queue)
+            
+            # Add end timestamp
+            job.connection.hset(job.key, 'worker_end_time', time.time())
+            
+            # Force cleanup after job completion
+            gc.collect()
+            
+            logger.info(f"Worker {self.name} completed job {job.id}")
+            return result
+            
+        except Exception as e:
+            # Log the error
+            logger.error(f"Error in job {job.id}: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # Update job status
+            job.connection.hset(job.key, 'worker_error', str(e))
+            job.connection.hset(job.key, 'worker_error_time', time.time())
+            
+            # Force cleanup
+            gc.collect()
+            
+            # Re-raise the exception
+            raise
     
     # Replace with enhanced version
     Worker.perform_job = patched_perform_job
@@ -59,108 +80,36 @@ def patch_job_handling():
     
     @wraps(original_get_current_job)
     def patched_get_current_job(self):
-        """Enhanced get_current_job that handles edge cases better"""
+        """Enhanced get_current_job with better error handling"""
         try:
-            job = original_get_current_job(self)
-            if job:
-                # Update last activity time for monitoring
-                job.connection.hset(job.key, 'last_activity', time.time())
-            return job
+            return original_get_current_job(self)
         except Exception as e:
-            logger.error(f"Error in get_current_job: {str(e)}")
+            logger.error(f"Error getting current job: {str(e)}")
             return None
     
     # Replace with enhanced version
     Worker.get_current_job = patched_get_current_job
     logger.info("✅ Worker.get_current_job patched")
     
-    # Add custom method to Job class to check if a job is potentially stuck
-    def is_stuck(self, threshold_seconds=300):
-        """Check if a job appears to be stuck (in started state too long)"""
-        if self.get_status() != 'started':
-            return False
-            
-        # Check if job has been in started state too long
-        if self.started_at:
-            worker_start = self.connection.hget(self.key, 'worker_start_time')
-            if worker_start:
-                worker_start = float(worker_start)
-                current_time = time.time()
-                duration = current_time - worker_start
-                return duration > threshold_seconds
-            
-            # Fall back to started_at if worker_start_time not available
-            current_time = time.time()
-            duration = current_time - self.started_at
-            return duration > threshold_seconds
-            
-        return False
-    
-    # Add the method to the Job class
-    Job.is_stuck = is_stuck
-    logger.info("✅ Added Job.is_stuck method")
-    
-    # Patch Queue.enqueue method to add more metadata
-    original_enqueue = Queue.enqueue
-    
-    @wraps(original_enqueue)
-    def patched_enqueue(self, *args, **kwargs):
-        """Enhanced enqueue with better metadata"""
-        # Add default timeout if not specified
-        if 'job_timeout' not in kwargs:
-            kwargs['job_timeout'] = 600  # 10 minutes
-            
-        result = original_enqueue(self, *args, **kwargs)
-        # Add submission metadata
-        if result:
-            result.connection.hset(result.key, 'enqueue_timestamp', time.time())
-        return result
-        
-    # Replace with enhanced version
-    Queue.enqueue = patched_enqueue
-    logger.info("✅ Queue.enqueue patched")
-    
-    # Create cleanup function for queue
-    def cleanup_stale_jobs(self, age_threshold=3600):
-        """Clean up stale job registries"""
+    # Add cleanup method
+    def cleanup_worker(self):
+        """Clean up worker resources"""
         try:
-            # Check started jobs
-            started_job_ids = self.started_job_registry.get_job_ids()
-            cleaned_count = 0
+            # Force garbage collection
+            gc.collect()
             
-            current_time = time.time()
+            # Clear any remaining job references
+            self._current_job = None
             
-            for job_id in started_job_ids:
-                try:
-                    job = Job.fetch(job_id, connection=self.connection)
-                    
-                    # Check if job is stale
-                    if job.is_stuck(threshold_seconds=age_threshold):
-                        logger.warning(f"Cleaning up stuck job {job_id}")
-                        
-                        # Remove from started registry
-                        self.started_job_registry.remove(job)
-                        
-                        # Add to failed registry with explanation
-                        job.set_status(rq.job.JobStatus.FAILED)
-                        job.exc_info = "Job timed out or became stuck in worker process"
-                        job.save()
-                        self.failed_job_registry.add(job, current_time)
-                        
-                        cleaned_count += 1
-                except Exception as e:
-                    logger.error(f"Error cleaning up job {job_id}: {str(e)}")
-            
-            return cleaned_count
+            logger.info(f"Worker {self.name} cleaned up successfully")
         except Exception as e:
-            logger.error(f"Error cleaning up stale jobs: {str(e)}")
-            return 0
+            logger.error(f"Error cleaning up worker: {str(e)}")
     
-    # Add the method to the Queue class
-    Queue.cleanup_stale_jobs = cleanup_stale_jobs
-    logger.info("✅ Added Queue.cleanup_stale_jobs method")
+    # Add cleanup method to Worker class
+    Worker.cleanup = cleanup_worker
+    logger.info("✅ Worker.cleanup added")
     
-    logger.info("Worker process patches applied successfully")
+    return True
 
 def add_cleanup_endpoint(app):
     """Add an endpoint to manually trigger cleanup of stuck jobs"""

@@ -13,6 +13,7 @@ import gc
 import logging
 import time
 import traceback
+import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -283,7 +284,6 @@ def start_worker():
     
     try:
         import redis
-        # Modified import - removed Connection since it's not available in newer RQ versions
         from rq import Queue, Worker
         from rq.job import Job
         
@@ -335,24 +335,55 @@ def start_worker():
             logger.error(f"Error repairing jobs: {str(e)}")
             logger.error("Will try to proceed anyway")
         
+        # Generate a unique worker name using hostname, PID, timestamp and UUID
+        hostname = os.environ.get('HOSTNAME', 'unknown')
+        unique_id = f"{hostname}-{os.getpid()}-{int(time.time())}-{str(uuid.uuid4())[:8]}"
+        worker_name = f"shap-worker-{unique_id}"
+        
         # Start worker with improved settings
         logger.info("Starting worker...")
-        # Create worker directly without Connection context manager
-        worker = Worker(['shap-jobs'], connection=conn, name=f"memory-optimized-worker-{os.getpid()}")
+        worker = Worker(['shap-jobs'], connection=conn, name=worker_name)
         logger.info(f"Worker started with ID {worker.name}")
         logger.info("Listening for jobs on queue: shap-jobs")
         logger.info(f"Using max batch size: {MAX_ROWS_TO_PROCESS} rows")
         
-        # Start working (with exception handling)
-        try:
-            worker.work(with_scheduler=True)
-        except KeyboardInterrupt:
+        # Configure worker settings
+        worker.work_burst = True  # Exit after processing all jobs
+        worker.disable_default_exception_handler = True  # Use our custom handler
+        
+        def custom_exception_handler(job, *exc_info):
+            """Custom exception handler for worker"""
+            logger.error(f"Job {job.id} failed with error: {exc_info[1]}")
+            logger.error(traceback.format_exception(*exc_info))
+            return False  # Don't requeue the job
+        
+        worker.push_exc_handler(custom_exception_handler)
+        
+        # Start working with retry logic
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                if attempt > 1:
+                    logger.info(f"Retry attempt {attempt}/{max_retries}...")
+                    time.sleep(retry_delay)
+                
+                worker.work(with_scheduler=True)
+                break  # If successful, exit the retry loop
+                
+            except KeyboardInterrupt:
                 logger.info("Worker stopped by user")
                 sys.exit(0)
             except Exception as e:
-                logger.critical(f"Worker crashed with error: {str(e)}")
-                logger.critical(traceback.format_exc())
-                sys.exit(1)
+                logger.error(f"Worker error on attempt {attempt}: {str(e)}")
+                logger.error(traceback.format_exc())
+                if attempt >= max_retries:
+                    logger.critical("Maximum retry attempts reached")
+                    sys.exit(1)
+                logger.info(f"Waiting {retry_delay} seconds before retry...")
+                time.sleep(retry_delay)
+                
     except ImportError as e:
         logger.error(f"Missing dependency: {str(e)}")
         traceback.print_exc()

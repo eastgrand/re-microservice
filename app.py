@@ -20,6 +20,8 @@ from collections import defaultdict
 import time
 import psutil
 
+# Import field mappings and target variable
+from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
 # Redis connection patch for better stability
 from redis_connection_patch import apply_all_patches
@@ -467,6 +469,48 @@ def job_status(job_id):
         logger.error(f"[JOB STATUS ERROR] Exception: {e}\nTraceback:\n{tb}")
         return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
 
+# --- LOGS ENDPOINT ---
+@app.route('/logs', methods=['GET'])
+@require_api_key
+def get_logs():
+    """Get recent logs from the application"""
+    try:
+        # Get Redis connection
+        redis_conn = get_redis_connection()
+        
+        if not redis_conn:
+            return jsonify({
+                'success': False,
+                'error': 'Redis connection not available'
+            }), 500
+        
+        # Get worker logs from Redis if available
+        logs_key = 'shap-service:logs'
+        logs = redis_conn.lrange(logs_key, -100, -1)  # Get last 100 log entries
+        
+        log_entries = []
+        for log_entry in logs:
+            try:
+                log_entries.append(log_entry.decode('utf-8'))
+            except Exception:
+                log_entries.append(str(log_entry))
+        
+        # If no logs in Redis, return a message
+        if not log_entries:
+            log_entries = ["No recent logs available in Redis"]
+        
+        return jsonify({
+            'success': True,
+            'logs': log_entries,
+            'count': len(log_entries)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting logs: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 from data_versioning import DataVersionTracker
 
@@ -611,99 +655,166 @@ def list_versions():
 @app.route('/health', methods=['GET'])
 @require_api_key
 def health_check():
-    ensure_model_loaded()
     try:
-        import psutil
-        process = psutil.Process(os.getpid())
-        memory_usage = process.memory_info().rss / (1024 * 1024)
-    except ImportError:
-        memory_usage = "psutil not installed"
-    
-    # Check Redis connection
-    redis_status = {"connected": False, "error": None}
-    try:
-        redis_conn = app.config.get('redis_conn')
-        if redis_conn:
-            redis_status["connected"] = redis_conn.ping()
-        else:
-            redis_status["error"] = "Redis connection not found in app config"
+        # Load model and features to ensure they're available
+        model, feature_names = ensure_model_loaded()
+        
+        # Calculate memory usage
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss / (1024 * 1024)
+        except ImportError:
+            memory_usage = "psutil not installed"
+        
+        # Check Redis connection
+        redis_status = {"connected": False, "error": None}
+        try:
+            redis_conn = app.config.get('redis_conn')
+            if redis_conn:
+                redis_status["connected"] = redis_conn.ping()
+            else:
+                redis_status["error"] = "Redis connection not found in app config"
+        except Exception as e:
+            redis_status["error"] = str(e)
+        
+        # Get version info
+        model_version = version_tracker.get_latest_model()
+        dataset_version = version_tracker.get_latest_dataset()
+        
+        model_version_info = None
+        if model_version:
+            model_version_id, model_info = model_version
+            model_version_info = {
+                "id": model_version_id,
+                "created_at": model_info.get("timestamp"),
+                "metrics": model_info.get("metrics", {})
+            }
+        
+        dataset_version_info = None
+        if dataset_version:
+            dataset_version_id, dataset_info = dataset_version
+            dataset_version_info = {
+                "id": dataset_version_id,
+                "created_at": dataset_info.get("timestamp"),
+                "record_count": dataset_info.get("row_count"),
+                "description": dataset_info.get("description"),
+                "source": dataset_info.get("source")
+            }
+        
+        # Try to load dataset info (optional)
+        dataset_info = None
+        try:
+            dataset_path = 'data/nesto_merge_0.csv'
+            if not os.path.exists(dataset_path):
+                dataset_path = 'data/cleaned_data.csv'
+            
+            if os.path.exists(dataset_path):
+                # Just get basic info without loading full dataset
+                import pandas as pd
+                sample_data = pd.read_csv(dataset_path, nrows=1)  # Read just one row to get columns
+                dataset_info = {
+                    "columns": list(sample_data.columns),
+                    "column_count": len(sample_data.columns),
+                    "path": dataset_path
+                }
+        except Exception as e:
+            logger.warning(f"Could not load dataset info: {str(e)}")
+            dataset_info = None
+        
+        # Get XGBoost version safely
+        xgboost_version = "unknown"
+        try:
+            import xgboost
+            xgboost_version = xgboost.__version__
+        except ImportError:
+            xgboost_version = "not installed"
+        
+        return jsonify({
+            "status": "healthy",
+            "model": {
+                "type": "xgboost",
+                "version": xgboost_version,
+                "feature_count": len(feature_names) if feature_names else 0,
+                "features": feature_names[:10] if feature_names else [],  # Limit to first 10 features
+                "version_info": model_version_info
+            },
+            "dataset": dataset_info,
+            "redis_connected": redis_status["connected"],
+            "redis_status": redis_status,
+            "system_info": {
+                "python_version": platform.python_version(),
+                "system": platform.system(),
+                "memory_usage_mb": memory_usage
+            },
+            "shap_version": shap.__version__
+        })
     except Exception as e:
-        redis_status["error"] = str(e)
-    
-    model_version = version_tracker.get_latest_model()
-    dataset_version = version_tracker.get_latest_dataset()
-    model_version_info = None
-    if model_version:
-        model_version_id, model_info = model_version
-        model_version_info = {
-            "id": model_version_id,
-            "created_at": model_info.get("timestamp"),
-            "metrics": model_info.get("metrics", {})
-        }
-    dataset_version_info = None
-    if dataset_version:
-        dataset_version_id, dataset_info = dataset_version
-        dataset_version_info = {
-            "id": dataset_version_id,
-            "created_at": dataset_info.get("timestamp"),
-            "record_count": dataset_info.get("row_count"),
-            "description": dataset_info.get("description"),
-            "source": dataset_info.get("source")
-        }
-    return jsonify({
-        "status": "healthy",
-        "model": {
-            "type": "xgboost",
-            "version": xgboost.__version__,
-            "feature_count": len(feature_names) if feature_names else 0,
-            "features": feature_names,
-            "version_info": model_version_info
-        },
-        "dataset": {
-            "shape": f"{dataset.shape[0]} rows, {dataset.shape[1]} columns" if dataset is not None else None,
-            "columns": list(dataset.columns) if dataset is not None else None,
-            "version_info": dataset_version_info
-        },
-        "redis_connected": redis_status["connected"],
-        "redis_status": redis_status,
-        "system_info": {
-            "python_version": platform.python_version(),
-            "system": platform.system(),
-            "memory_usage_mb": memory_usage
-        },
-        "shap_version": shap.__version__
-    })
+        logger.error(f"Health check error: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
 
 
 
 @app.route('/metadata', methods=['GET'])
 @require_api_key
 def get_metadata():
-    ensure_model_loaded()
     try:
-        if dataset is None:
-            raise APIError("Dataset not available", 500)
+        # Load model and features to ensure they're available
+        model, feature_names = ensure_model_loaded()
+        
+        # Load dataset for metadata
+        try:
+            dataset_path = 'data/nesto_merge_0.csv'
+            if not os.path.exists(dataset_path):
+                dataset_path = 'data/cleaned_data.csv'
+            
+            if not os.path.exists(dataset_path):
+                raise APIError("Dataset file not found", 500)
+            
+            dataset = pd.read_csv(dataset_path)
+            logger.info(f"Successfully loaded dataset from {dataset_path} for metadata")
+        except Exception as e:
+            logger.error(f"Error loading dataset for metadata: {str(e)}")
+            raise APIError(f"Dataset not available: {str(e)}", 500)
+        
+        # Calculate summary statistics
         summary_stats = {}
         for column in dataset.columns:
             if column in ['zip_code']:
                 continue
             if np.issubdtype(dataset[column].dtype, np.number):
-                column_stats = {
-                    "mean": float(dataset[column].mean()),
-                    "median": float(dataset[column].median()),
-                    "min": float(dataset[column].min()),
-                    "max": float(dataset[column].max()),
-                    "std": float(dataset[column].std())
-                }
-                summary_stats[column] = column_stats
+                try:
+                    column_stats = {
+                        "mean": float(dataset[column].mean()),
+                        "median": float(dataset[column].median()),
+                        "min": float(dataset[column].min()),
+                        "max": float(dataset[column].max()),
+                        "std": float(dataset[column].std())
+                    }
+                    summary_stats[column] = column_stats
+                except Exception as e:
+                    logger.warning(f"Could not calculate stats for column {column}: {str(e)}")
+        
+        # Calculate correlations with target variable
+        correlations = None
         if TARGET_VARIABLE in dataset.columns:
             correlations = {}
             for column in dataset.columns:
                 if column != TARGET_VARIABLE and np.issubdtype(dataset[column].dtype, np.number):
-                    correlations[column] = float(dataset[column].corr(dataset[TARGET_VARIABLE]))
-        else:
-            correlations = None
+                    try:
+                        correlation = dataset[column].corr(dataset[TARGET_VARIABLE])
+                        if not np.isnan(correlation):
+                            correlations[column] = float(correlation)
+                    except Exception as e:
+                        logger.warning(f"Could not calculate correlation for column {column}: {str(e)}")
+        
+        # Get version info
         dataset_version = version_tracker.get_latest_dataset()
+        version_info = None
         if dataset_version:
             dataset_version_id, dataset_info = dataset_version
             version_info = {
@@ -712,18 +823,21 @@ def get_metadata():
                 "description": dataset_info.get("description"),
                 "source": dataset_info.get("source")
             }
-        else:
-            version_info = None
+        
         return jsonify({
             "success": True,
             "columns": list(dataset.columns),
             "record_count": len(dataset),
             "statistics": summary_stats,
             "correlations_with_target": correlations,
+            "target_variable": TARGET_VARIABLE,
             "version_info": version_info
         })
+    except APIError:
+        raise  # Re-raise API errors as-is
     except Exception as e:
         logger.error(f"Error getting metadata: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 
 # Add worker status endpoint
@@ -749,7 +863,9 @@ def worker_status():
             return jsonify({
                 'status': 'warning',
                 'message': 'No workers registered',
-                'workers': []
+                'workers': [],
+                'active_workers': 0,
+                'total_workers': 0
             })
             
         workers_info = []
@@ -809,6 +925,118 @@ def worker_status():
             'status': 'error',
             'message': str(e)
         }), 500
+
+# --- ADMIN ENDPOINTS ---
+@app.route('/admin/queue_status', methods=['GET'])
+@require_api_key
+def admin_queue_status():
+    """Get detailed queue status for admin purposes"""
+    try:
+        # Get Redis connection
+        redis_conn = get_redis_connection()
+        
+        if not redis_conn:
+            return jsonify({
+                'success': False,
+                'error': 'Redis connection not available',
+                'redis_connected': False
+            }), 500
+        
+        # Test Redis connection
+        try:
+            redis_conn.ping()
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Redis connection failed: {str(e)}',
+                'redis_connected': False
+            }), 500
+        
+        # Get queue information
+        from rq import Queue
+        try:
+            queue_instance = Queue('shap-jobs', connection=redis_conn)
+            
+            # Get job counts with error handling
+            try:
+                queued_jobs = len(queue_instance)
+            except Exception:
+                queued_jobs = 0
+            
+            try:
+                started_jobs = len(queue_instance.started_job_registry)
+            except Exception:
+                started_jobs = 0
+            
+            try:
+                finished_jobs = len(queue_instance.finished_job_registry)
+            except Exception:
+                finished_jobs = 0
+            
+            try:
+                failed_jobs = len(queue_instance.failed_job_registry)
+            except Exception:
+                failed_jobs = 0
+            
+            # Get recent job IDs with error handling
+            recent_queued = []
+            recent_started = []
+            recent_finished = []
+            recent_failed = []
+            
+            try:
+                recent_queued = queue_instance.job_ids[:5]
+            except Exception:
+                pass
+            
+            try:
+                recent_started = list(queue_instance.started_job_registry.get_job_ids())[:5]
+            except Exception:
+                pass
+            
+            try:
+                recent_finished = list(queue_instance.finished_job_registry.get_job_ids())[:5]
+            except Exception:
+                pass
+            
+            try:
+                recent_failed = list(queue_instance.failed_job_registry.get_job_ids())[:5]
+            except Exception:
+                pass
+            
+            return jsonify({
+                'success': True,
+                'redis_connected': True,
+                'queue_name': 'shap-jobs',
+                'queued_jobs': queued_jobs,
+                'in_progress_jobs': started_jobs,
+                'completed_jobs': finished_jobs,
+                'failed_jobs': failed_jobs,
+                'recent_jobs': {
+                    'queued': recent_queued,
+                    'started': recent_started,
+                    'finished': recent_finished,
+                    'failed': recent_failed
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Error creating queue instance: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to access queue: {str(e)}',
+                'redis_connected': True
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error getting queue status: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'redis_connected': False
+        }), 500
+
 # Error handlers
 class APIError(Exception):
     def __init__(self, message, status_code=400):
