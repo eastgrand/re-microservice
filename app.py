@@ -170,7 +170,24 @@ def create_memory_optimized_explainer(model, data, max_rows=200):
         
         # Validate data
         if 'ID' not in data.columns:
-            raise ValueError("Data missing required ID field")
+            # Try alternative ID fields
+            id_candidates = ['OBJECTID', 'FID', 'id', 'objectid']
+            id_field = None
+            for candidate in id_candidates:
+                if candidate in data.columns:
+                    id_field = candidate
+                    logger.info(f"Using {candidate} as ID field")
+                    break
+            
+            if not id_field:
+                logger.warning("No ID field found - creating synthetic IDs")
+                # Create synthetic ID field
+                data = data.copy()
+                data['ID'] = range(len(data))
+            else:
+                # Rename the ID field to 'ID' for consistency
+                data = data.copy()
+                data['ID'] = data[id_field]
             
         if data['ID'].duplicated().any():
             logger.warning("Data contains duplicate IDs - removing duplicates")
@@ -358,6 +375,13 @@ def analysis_worker(query):
         if len(matching_features) >= len(model_features) * 0.8:  # If 80%+ features match directly
             logger.info("Dataset columns match model features directly - using without mapping")
             available_features = matching_features
+            
+            # Preserve non-model columns like ID for results processing
+            preserved_cols = ['ID', 'OBJECTID', 'Shape__Area', 'Shape__Length']
+            for col in preserved_cols:
+                if col in X.columns and col not in available_features:
+                    available_features.append(col)
+            
             X = X[available_features]
         else:
             # Apply field mappings only if direct match fails
@@ -393,9 +417,19 @@ def analysis_worker(query):
         
         logger.info(f"Data prepared. Shape: {X.shape}")
         
+        # Separate model features from preserved columns for SHAP computation
+        model_only_features = [feat for feat in available_features if feat in model_features]
+        preserved_only_cols = [col for col in available_features if col not in model_features]
+        
+        logger.info(f"Model features for SHAP: {len(model_only_features)} features")
+        logger.info(f"Preserved columns: {preserved_only_cols}")
+        
+        # Only pass model features to SHAP
+        X_for_shap = X[model_only_features] if model_only_features else X
+        
         # Replace the direct SHAP computation with the memory-optimized version
         logger.info("Starting SHAP computation with memory optimization")
-        shap_values = create_memory_optimized_explainer(model, X)
+        shap_values = create_memory_optimized_explainer(model, X_for_shap)
         
         if shap_values is None:
             logger.error("SHAP computation failed")
@@ -409,7 +443,7 @@ def analysis_worker(query):
         logger.info("SHAP computation completed successfully")
         
         feature_importance = []
-        for i, feature in enumerate(available_features):  # Use available_features instead of model_features
+        for i, feature in enumerate(model_only_features):  # Use model_only_features for SHAP results
             importance = abs(shap_values[:, i]).mean()
             feature_importance.append({'feature': feature, 'importance': float(importance)})
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
@@ -456,7 +490,7 @@ def analysis_worker(query):
             summary += f" The top 3 factors influencing {target_field} are {feature_importance[0]['feature']}, "
             summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
         shap_values_dict = {}
-        for i, feature in enumerate(available_features):  # Use available_features instead of model_features
+        for i, feature in enumerate(model_only_features):  # Use model_only_features for SHAP results
             shap_values_dict[feature] = shap_values[:, i].tolist()[:10]
         model_version = version_tracker.get_latest_model()
         dataset_version = version_tracker.get_latest_dataset()
