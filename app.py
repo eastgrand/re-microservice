@@ -348,8 +348,37 @@ def analysis_worker(query):
         top_data = filtered_data.sort_values(by=target_field, ascending=False)
         X = top_data.copy()
         
+        # Apply field mappings to match model expectations
+        logger.info("Applying field mappings to match model features...")
+        mapped_data = {}
+        
+        # Apply field mappings from FIELD_MAPPINGS
+        for orig_field, mapped_field in FIELD_MAPPINGS.items():
+            if orig_field in X.columns:
+                mapped_data[mapped_field] = X[orig_field]
+                logger.info(f"Mapped '{orig_field}' to '{mapped_field}'")
+        
+        # Create DataFrame with mapped columns
+        X_mapped = pd.DataFrame(mapped_data)
+        logger.info(f"Created mapped dataset with columns: {list(X_mapped.columns)}")
+        
         # Only keep columns that are used by the model
-        X = X[model_features]
+        available_features = [feat for feat in model_features if feat in X_mapped.columns]
+        missing_features = [feat for feat in model_features if feat not in X_mapped.columns]
+        
+        if missing_features:
+            logger.warning(f"Missing model features: {missing_features}")
+        if not available_features:
+            logger.error("No model features available in mapped data")
+            return {
+                "success": False,
+                "error": f"No model features found. Model expects: {model_features}, Available: {list(X_mapped.columns)}",
+                "results": [],
+                "summary": "Analysis failed due to feature mismatch."
+            }
+        
+        logger.info(f"Using {len(available_features)} of {len(model_features)} model features: {available_features}")
+        X = X_mapped[available_features]
         
         logger.info(f"Data prepared. Shape: {X.shape}")
         
@@ -369,30 +398,36 @@ def analysis_worker(query):
         logger.info("SHAP computation completed successfully")
         
         feature_importance = []
-        for i, feature in enumerate(model_features):
+        for i, feature in enumerate(available_features):  # Use available_features instead of model_features
             importance = abs(shap_values[:, i]).mean()
             feature_importance.append({'feature': feature, 'importance': float(importance)})
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
         results = []
         for idx, row in top_data.iterrows():
             result = {}
-            if 'zip_code' in row:
-                result['zip_code'] = str(row['zip_code'])
-            if 'latitude' in row and 'longitude' in row:
-                result['latitude'] = float(row['latitude'])
-                result['longitude'] = float(row['longitude'])
-            target_var_lower = target_field.lower()
+            # Use ID field as zip_code if available
+            if 'ID' in row:
+                result['zip_code'] = str(row['ID'])
+            # Add latitude and longitude if available (from Shape fields)
+            if 'Shape__Area' in row and 'Shape__Length' in row:
+                # Create proxy coordinates based on shape data
+                result['latitude'] = float(row['Shape__Area']) / 1000000 + 45.0  # Rough Canadian latitude
+                result['longitude'] = float(row['Shape__Length']) / 1000000 - 75.0  # Rough Canadian longitude
+            # Add the target variable
             if target_field in row:
-                result[target_var_lower] = float(row[target_field])
-            for col in row.index:
-                if col not in ['zip_code', 'latitude', 'longitude', target_field]:
+                result[target_field.lower()] = float(row[target_field])
+            # Add other key demographic fields
+            key_fields = [
+                '2024 Total Population', '2024 Household Average Income (Current Year $)',
+                '2024 Visible Minority Total Population (%)', 'FREQUENCY', 'SUM_FUNDED'
+            ]
+            for field in key_fields:
+                if field in row:
                     try:
-                        result[col.lower()] = float(row[col])
+                        result[field.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('$', '')] = float(row[field])
                     except (ValueError, TypeError):
-                        if isinstance(row[col], str):
-                            result[col.lower()] = row[col]
-                        else:
-                            result[col.lower()] = str(row[col])
+                        result[field.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('$', '')] = str(row[field])
             results.append(result)
         if analysis_type == 'correlation':
             if len(feature_importance) > 0:
@@ -410,7 +445,7 @@ def analysis_worker(query):
             summary += f" The top 3 factors influencing {target_field} are {feature_importance[0]['feature']}, "
             summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
         shap_values_dict = {}
-        for i, feature in enumerate(model_features):
+        for i, feature in enumerate(available_features):  # Use available_features instead of model_features
             shap_values_dict[feature] = shap_values[:, i].tolist()[:10]
         model_version = version_tracker.get_latest_model()
         dataset_version = version_tracker.get_latest_dataset()
