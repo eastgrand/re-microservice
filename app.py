@@ -26,6 +26,7 @@ import xgboost as xgb
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
 # Import query-aware analysis functions - with graceful fallback
+QUERY_AWARE_AVAILABLE = False  # Initialize as module global
 try:
     from query_aware_analysis import enhanced_query_aware_analysis, analyze_query_intent
     QUERY_AWARE_AVAILABLE = True
@@ -38,6 +39,8 @@ except ImportError as e:
         return {"error": "Query-aware analysis not available"}
     def analyze_query_intent(query):
         return {"error": "Query intent analysis not available"}
+
+print(f"🔧 Module loaded - Query-aware available: {QUERY_AWARE_AVAILABLE}")
 
 # Redis connection patch for better stability
 from redis_connection_patch import apply_all_patches
@@ -63,7 +66,13 @@ CORS(app, resources={
 
 @app.route('/')
 def hello_world():
-    return jsonify({"message": "SHAP Microservice is running", "status": "healthy"}), 200
+    return jsonify({
+        "message": "SHAP Microservice is running", 
+        "status": "healthy",
+        "query_aware_available": QUERY_AWARE_AVAILABLE
+    }), 200
+
+print(f"🚀 Flask app created successfully - Query-aware: {QUERY_AWARE_AVAILABLE}")
 
 # --- /analyze GET handler (added for friendly error) ---
 @app.route('/analyze', methods=['GET'])
