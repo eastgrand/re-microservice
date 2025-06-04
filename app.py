@@ -274,6 +274,7 @@ def analysis_worker(query):
     import shap
     import gc
     import psutil
+    import os  # Add os import here
     
     logger.info(f"[RQ WORKER] analysis_worker called with query: {query}")
     model, model_features = ensure_model_loaded()
@@ -444,7 +445,6 @@ def analysis_worker(query):
         logger.info("Loading pre-calculated SHAP values for instant analysis")
         try:
             # Load pre-calculated SHAP values
-            import os
             if os.path.exists('precalculated/shap_values.pkl.gz'):
                 logger.info("Loading pre-calculated SHAP data...")
                 precalc_df = pd.read_pickle('precalculated/shap_values.pkl.gz', compression='gzip')

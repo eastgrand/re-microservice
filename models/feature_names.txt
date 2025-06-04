@@ -1,20 +1,83 @@
-2024 Visible Minority Total Population (%)
-2024 Visible Minority South Asian (%)
-2024 Visible Minority Chinese (%)
-2024 Visible Minority Black (%)
-2024 Household Average Income (Current Year $)
-2024 Total Population
-2024 Structure Type Single-Detached House (%)
-2024 Structure Type Apartment, Building Five or More Story (%)
-2024 Tenure: Owned (%)
+2021 Period of Construction - 1961 to 1980 (Census) (%)
+2021 Period of Construction - 1981 to 1990 (Census) (%)
+2021 Period of Construction - 1991 to 2000 (Census) (%)
+2021 Period of Construction - 2001 to 2005 (Census) (%)
+2021 Period of Construction - 2006 to 2010 (Census) (%)
+2021 Period of Construction - 2011 to 2016 (Census) (%)
+2021 Period of Construction - 2016 to 2021 (Census) (%)
+2021 Period of Construction - 1960 or Before (Census) (%)
+2021 Housing: Apartment or Flat in Duplex (Census) (%)
+2024 Condominium Status - In Condo (%)
+2024 Condominium Status - Not In Condo (%)
+2024 Female Household Population (%)
 2024 Maintainers - 25 to 34 (%)
 2024 Maintainers - 35 to 44 (%)
-2024 Labour Force - Labour Employment Rate
+2024 Maintainers - 45 to 54 (%)
+2024 Maintainers - 55 to 64 (%)
+2024 Male Household Population (%)
+2024 Pop 15+: Divorced (%)
+2024 Pop 15+: Living Common Law (%)
 2024 Pop 15+: Married (And Not Separated) (%)
+2024 Pop 15+: Married or Living Common-Law (%)
+2024 Pop 15+: Not Married or Common-Law (%)
+2024 Pop 15+: Separated (%)
+2024 Pop 15+: Single (Never Legally Married) (%)
+2024 Pop 15+: Widowed (%)
+2024 Structure Type Apartment, Building Five or More Story (%)
+2024 Structure Type Apartment, Building Fewer Than Five Story (%)
+2024 Structure Type Movable Dwelling (%)
+2024 Structure Type Other Single-Attached House (%)
+2024 Structure Type Row House (%)
+2024 Structure Type Semi-Detached House (%)
+2024 Structure Type Single-Detached House (%)
+2024 Tenure: Band Housing (%)
+2024 Tenure: Owned (%)
+2024 Tenure: Rented (%)
+2024 Visible Minority Arab (%)
+2024 Visible Minority Black (%)
+2024 Visible Minority Chinese (%)
+2024 Visible Minority Filipino (%)
+2024 Visible Minority Japanese (%)
+2024 Visible Minority Korean (%)
+2024 Visible Minority Latin American (%)
+2024 Visible Minority South Asian (%)
+2024 Visible Minority Southeast Asian (%)
+2024 Visible Minority Total Population (%)
+2024 Visible Minority West Asian (%)
+2021-2022 Total Population % Change
+2022-2023 Current$ Household Average Income % Change
+2022-2023 Total Population % Change
+2023-2024 Current$ Household Average Income % Change
+2023-2024 Total Population % Change
+2024 Condominium Charges (Shelter)
+2024 Condominium Charges (Shelter) (Avg)
+2024 Condominium Status - Total Households
+2024 Financial Services
+2024 Financial Services (Avg)
+2024 Household Aggregate Income (Current Year $)
+2024 Household Average Income (Current Year $)
+2024 Household Median Income (Current Year $)
+2024 Household Type - Total Households
 2024 Household Discretionary Aggregate Income
+2024 Household Disposable Aggregate Income
+2024 Household Aggregate Income
+2024 Labour Force - Labour Employment Rate
+2024 Labour Force - Labour Participation Rate
+2024 Labour Force - Labour Unemployment Rate
+2024 Maintainers - Median Age
+2024 Property Taxes (Shelter)
 2024 Property Taxes (Shelter) (Avg)
+2024 Regular Mortgage Payments (Shelter)
 2024 Regular Mortgage Payments (Shelter) (Avg)
+2024 Service Charges for Banks, Other Financial Institutions
+2024 Service Charges for Banks, Other Financial Institutions (Avg)
+2024 Tenure: Total Households
+2024 Total Population
+2024-2025 Current$ Household Average Income % Change
+2024-2025 Total Population % Change
+2025-2026 Current$ Household Average Income % Change
+2025-2026 Total Population % Change
+2026-2027 Current$ Household Average Income % Change
+2026-2027 Total Population % Change
 FREQUENCY
 SUM_FUNDED
-2024-2025 Total Population % Change
-2024 Condominium Status - In Condo (%)
