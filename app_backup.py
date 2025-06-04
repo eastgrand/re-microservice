@@ -25,8 +25,8 @@ import xgboost as xgb
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
-# Import query-aware analysis functions - TEMPORARILY DISABLED FOR DEPLOYMENT DEBUG
-# from query_aware_analysis import enhanced_query_aware_analysis, analyze_query_intent
+# Import query-aware analysis functions
+from query_aware_analysis import enhanced_query_aware_analysis, analyze_query_intent
 
 # Redis connection patch for better stability
 from redis_connection_patch import apply_all_patches
@@ -570,76 +570,58 @@ def analysis_worker(query):
                         result[field.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('$', '')] = str(row[field])
             results.append(result)
         
-        # Apply query-aware analysis enhancement - TEMPORARILY DISABLED FOR DEPLOYMENT DEBUG
+        # Apply query-aware analysis enhancement
         user_query = query.get('query', '')
-        # TEMPORARILY DISABLED: query-aware analysis
-        # if user_query:
-        #     logger.info(f"Applying query-aware analysis for: {user_query}")
-        #     try:
-        #         # Use the pre-calculated data for enhanced analysis
-        #         enhanced_analysis = enhanced_query_aware_analysis(
-        #             user_query, precalc_subset, feature_importance, results, target_field
-        #         )
-        #         
-        #         # Use enhanced results
-        #         summary = enhanced_analysis['intent_aware_summary']
-        #         enhanced_feature_importance = enhanced_analysis['enhanced_feature_importance']
-        #         query_intent = enhanced_analysis['query_intent']
-        #         
-        #         logger.info(f"Query intent detected: {query_intent}")
-        #         
-        #     except Exception as e:
-        #         logger.warning(f"Query-aware analysis failed, using standard analysis: {str(e)}")
-        #         # Fallback to standard summary
-        #         if analysis_type == 'correlation':
-        #             if len(feature_importance) > 0:
-        #                 summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
-        #             else:
-        #                 summary = f"Analysis complete for {target_field}, but no clear correlations found."
-        #         elif analysis_type == 'ranking':
-        #             if len(results) > 0:
-        #                 summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
-        #             else:
-        #                 summary = f"No results found for {target_field} with the specified filters."
-        #         else:
-        #             summary = f"Analysis complete for {target_field}."
-        #         
-        #         enhanced_feature_importance = feature_importance
-        #         query_intent = None
-        # else:
-        #     # No query provided, use standard analysis
-        #     if analysis_type == 'correlation':
-        #         if len(feature_importance) > 0:
-        #             summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
-        #         else:
-        #             summary = f"Analysis complete for {target_field}, but no clear correlations found."
-        #     elif analysis_type == 'ranking':
-        #         if len(results) > 0:
-        #             summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
-        #         else:
-        #             summary = f"No results found for {target_field} with the specified filters."
-        #     else:
-        #         summary = f"Analysis complete for {target_field}."
-        #     
-        #     enhanced_feature_importance = feature_importance
-        #     query_intent = None
-        
-        # FALLBACK TO STANDARD ANALYSIS FOR DEPLOYMENT DEBUG
-        if analysis_type == 'correlation':
-            if len(feature_importance) > 0:
-                summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
-            else:
-                summary = f"Analysis complete for {target_field}, but no clear correlations found."
-        elif analysis_type == 'ranking':
-            if len(results) > 0:
-                summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
-            else:
-                summary = f"No results found for {target_field} with the specified filters."
+        if user_query:
+            logger.info(f"Applying query-aware analysis for: {user_query}")
+            try:
+                # Use the pre-calculated data for enhanced analysis
+                enhanced_analysis = enhanced_query_aware_analysis(
+                    user_query, precalc_subset, feature_importance, results, target_field
+                )
+                
+                # Use enhanced results
+                summary = enhanced_analysis['intent_aware_summary']
+                enhanced_feature_importance = enhanced_analysis['enhanced_feature_importance']
+                query_intent = enhanced_analysis['query_intent']
+                
+                logger.info(f"Query intent detected: {query_intent}")
+                
+            except Exception as e:
+                logger.warning(f"Query-aware analysis failed, using standard analysis: {str(e)}")
+                # Fallback to standard summary
+                if analysis_type == 'correlation':
+                    if len(feature_importance) > 0:
+                        summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
+                    else:
+                        summary = f"Analysis complete for {target_field}, but no clear correlations found."
+                elif analysis_type == 'ranking':
+                    if len(results) > 0:
+                        summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
+                    else:
+                        summary = f"No results found for {target_field} with the specified filters."
+                else:
+                    summary = f"Analysis complete for {target_field}."
+                
+                enhanced_feature_importance = feature_importance
+                query_intent = None
         else:
-            summary = f"Analysis complete for {target_field}."
-        
-        enhanced_feature_importance = feature_importance
-        query_intent = None
+            # No query provided, use standard analysis
+            if analysis_type == 'correlation':
+                if len(feature_importance) > 0:
+                    summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
+                else:
+                    summary = f"Analysis complete for {target_field}, but no clear correlations found."
+            elif analysis_type == 'ranking':
+                if len(results) > 0:
+                    summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
+                else:
+                    summary = f"No results found for {target_field} with the specified filters."
+            else:
+                summary = f"Analysis complete for {target_field}."
+            
+            enhanced_feature_importance = feature_importance
+            query_intent = None
         
         # Add top 3 factors to summary if available
         if len(enhanced_feature_importance) >= 3 and 'top 3 factors' not in summary.lower():
