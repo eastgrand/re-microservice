@@ -93,27 +93,65 @@ def get_relevant_features_by_intent(intent: Dict, all_features: List[str]) -> Li
     
     relevant_features = []
     focus_areas = intent['focus_areas']
+    key_concepts = intent.get('key_concepts', [])
     
+    # First, identify specific concepts mentioned in the query
+    specific_concepts = set()
+    for concept in key_concepts:
+        if 'diversity' in concept.lower():
+            specific_concepts.update(['visible minority', 'population diversity'])
+        elif 'income' in concept.lower():
+            specific_concepts.update(['income', 'household income', 'discretionary income'])
+        elif 'housing' in concept.lower():
+            specific_concepts.update(['housing', 'structure type', 'tenure'])
+        elif 'conversion' in concept.lower():
+            specific_concepts.update(['conversion rate', 'mortgage approval'])
+    
+    # Then, select features based on both focus areas and specific concepts
     if 'demographic' in focus_areas:
-        demo_features = [f for f in all_features if any(x in f.lower() for x in 
-                        ['visible minority', 'population', 'age', 'married', 'divorced', 'single', 'maintainer'])]
+        # Only include demographic features that match specific concepts
+        demo_features = []
+        for f in all_features:
+            f_lower = f.lower()
+            # Check if feature matches any specific concepts
+            if any(concept in f_lower for concept in specific_concepts):
+                demo_features.append(f)
+            # If no specific concepts, use broader matching
+            elif not specific_concepts and any(x in f_lower for x in 
+                    ['visible minority', 'population', 'age', 'married', 'divorced', 'single', 'maintainer']):
+                demo_features.append(f)
         relevant_features.extend(demo_features)
     
     if 'geographic' in focus_areas:
-        geo_features = [f for f in all_features if any(x in f.lower() for x in 
-                       ['housing', 'construction', 'tenure', 'structure', 'condominium', 'apartment'])]
+        # Only include geographic features that match specific concepts
+        geo_features = []
+        for f in all_features:
+            f_lower = f.lower()
+            if any(concept in f_lower for concept in specific_concepts):
+                geo_features.append(f)
+            elif not specific_concepts and any(x in f_lower for x in 
+                   ['housing', 'construction', 'tenure', 'structure', 'condominium', 'apartment']):
+                geo_features.append(f)
         relevant_features.extend(geo_features)
     
     if 'financial' in focus_areas:
-        fin_features = [f for f in all_features if any(x in f.lower() for x in 
-                       ['income', 'mortgage', 'property', 'employment', 'financial', 'shelter', 'tax'])]
+        # Only include financial features that match specific concepts
+        fin_features = []
+        for f in all_features:
+            f_lower = f.lower()
+            if any(concept in f_lower for concept in specific_concepts):
+                fin_features.append(f)
+            elif not specific_concepts and any(x in f_lower for x in 
+                   ['income', 'mortgage', 'property', 'employment', 'financial', 'shelter', 'tax']):
+                fin_features.append(f)
         relevant_features.extend(fin_features)
     
-    # If no specific focus, return top features by importance
+    # If no specific focus or no features found, return top features by importance
     if not relevant_features:
         relevant_features = all_features
     
-    return list(set(relevant_features))  # Remove duplicates
+    # Remove duplicates and return
+    return list(set(relevant_features))
 
 def generate_intent_aware_summary(intent: Dict, feature_importance: List[Dict], 
                                  target_variable: str, results: List[Dict],

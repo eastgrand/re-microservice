@@ -8,7 +8,9 @@ def select_model_for_analysis(query):
     
     analysis_type = query.get('analysis_type', 'correlation')
     target_variable = query.get('target_variable', 'CONVERSION_RATE')
-    focus_area = query.get('focus_area', None)  # New parameter: 'demographic', 'financial', 'geographic'
+    focus_area = query.get('focus_area', None)
+    user_query = query.get('query', '').lower()
+    conversation_context = query.get('conversationContext', '').lower()
     
     # Load available models metadata
     metadata_path = 'precalculated/models/metadata.json'
@@ -18,18 +20,50 @@ def select_model_for_analysis(query):
     with open(metadata_path, 'r') as f:
         available_models = json.load(f)
     
-    # Model selection logic
+    # Check for specific concepts in query and context
+    specific_concepts = set()
+    
+    # Check query for specific concepts
+    if 'diversity' in user_query or 'population' in user_query:
+        specific_concepts.add('demographic')
+    if 'income' in user_query or 'financial' in user_query:
+        specific_concepts.add('financial')
+    if 'housing' in user_query or 'structure' in user_query:
+        specific_concepts.add('geographic')
+    
+    # Check conversation context for additional concepts
+    if conversation_context:
+        if 'diversity' in conversation_context or 'population' in conversation_context:
+            specific_concepts.add('demographic')
+        if 'income' in conversation_context or 'financial' in conversation_context:
+            specific_concepts.add('financial')
+        if 'housing' in conversation_context or 'structure' in conversation_context:
+            specific_concepts.add('geographic')
+    
+    # Model selection logic based on specific concepts
     if target_variable == 'CONVERSION_RATE':
-        if focus_area == 'demographic':
+        if 'demographic' in specific_concepts and 'financial' not in specific_concepts:
             return 'demographic_analysis'
-        elif focus_area == 'geographic': 
+        elif 'geographic' in specific_concepts and 'financial' not in specific_concepts:
             return 'geographic_analysis'
+        elif 'financial' in specific_concepts:
+            return 'financial_analysis'
         else:
             return 'conversion'  # General conversion model
     elif target_variable == 'SUM_FUNDED':
-        return 'volume'
+        if 'demographic' in specific_concepts:
+            return 'demographic_volume'
+        elif 'geographic' in specific_concepts:
+            return 'geographic_volume'
+        else:
+            return 'volume'
     elif target_variable == 'FREQUENCY':
-        return 'frequency'
+        if 'demographic' in specific_concepts:
+            return 'demographic_frequency'
+        elif 'geographic' in specific_concepts:
+            return 'geographic_frequency'
+        else:
+            return 'frequency'
     else:
         # Default to conversion model
         return 'conversion'
