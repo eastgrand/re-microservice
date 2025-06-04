@@ -105,6 +105,10 @@ REDIS_URL = os.getenv('REDIS_URL', 'rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA
 logger = logging.getLogger("shap-microservice")
 logger.info(f"[DEBUG] Using Redis URL: {REDIS_URL}")
 
+# Initialize Redis connection and queue more gracefully
+redis_conn = None
+queue = None
+
 # First create a Flask application context
 with app.app_context():
     try:
@@ -112,6 +116,7 @@ with app.app_context():
         apply_all_worker_patches(app)
         
         # Create Redis connection with improved parameters
+        logger.info("Attempting to connect to Redis...")
         redis_conn = redis.from_url(
             REDIS_URL,
             socket_timeout=10,
@@ -122,12 +127,9 @@ with app.app_context():
             ssl_cert_reqs=None  # Don't verify SSL certificate
         )
         
-        # Test the connection
-        if redis_conn.ping():
-            logger.info("Successfully connected to Redis")
-        else:
-            logger.error("Failed to ping Redis server")
-            raise Exception("Redis connection test failed")
+        # Test the connection with timeout
+        redis_conn.ping()
+        logger.info("Successfully connected to Redis")
         
         # Store Redis connection in app config for endpoint access
         app.config['redis_conn'] = redis_conn
@@ -138,7 +140,9 @@ with app.app_context():
         
     except Exception as e:
         logger.error(f"Failed to initialize Redis connection: {str(e)}")
-        raise
+        logger.error("App will start without Redis - some features may be unavailable")
+        # Don't raise the exception - let the app start without Redis
+        app.config['redis_conn'] = None
 
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
@@ -672,6 +676,16 @@ def analyze():
     query = request.json
     if not query:
         return jsonify({"error": "No query provided"}), 400
+    
+    # Check if Redis/queue is available
+    if queue is None:
+        logger.error("Redis queue not available - cannot process async jobs")
+        return jsonify({
+            "success": False, 
+            "error": "Analysis service temporarily unavailable. Redis connection failed during startup.",
+            "retry_suggestion": "Please try again in a few minutes as the service may be initializing."
+        }), 503
+    
     try:
         # Ensure 'analysis_worker' is defined later in the file
         job = queue.enqueue(analysis_worker, query, job_timeout=600)
@@ -688,6 +702,14 @@ def analyze():
 @app.route('/job_status/<job_id>', methods=['GET'])
 @require_api_key
 def job_status(job_id):
+    # Check if Redis/queue is available
+    if queue is None:
+        logger.error("Redis queue not available - cannot check job status")
+        return jsonify({
+            "success": False, 
+            "error": "Job status unavailable. Redis connection failed during startup."
+        }), 503
+    
     try:
         job = queue.fetch_job(job_id)
         if job is None:
