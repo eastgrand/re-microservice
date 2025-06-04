@@ -440,23 +440,95 @@ def analysis_worker(query):
         # Only pass model features to SHAP
         X_for_shap = X[model_only_features] if model_only_features else X
         
-        # Replace the direct SHAP computation with the memory-optimized version
-        logger.info("Starting SHAP computation with memory optimization")
-        shap_values = create_memory_optimized_explainer(model, X_for_shap)
-        
-        if shap_values is None:
-            logger.error("SHAP computation failed")
-            return {
-                "success": False,
-                "error": "SHAP computation failed due to timeout or memory constraints",
-                "results": [],
-                "summary": "Analysis could not be completed due to resource constraints."
-            }
+        # Replace the direct SHAP computation with pre-calculated SHAP lookup
+        logger.info("Loading pre-calculated SHAP values for instant analysis")
+        try:
+            # Load pre-calculated SHAP values
+            import os
+            if os.path.exists('precalculated/shap_values.pkl.gz'):
+                logger.info("Loading pre-calculated SHAP data...")
+                precalc_df = pd.read_pickle('precalculated/shap_values.pkl.gz', compression='gzip')
+                logger.info(f"Pre-calculated data loaded: {precalc_df.shape}")
+                
+                # Filter to matching IDs from our analysis data
+                analysis_ids = top_data['ID'].values
+                precalc_subset = precalc_df[precalc_df['ID'].isin(analysis_ids)]
+                
+                if len(precalc_subset) == 0:
+                    logger.warning("No matching IDs found in pre-calculated data")
+                    return {
+                        "success": False,
+                        "error": "No pre-calculated SHAP values found for the filtered data",
+                        "results": [],
+                        "summary": "Analysis could not be completed - no matching data in pre-calculated values."
+                    }
+                
+                logger.info(f"Found {len(precalc_subset)} matching rows in pre-calculated data")
+                
+                # Extract SHAP values for model features
+                shap_columns = [col for col in precalc_df.columns if col.startswith('shap_')]
+                shap_feature_names = [col.replace('shap_', '') for col in shap_columns]
+                
+                # Create SHAP values array matching our model features
+                matching_shap_features = []
+                shap_values_list = []
+                
+                for feature in model_only_features:
+                    shap_col = f'shap_{feature}'
+                    if shap_col in precalc_subset.columns:
+                        matching_shap_features.append(feature)
+                        shap_values_list.append(precalc_subset[shap_col].values)
+                
+                if len(matching_shap_features) == 0:
+                    logger.error("No matching SHAP features found")
+                    return {
+                        "success": False,
+                        "error": "No matching SHAP features found in pre-calculated data",
+                        "results": [],
+                        "summary": "SHAP features do not match between model and pre-calculated data."
+                    }
+                
+                # Create SHAP values array (rows x features)
+                shap_values = np.column_stack(shap_values_list)
+                logger.info(f"SHAP values loaded: {shap_values.shape} for {len(matching_shap_features)} features")
+                
+            else:
+                logger.warning("Pre-calculated SHAP file not found, falling back to on-demand computation")
+                # Fallback to original SHAP computation
+                X_for_shap = X[model_only_features] if model_only_features else X
+                shap_values = create_memory_optimized_explainer(model, X_for_shap)
+                matching_shap_features = model_only_features
+                
+                if shap_values is None:
+                    logger.error("SHAP computation failed")
+                    return {
+                        "success": False,
+                        "error": "SHAP computation failed due to timeout or memory constraints",
+                        "results": [],
+                        "summary": "Analysis could not be completed due to resource constraints."
+                    }
             
-        logger.info("SHAP computation completed successfully")
+        except Exception as e:
+            logger.error(f"Error loading pre-calculated SHAP values: {str(e)}")
+            logger.info("Falling back to on-demand SHAP computation")
+            # Fallback to original SHAP computation
+            X_for_shap = X[model_only_features] if model_only_features else X
+            shap_values = create_memory_optimized_explainer(model, X_for_shap)
+            matching_shap_features = model_only_features
+            
+            if shap_values is None:
+                logger.error("SHAP computation failed")
+                return {
+                    "success": False,
+                    "error": "SHAP computation failed due to timeout or memory constraints",
+                    "results": [],
+                    "summary": "Analysis could not be completed due to resource constraints."
+                }
+            
+        logger.info("SHAP analysis completed successfully (using pre-calculated values)")
         
         feature_importance = []
-        for i, feature in enumerate(model_only_features):  # Use model_only_features for SHAP results
+        for i, feature in enumerate(matching_shap_features):  # Use matching_shap_features for SHAP results
             importance = abs(shap_values[:, i]).mean()
             feature_importance.append({'feature': feature, 'importance': float(importance)})
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
@@ -503,7 +575,7 @@ def analysis_worker(query):
             summary += f" The top 3 factors influencing {target_field} are {feature_importance[0]['feature']}, "
             summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
         shap_values_dict = {}
-        for i, feature in enumerate(model_only_features):  # Use model_only_features for SHAP results
+        for i, feature in enumerate(matching_shap_features):  # Use matching_shap_features for SHAP results
             shap_values_dict[feature] = shap_values[:, i].tolist()[:10]
         model_version = version_tracker.get_latest_model()
         dataset_version = version_tracker.get_latest_dataset()
