@@ -1,4 +1,3 @@
-# --- EARLY LOGGING SETUP (fixes NameError: logger not defined) ---
 import os
 import sys
 import logging
@@ -19,6 +18,9 @@ import uuid
 from collections import defaultdict
 import time
 import psutil
+import threading
+import signal
+import xgboost as xgb
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
@@ -274,7 +276,6 @@ def analysis_worker(query):
     import shap
     import gc
     import psutil
-    import os  # Add os import here
     
     logger.info(f"[RQ WORKER] analysis_worker called with query: {query}")
     model, model_features = ensure_model_loaded()
