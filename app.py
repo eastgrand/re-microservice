@@ -860,17 +860,6 @@ def load_model():
         logger.error(f"Error loading model: {str(e)}")
         raise
 
-# Routes
-@app.route('/', methods=['GET'])
-def root():
-    return jsonify({
-        "message": "SHAP/XGBoost Analytics API",
-        "endpoints": {
-            "/analyze": "POST - Run analysis with structured query",
-            "/health": "GET - Check system health",
-            "/metadata": "GET - Get dataset metadata and statistics",
-            "/versions": "GET - List all tracked versions of datasets and models"
-        }
     })
 
 @app.route('/ping', methods=['GET'])
