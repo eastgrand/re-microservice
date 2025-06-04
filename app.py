@@ -157,7 +157,7 @@ def require_api_key(f):
 
 
 # --- ASYNC ANALYSIS WORKER FUNCTION FOR RQ ---
-def create_memory_optimized_explainer(model, data, max_rows=50):
+def create_memory_optimized_explainer(model, data, max_rows=25):
     """Create a memory-optimized explainer that processes data in batches."""
     try:
         # Enable garbage collection
@@ -207,7 +207,7 @@ def create_memory_optimized_explainer(model, data, max_rows=50):
         all_shap_values = []
         
         start_time = time.time()
-        timeout = 30  # Reduce timeout to 30 seconds for 128-feature model
+        timeout = 20  # Reduce timeout to 20 seconds for 128-feature model
         
         for i in range(0, total_rows, max_rows):
             # Check for timeout
@@ -364,8 +364,8 @@ def analysis_worker(query):
         # Optimize data preparation
         top_data = filtered_data.sort_values(by=target_field, ascending=False)
         
-        # Limit data size for faster processing (more aggressive for 128+ feature model)
-        max_analysis_rows = 200  # Reduce from 500 to 200 rows for 128-feature model
+        # Limit data size for faster processing (extremely aggressive for 128+ feature model)
+        max_analysis_rows = 50  # Reduce from 200 to 50 rows for 128-feature model
         if len(top_data) > max_analysis_rows:
             logger.info(f"Limiting analysis to top {max_analysis_rows} rows (from {len(top_data)} total)")
             top_data = top_data.head(max_analysis_rows)
