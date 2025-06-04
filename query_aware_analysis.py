@@ -3,89 +3,90 @@ import numpy as np
 import re
 from typing import List, Dict, Tuple
 
-def analyze_query_intent(query: str) -> Dict[str, any]:
+def analyze_query_intent(query: str, conversation_context: str = '') -> Dict[str, any]:
     """Analyze the user's query to understand their analytical intent"""
     
     query_lower = query.lower()
     
-    # Intent categories
-    intent = {
-        'focus_areas': [],
-        'analysis_type': 'correlation',
-        'key_concepts': [],
-        'target_emphasis': 'conversion_rate'
-    }
-    
-    # Demographic focus keywords
-    demographic_keywords = [
-        'diversity', 'diverse', 'minority', 'visible minority', 'population', 
-        'demographic', 'age', 'married', 'single', 'divorced', 'family',
-        'ethnic', 'cultural', 'community', 'residents'
-    ]
-    
-    # Geographic/Housing focus keywords  
-    geographic_keywords = [
-        'housing', 'house', 'apartment', 'condo', 'condominium', 'structure',
-        'construction', 'built', 'neighborhood', 'area', 'location', 'geography',
-        'detached', 'semi-detached', 'building', 'property', 'tenure', 'owned', 'rented'
-    ]
-    
-    # Financial focus keywords
-    financial_keywords = [
-        'income', 'salary', 'financial', 'mortgage', 'loan', 'money', 'funding',
-        'employment', 'job', 'work', 'tax', 'property tax', 'shelter', 'cost',
-        'economic', 'wealth', 'affluent', 'high-income', 'low-income'
-    ]
-    
-    # Volume/Frequency analysis keywords
-    volume_keywords = [
-        'volume', 'amount', 'total', 'sum', 'funding', 'loan amount',
-        'frequency', 'applications', 'activity', 'market activity'
-    ]
-    
-    # Analysis type keywords
-    ranking_keywords = ['top', 'best', 'highest', 'lowest', 'rank', 'which areas']
-    correlation_keywords = ['affect', 'influence', 'impact', 'drive', 'factor', 'relationship']
-    comparison_keywords = ['compare', 'versus', 'vs', 'difference', 'between']
-    
-    # Detect focus areas
-    if any(keyword in query_lower for keyword in demographic_keywords):
-        intent['focus_areas'].append('demographic')
+    # If we have conversation context, incorporate it for better intent detection
+    if conversation_context:
+        # Look for follow-up indicators in the query
+        follow_up_indicators = ['why', 'how', 'what about', 'more like', 'similar to', 'based on that', 'tell me more']
+        is_follow_up = any(indicator in query_lower for indicator in follow_up_indicators)
         
-    if any(keyword in query_lower for keyword in geographic_keywords):
-        intent['focus_areas'].append('geographic')
-        
-    if any(keyword in query_lower for keyword in financial_keywords):
-        intent['focus_areas'].append('financial')
+        if is_follow_up:
+            # For follow-up questions, extract context from previous conversation
+            context_lower = conversation_context.lower()
+            
+            # Inherit focus areas from context
+            inherited_focus = []
+            if any(term in context_lower for term in ['demographic', 'diversity', 'population', 'ethnic']):
+                inherited_focus.append('demographic')
+            if any(term in context_lower for term in ['income', 'financial', 'economic', 'mortgage']):
+                inherited_focus.append('financial')
+            if any(term in context_lower for term in ['housing', 'geographic', 'area', 'region']):
+                inherited_focus.append('geographic')
+                
+            # Extract mentioned areas from context
+            inherited_concepts = []
+            if 'conversion' in context_lower or 'approval' in context_lower:
+                inherited_concepts.append('conversion')
+            if 'diversity' in context_lower:
+                inherited_concepts.append('diversity')
+            if 'income' in context_lower:
+                inherited_concepts.append('income')
+            if 'housing' in context_lower:
+                inherited_concepts.append('housing')
     
-    # Detect analysis type
-    if any(keyword in query_lower for keyword in ranking_keywords):
-        intent['analysis_type'] = 'ranking'
-    elif any(keyword in query_lower for keyword in correlation_keywords):
-        intent['analysis_type'] = 'correlation'
-    elif any(keyword in query_lower for keyword in comparison_keywords):
-        intent['analysis_type'] = 'comparison'
+    # Determine analysis type
+    analysis_type = 'correlation'  # Default
+    if any(word in query_lower for word in ['highest', 'top', 'best', 'rank', 'leading']):
+        analysis_type = 'ranking'
+    elif any(word in query_lower for word in ['compare', 'difference', 'between', 'vs', 'versus']):
+        analysis_type = 'comparison'
+    elif any(word in query_lower for word in ['correlate', 'relationship', 'relate', 'connection']):
+        analysis_type = 'correlation'
+    elif any(word in query_lower for word in ['distribution', 'spread', 'pattern', 'trend']):
+        analysis_type = 'distribution'
     
-    # Detect target emphasis
-    if any(keyword in query_lower for keyword in volume_keywords):
-        intent['target_emphasis'] = 'volume'
-    elif 'frequency' in query_lower or 'applications' in query_lower:
-        intent['target_emphasis'] = 'frequency'
+    # Determine focus areas
+    focus_areas = []
+    if any(word in query_lower for word in ['demographic', 'diversity', 'population', 'ethnic', 'minority', 'race']):
+        focus_areas.append('demographic')
+    if any(word in query_lower for word in ['income', 'financial', 'economic', 'money', 'mortgage', 'loan']):
+        focus_areas.append('financial')
+    if any(word in query_lower for word in ['housing', 'geographic', 'area', 'region', 'location', 'structure']):
+        focus_areas.append('geographic')
+    
+    # Merge with inherited focus from conversation context
+    if conversation_context and 'inherited_focus' in locals():
+        focus_areas.extend([f for f in inherited_focus if f not in focus_areas])
     
     # Extract key concepts
-    concepts = []
-    if 'diversity' in query_lower or 'diverse' in query_lower:
-        concepts.append('diversity')
-    if 'income' in query_lower:
-        concepts.append('income')
-    if 'housing' in query_lower or 'house' in query_lower:
-        concepts.append('housing')
-    if 'mortgage' in query_lower or 'loan' in query_lower:
-        concepts.append('mortgage')
+    key_concepts = []
+    if any(word in query_lower for word in ['diversity', 'diverse']):
+        key_concepts.append('diversity')
+    if any(word in query_lower for word in ['income', 'earnings']):
+        key_concepts.append('income')
+    if any(word in query_lower for word in ['housing', 'house', 'apartment', 'structure']):
+        key_concepts.append('housing')
+    if any(word in query_lower for word in ['conversion', 'approval', 'rate']):
+        key_concepts.append('conversion')
+    if any(word in query_lower for word in ['application', 'applications']):
+        key_concepts.append('applications')
     
-    intent['key_concepts'] = concepts
+    # Merge with inherited concepts from conversation context
+    if conversation_context and 'inherited_concepts' in locals():
+        key_concepts.extend([c for c in inherited_concepts if c not in key_concepts])
     
-    return intent
+    return {
+        'analysis_type': analysis_type,
+        'focus_areas': focus_areas,
+        'key_concepts': key_concepts,
+        'confidence': 0.8 if focus_areas else 0.5,
+        'is_follow_up': conversation_context and is_follow_up if 'is_follow_up' in locals() else False,
+        'context_enhanced': bool(conversation_context)
+    }
 
 def get_relevant_features_by_intent(intent: Dict, all_features: List[str]) -> List[str]:
     """Get features most relevant to the user's intent"""
@@ -115,75 +116,109 @@ def get_relevant_features_by_intent(intent: Dict, all_features: List[str]) -> Li
     return list(set(relevant_features))  # Remove duplicates
 
 def generate_intent_aware_summary(intent: Dict, feature_importance: List[Dict], 
-                                 target_variable: str, results: List[Dict]) -> str:
-    """Generate a summary that addresses the user's specific query intent"""
+                                 target_variable: str, results: List[Dict],
+                                 conversation_context: str = '') -> str:
+    """Generate a conversational summary that directly answers the user's question"""
     
     analysis_type = intent['analysis_type']
     focus_areas = intent['focus_areas']
     key_concepts = intent['key_concepts']
+    is_follow_up = intent.get('is_follow_up', False)
     
-    # Start with context
-    if focus_areas:
-        focus_text = " and ".join(focus_areas)
-        summary = f"Analysis focused on {focus_text} factors affecting {target_variable}. "
+    # Get top results for context
+    top_results = results[:3] if results else []
+    
+    # If this is a follow-up question, reference the conversation context
+    if is_follow_up and conversation_context:
+        if 'why' in intent.get('query', '').lower():
+            summary = "Building on our previous analysis, "
+        elif 'what about' in intent.get('query', '').lower():
+            summary = "Expanding on those findings, "
+        elif 'more like' in intent.get('query', '').lower() or 'similar' in intent.get('query', '').lower():
+            summary = "Looking for areas with similar characteristics, "
+        else:
+            summary = "To elaborate on that analysis, "
     else:
-        summary = f"Comprehensive analysis of factors affecting {target_variable}. "
+        # Start with a direct answer to their question
+        if analysis_type == 'ranking' and 'diversity' in key_concepts and top_results:
+            summary = f"Looking at areas with both high diversity and strong {target_variable.lower().replace('_', ' ')}, "
+        elif analysis_type == 'correlation' and len(key_concepts) >= 2:
+            summary = f"When examining the relationship between {' and '.join(key_concepts)}, "
+        elif analysis_type == 'ranking' and 'income' in key_concepts:
+            summary = f"Focusing on areas with high income levels and strong {target_variable.lower().replace('_', ' ')}, "
+        elif analysis_type == 'ranking':
+            summary = f"Looking at the top-performing areas for {target_variable.lower().replace('_', ' ')}, "
+        else:
+            summary = f"Analyzing the data for {target_variable.lower().replace('_', ' ')}, "
     
-    # Add findings based on analysis type
-    if analysis_type == 'ranking' and results:
-        top_area = results[0]['zip_code']
-        top_value = results[0].get(target_variable.lower(), 'N/A')
-        summary += f"The top-performing area is {top_area} with a {target_variable} of {top_value:.3f}. "
-    
-    # Highlight relevant factors
-    if feature_importance:
-        # Filter feature importance to match intent
-        relevant_factors = []
-        for factor in feature_importance[:10]:  # Top 10 factors
-            feature_name = factor['feature'].lower()
-            
-            # Check if factor matches intent
-            is_relevant = False
-            if 'demographic' in focus_areas and any(x in feature_name for x in ['minority', 'population', 'age', 'married']):
-                is_relevant = True
-            elif 'geographic' in focus_areas and any(x in feature_name for x in ['housing', 'construction', 'structure']):
-                is_relevant = True
-            elif 'financial' in focus_areas and any(x in feature_name for x in ['income', 'mortgage', 'employment']):
-                is_relevant = True
-            elif not focus_areas:  # If no specific focus, include all
-                is_relevant = True
-            
-            if is_relevant:
-                relevant_factors.append(factor)
+    # Add specific insights based on top factors
+    if feature_importance and len(feature_importance) > 0:
+        top_factor = feature_importance[0]['feature']
         
-        # Mention top relevant factors
-        if relevant_factors:
-            top_factor = relevant_factors[0]['feature']
-            summary += f"The most significant factor is {top_factor}."
+        # Make it conversational and human-readable
+        if 'income' in top_factor.lower():
+            factor_description = "income levels"
+        elif 'filipino' in top_factor.lower():
+            factor_description = "Filipino population concentration"
+        elif 'south asian' in top_factor.lower():
+            factor_description = "South Asian community presence"
+        elif 'chinese' in top_factor.lower():
+            factor_description = "Chinese population density"
+        elif any(term in top_factor.lower() for term in ['minority', 'population']):
+            factor_description = "demographic composition"
+        elif 'housing' in top_factor.lower() or 'structure' in top_factor.lower():
+            factor_description = "housing characteristics"
+        elif 'apartment' in top_factor.lower():
+            factor_description = "apartment-style housing"
+        elif 'employment' in top_factor.lower():
+            factor_description = "employment patterns"
+        else:
+            factor_description = top_factor.lower().replace('_', ' ')
+        
+        # Different phrasing for follow-ups vs initial questions
+        if is_follow_up:
+            summary += f"the key driver appears to be {factor_description}. "
+        else:
+            summary += f"areas with strong {factor_description} consistently show the best performance. "
+        
+        # Add context-aware insights
+        if len(feature_importance) >= 2:
+            second_factor = feature_importance[1]['feature']
+            if 'income' in second_factor.lower() and 'income' not in factor_description:
+                summary += "Combined with solid income levels, "
+            elif any(term in second_factor.lower() for term in ['housing', 'structure']) and 'housing' not in factor_description:
+                summary += "Along with favorable housing characteristics, "
+            elif any(term in second_factor.lower() for term in ['minority', 'population']) and 'demographic' not in factor_description:
+                summary += "Paired with specific demographic patterns, "
+            else:
+                summary += f"Working together with {second_factor.lower().replace('_', ' ')}, "
             
-            if len(relevant_factors) >= 3:
-                summary += f" Other key factors include {relevant_factors[1]['feature']} and {relevant_factors[2]['feature']}."
+            summary += "these factors create a strong foundation for mortgage success."
     
-    # Add concept-specific insights
-    if 'diversity' in key_concepts:
-        diversity_factors = [f for f in feature_importance if 'minority' in f['feature'].lower()]
-        if diversity_factors:
-            summary += f" Diversity metrics show {diversity_factors[0]['feature']} has significant impact."
+    # Add specific area mentions if available
+    if top_results and not is_follow_up:
+        # Mention specific high-performing areas
+        top_area_ids = [str(result.get('zip_code', '')) for result in top_results[:2] if result.get('zip_code')]
+        if top_area_ids:
+            if len(top_area_ids) == 1:
+                summary += f" {top_area_ids[0]} stands out as a particularly strong performer."
+            else:
+                summary += f" Areas like {', '.join(top_area_ids)} exemplify these successful patterns."
     
-    if 'income' in key_concepts:
-        income_factors = [f for f in feature_importance if 'income' in f['feature'].lower()]
-        if income_factors:
-            summary += f" Income-related factors, particularly {income_factors[0]['feature']}, are influential."
+    # Add forward-looking insight for conversation continuity
+    if not is_follow_up and len(feature_importance) >= 3:
+        summary += " This multi-factor approach suggests that successful areas typically have several complementary strengths rather than relying on just one characteristic."
     
     return summary
 
 def enhanced_query_aware_analysis(query: str, precalc_df: pd.DataFrame, 
                                  feature_importance: List[Dict], results: List[Dict],
-                                 target_variable: str = 'CONVERSION_RATE') -> Dict:
-    """Enhanced analysis that interprets results based on query intent"""
+                                 target_variable: str = 'CONVERSION_RATE',
+                                 conversation_context: str = '') -> Dict:
+    """Enhanced analysis that interprets results based on query intent and conversation context"""
     
-    # Analyze query intent
-    intent = analyze_query_intent(query)
+    # Analyze query intent, enriched with conversation context
+    intent = analyze_query_intent(query, conversation_context)
     
     # Get all available features from SHAP columns
     all_features = [col.replace('shap_', '') for col in precalc_df.columns if col.startswith('shap_')]
@@ -215,8 +250,8 @@ def enhanced_query_aware_analysis(query: str, precalc_df: pd.DataFrame,
     # Sort by boosted importance
     relevant_importance.sort(key=lambda x: x['importance'], reverse=True)
     
-    # Generate intent-aware summary
-    summary = generate_intent_aware_summary(intent, relevant_importance, target_variable, results)
+    # Generate intent-aware summary with conversation context
+    summary = generate_intent_aware_summary(intent, relevant_importance, target_variable, results, conversation_context)
     
     return {
         'query_intent': intent,
@@ -224,7 +259,8 @@ def enhanced_query_aware_analysis(query: str, precalc_df: pd.DataFrame,
         'enhanced_feature_importance': relevant_importance[:15],  # Top 15 with relevance
         'intent_aware_summary': summary,
         'analysis_focus': intent['focus_areas'],
-        'key_concepts': intent['key_concepts']
+        'key_concepts': intent['key_concepts'],
+        'conversation_context': conversation_context  # Include context in response
     }
 
 # Example usage:

@@ -299,19 +299,56 @@ def create_memory_optimized_explainer(model, data, max_rows=10):
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
 def _generate_standard_analysis(analysis_type, target_field, feature_importance, results):
-    """Generate standard analysis results when query-aware analysis is not available"""
+    """Generate conversational analysis results when query-aware analysis is not available"""
     if analysis_type == 'correlation':
         if len(feature_importance) > 0:
-            summary = f"Analysis shows a strong correlation between {target_field} and {feature_importance[0]['feature']}."
+            # Get the top factor and make it human-readable
+            top_factor = feature_importance[0]['feature']
+            if 'income' in top_factor.lower():
+                factor_description = "income levels"
+            elif any(term in top_factor.lower() for term in ['minority', 'population']):
+                factor_description = "demographic composition"
+            elif 'housing' in top_factor.lower():
+                factor_description = "housing characteristics"
+            else:
+                factor_description = "key demographic factors"
+            
+            summary = f"The analysis reveals that {factor_description} show the strongest relationship with {target_field.lower().replace('_', ' ')}. Areas that perform well in one metric tend to perform well in the other."
         else:
-            summary = f"Analysis complete for {target_field}, but no clear correlations found."
+            summary = f"While the analysis completed successfully, no clear correlations were found in the current dataset."
     elif analysis_type == 'ranking':
-        if len(results) > 0:
-            summary = f"The top area for {target_field} has a value of {results[0][target_field.lower()]:.2f}."
+        if len(results) > 0 and target_field.lower() in results[0]:
+            top_area = results[0].get('zip_code', 'the top-performing area')
+            top_value = results[0][target_field.lower()]
+            summary = f"The analysis shows {top_area} leads with strong performance. "
+            
+            # Add context about what makes it successful
+            if len(feature_importance) > 0:
+                top_factor = feature_importance[0]['feature']
+                if 'income' in top_factor.lower():
+                    summary += "Higher income levels appear to be a key factor in their success."
+                elif any(term in top_factor.lower() for term in ['minority', 'population']):
+                    summary += "The demographic composition of this area contributes to its strong performance."
+                elif 'housing' in top_factor.lower():
+                    summary += "Housing characteristics play an important role in their success."
+                else:
+                    summary += "Multiple demographic and economic factors contribute to their strong performance."
         else:
-            summary = f"No results found for {target_field} with the specified filters."
+            summary = f"The analysis completed, but no clear top performers were found with the current filters."
     else:
-        summary = f"Analysis complete for {target_field}."
+        # General analysis
+        if len(feature_importance) > 0:
+            top_factor = feature_importance[0]['feature']
+            if 'income' in top_factor.lower():
+                summary = f"Income levels are the most important factor influencing {target_field.lower().replace('_', ' ')} in your selected areas."
+            elif any(term in top_factor.lower() for term in ['minority', 'population']):
+                summary = f"Demographic composition has the strongest impact on {target_field.lower().replace('_', ' ')} across the analyzed areas."
+            elif 'housing' in top_factor.lower():
+                summary = f"Housing characteristics are the primary driver of {target_field.lower().replace('_', ' ')} in these areas."
+            else:
+                summary = f"The analysis shows that demographic and economic factors significantly influence {target_field.lower().replace('_', ' ')}."
+        else:
+            summary = f"Analysis completed for {target_field.lower().replace('_', ' ')}."
     
     enhanced_feature_importance = feature_importance
     query_intent = None
@@ -355,6 +392,16 @@ def analysis_worker(query):
         analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
         target_variable = query.get('target_variable', query.get('target', TARGET_VARIABLE))
         
+        # Extract user query and conversation context for query-aware analysis
+        user_query = query.get('query', '')
+        conversation_context = query.get('conversationContext', '')
+        
+        # Log conversation context if provided
+        if conversation_context:
+            logger.info(f"Conversation context provided: {conversation_context[:100]}...")
+        else:
+            logger.info("No conversation context provided")
+        
         # Map target variable to dataset field name
         target_field = None
         for orig_field, mapped_field in FIELD_MAPPINGS.items():
@@ -388,6 +435,16 @@ def analysis_worker(query):
         logger.info("Loading and filtering data...")
         filtered_data = dataset.copy()
         
+        # Apply minimum applications filter if specified - MOVED TO TOP
+        min_applications = query.get('minApplications', 1)
+        if min_applications > 1:
+            if 'FREQUENCY' in filtered_data.columns:
+                initial_count = len(filtered_data)
+                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
+                logger.info(f"Applied minimum applications filter (>= {min_applications}): {initial_count} -> {len(filtered_data)} rows")
+            else:
+                logger.warning(f"FREQUENCY column not found in dataset - cannot apply minimum applications filter")
+        
         # Apply filters more efficiently
         for filter_item in filters:
             if isinstance(filter_item, str):
@@ -410,14 +467,30 @@ def analysis_worker(query):
         
         logger.info(f"Data filtered. Shape: {filtered_data.shape}")
         
+        # Check if we have any data left after filtering
+        if len(filtered_data) == 0:
+            logger.warning("No data remaining after applying filters")
+            return {
+                "success": False,
+                "error": f"No data found matching the minimum applications threshold of {min_applications}",
+                "results": [],
+                "summary": f"No areas found with at least {min_applications} mortgage applications."
+            }
+        
         # Optimize data preparation
         top_data = filtered_data.sort_values(by=target_field, ascending=False)
         
-        # Limit data size for faster processing (extremely conservative for 128+ feature model)
-        max_analysis_rows = 25  # Very small sample to test 128-feature SHAP feasibility
+        # With pre-calculated SHAP values, we can analyze ALL qualifying geographic areas
+        # No need to limit for performance - geographic analysis requires spatial completeness
+        logger.info(f"Preparing to analyze {len(top_data)} qualifying geographic areas (no artificial limits)")
+        
+        # Only apply limits if the dataset is extremely large (>500 areas) to prevent memory issues
+        max_analysis_rows = min(500, len(top_data))  # Allow up to 500 areas
         if len(top_data) > max_analysis_rows:
-            logger.info(f"Limiting analysis to top {max_analysis_rows} rows (from {len(top_data)} total)")
+            logger.info(f"Large dataset detected. Limiting analysis to top {max_analysis_rows} areas (from {len(top_data)} total) for memory management")
             top_data = top_data.head(max_analysis_rows)
+        else:
+            logger.info(f"Analyzing all {len(top_data)} qualifying geographic areas for complete spatial coverage")
         
         X = top_data.copy()
         
@@ -610,14 +683,13 @@ def analysis_worker(query):
                         result[field.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('$', '')] = str(row[field])
             results.append(result)
         
-        # Apply query-aware analysis enhancement - with availability check
-        user_query = query.get('query', '')
+        # Use enhanced results if query-aware analysis is available, otherwise standard
         if user_query and QUERY_AWARE_AVAILABLE:
             logger.info(f"Applying query-aware analysis for: {user_query}")
             try:
                 # Use the pre-calculated data for enhanced analysis
                 enhanced_analysis = enhanced_query_aware_analysis(
-                    user_query, precalc_subset, feature_importance, results, target_field
+                    user_query, precalc_subset, feature_importance, results, target_field, conversation_context
                 )
                 
                 # Check if we got a valid response
@@ -650,10 +722,8 @@ def analysis_worker(query):
                 analysis_type, target_field, feature_importance, results
             )
         
-        # Add top 3 factors to summary if available
-        if len(enhanced_feature_importance) >= 3 and 'top 3 factors' not in summary.lower():
-            summary += f" The top 3 factors influencing {target_field} are {enhanced_feature_importance[0]['feature']}, "
-            summary += f"{enhanced_feature_importance[1]['feature']}, and {enhanced_feature_importance[2]['feature']}."
+        # DON'T automatically add technical factor names - let the query-aware analysis handle this contextually
+        # The conversational summaries already include relevant factor information in human-readable terms
         
         shap_values_dict = {}
         for i, feature in enumerate(matching_shap_features):  # Use matching_shap_features for SHAP results
