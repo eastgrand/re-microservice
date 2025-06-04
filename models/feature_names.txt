@@ -1,133 +1,128 @@
-OBJECTID
-2021 Period of Construction - 1961 to 1980 (Census)
-2021 Period of Construction - 1961 to 1980 (Census) (%)
-2021 Period of Construction - 1981 to 1990 (Census)
-2021 Period of Construction - 1981 to 1990 (Census) (%)
-2021 Period of Construction - 1991 to 2000 (Census)
-2021 Period of Construction - 1991 to 2000 (Census) (%)
-2021 Period of Construction - 2001 to 2005 (Census)
-2021 Period of Construction - 2001 to 2005 (Census) (%)
-2021 Period of Construction - 2006 to 2010 (Census)
-2021 Period of Construction - 2006 to 2010 (Census) (%)
-2021 Period of Construction - 2011 to 2016 (Census)
-2021 Period of Construction - 2011 to 2016 (Census) (%)
-2021 Period of Construction - 2016 to 2021 (Census)
-2021 Period of Construction - 2016 to 2021 (Census) (%)
-2021 Period of Construction - 1960 or Before (Census)
-2021 Period of Construction - 1960 or Before (Census) (%)
-2021 Housing: Apartment or Flat in Duplex (Census)
-2021 Housing: Apartment or Flat in Duplex (Census) (%)
-2021-2022 Total Population % Change
-2022-2023 Current$ Household Average Income % Change
-2022-2023 Total Population % Change
-2023-2024 Current$ Household Average Income % Change
-2023-2024 Total Population % Change
-2024 Condominium Charges (Shelter)
-2024 Condominium Charges (Shelter) (Avg)
-2024 Condominium Status - In Condo
-2024 Condominium Status - In Condo (%)
-2024 Condominium Status - Not In Condo
-2024 Condominium Status - Not In Condo (%)
-2024 Condominium Status - Total Households
-2024 Female Household Population
-2024 Female Household Population (%)
-2024 Financial Services
-2024 Financial Services (Avg)
-2024 Household Aggregate Income (Current Year $)
-2024 Household Average Income (Current Year $)
-2024 Household Median Income (Current Year $)
-2024 Household Type - Total Households
-2024 Household Discretionary Aggregate Income
-2024 Household Disposable Aggregate Income
-2024 Household Aggregate Income
-2024 Labour Force - Labour Employment Rate
-2024 Labour Force - Labour Participation Rate
-2024 Labour Force - Labour Unemployment Rate
-2024 Maintainers - 25 to 34
-2024 Maintainers - 25 to 34 (%)
-2024 Maintainers - 35 to 44
-2024 Maintainers - 35 to 44 (%)
-2024 Maintainers - 45 to 54
-2024 Maintainers - 45 to 54 (%)
-2024 Maintainers - 55 to 64
-2024 Maintainers - 55 to 64 (%)
-2024 Maintainers - Median Age
-2024 Male Household Population
-2024 Male Household Population (%)
-2024 Pop 15+: Divorced
-2024 Pop 15+: Divorced (%)
-2024 Pop 15+: Living Common Law
-2024 Pop 15+: Living Common Law (%)
-2024 Pop 15+: Married (And Not Separated)
-2024 Pop 15+: Married (And Not Separated) (%)
-2024 Pop 15+: Married or Living Common-Law
-2024 Pop 15+: Married or Living Common-Law (%)
-2024 Pop 15+: Not Married or Common-Law
-2024 Pop 15+: Not Married or Common-Law (%)
-2024 Pop 15+: Separated
-2024 Pop 15+: Separated (%)
-2024 Pop 15+: Single (Never Legally Married)
-2024 Pop 15+: Single (Never Legally Married) (%)
-2024 Pop 15+: Widowed
-2024 Pop 15+: Widowed (%)
-2024 Property Taxes (Shelter)
-2024 Property Taxes (Shelter) (Avg)
-2024 Regular Mortgage Payments (Shelter)
-2024 Regular Mortgage Payments (Shelter) (Avg)
-2024 Structure Type Apartment, Building Five or More Story
-2024 Structure Type Apartment, Building Five or More Story (%)
-2024 Structure Type Apartment, Building Fewer Than Five Story
-2024 Structure Type Apartment, Building Fewer Than Five Story (%)
-2024 Structure Type Movable Dwelling
-2024 Structure Type Movable Dwelling (%)
-2024 Structure Type Other Single-Attached House
-2024 Structure Type Other Single-Attached House (%)
-2024 Structure Type Row House
-2024 Structure Type Row House (%)
-2024 Structure Type Semi-Detached House
-2024 Structure Type Semi-Detached House (%)
-2024 Structure Type Single-Detached House
-2024 Structure Type Single-Detached House (%)
-2024 Service Charges for Banks, Other Financial Institutions
-2024 Service Charges for Banks, Other Financial Institutions (Avg)
-2024 Tenure: Band Housing
-2024 Tenure: Band Housing (%)
-2024 Tenure: Owned
-2024 Tenure: Owned (%)
-2024 Tenure: Rented
-2024 Tenure: Rented (%)
-2024 Tenure: Total Households
-2024 Total Population
-2024 Visible Minority Arab
-2024 Visible Minority Arab (%)
-2024 Visible Minority Black
-2024 Visible Minority Black (%)
-2024 Visible Minority Chinese
-2024 Visible Minority Chinese (%)
-2024 Visible Minority Filipino
-2024 Visible Minority Filipino (%)
-2024 Visible Minority Japanese
-2024 Visible Minority Japanese (%)
-2024 Visible Minority Korean
-2024 Visible Minority Korean (%)
-2024 Visible Minority Latin American
-2024 Visible Minority Latin American (%)
-2024 Visible Minority South Asian
-2024 Visible Minority South Asian (%)
-2024 Visible Minority Southeast Asian
-2024 Visible Minority Southeast Asian (%)
-2024 Visible Minority Total Population
-2024 Visible Minority Total Population (%)
-2024 Visible Minority West Asian
-2024 Visible Minority West Asian (%)
-2024-2025 Current$ Household Average Income % Change
-2024-2025 Total Population % Change
-2025-2026 Current$ Household Average Income % Change
-2025-2026 Total Population % Change
-2026-2027 Current$ Household Average Income % Change
-2026-2027 Total Population % Change
-FREQUENCY
-SUM_FUNDED
-CONVERSION_RATE
-Shape__Area
-Shape__Length
+Population
+Income
+Median_Income
+Age
+Female_Population
+Female_Population_Pct
+Male_Population
+Male_Population_Pct
+Total_Household_Types
+Young_Adult_Maintainers
+Young_Adult_Maintainers_Pct
+Middle_Age_Maintainers
+Middle_Age_Maintainers_Pct
+Mature_Maintainers
+Mature_Maintainers_Pct
+Senior_Maintainers
+Senior_Maintainers_Pct
+Homeownership
+Homeownership_Pct
+Rental_Units
+Rental_Units_Pct
+Band_Housing
+Band_Housing_Pct
+Households
+African_American_Population
+African_American_Population_Pct
+Asian_Population
+Asian_Population_Pct
+Latin_American_Population
+Latin_American_Population_Pct
+Arab_Population
+Arab_Population_Pct
+Filipino_Population
+Filipino_Population_Pct
+South_Asian_Population
+South_Asian_Population_Pct
+Southeast_Asian_Population
+Southeast_Asian_Population_Pct
+Japanese_Population
+Japanese_Population_Pct
+Korean_Population
+Korean_Population_Pct
+West_Asian_Population
+West_Asian_Population_Pct
+Total_Minority_Population
+Total_Minority_Population_Pct
+Labor_Participation_Rate
+Employment_Rate
+Unemployment_Rate
+Condo_Units
+Condo_Ownership_Pct
+Non_Condo_Units
+Non_Condo_Pct
+Total_Condo_Status_Households
+Single_Detached_Houses
+Single_Detached_House_Pct
+Semi_Detached_Houses
+Semi_Detached_House_Pct
+Row_Houses
+Row_House_Pct
+Large_Apartments
+Large_Apartment_Pct
+Small_Apartments
+Small_Apartment_Pct
+Movable_Dwellings
+Movable_Dwelling_Pct
+Other_Single_Attached_Houses
+Other_Attached_House_Pct
+Duplex_Apartments
+Duplex_Apt_Pct
+Old_Housing_Pct
+Housing_1961_1980_Pct
+Housing_1981_1990_Pct
+Housing_1991_2000_Pct
+Housing_2001_2005_Pct
+Housing_2006_2010_Pct
+Housing_2011_2016_Pct
+Housing_2016_2021_Pct
+Old_Housing
+Housing_1961_1980
+Housing_1981_1990
+Housing_1991_2000
+Housing_2001_2005
+Housing_2006_2010
+Housing_2011_2016
+Housing_2016_2021
+Recent_Population_Change
+Recent_Income_Change
+Prior_Year_Population_Change
+Prior_Year_Income_Change
+Two_Year_Prior_Population_Change
+Next_Year_Population_Change_Projection
+Next_Year_Income_Change_Projection
+Two_Year_Population_Change_Projection
+Two_Year_Income_Change_Projection
+Three_Year_Population_Change_Projection
+Three_Year_Income_Change_Projection
+Married_Population
+Married_Population_Pct
+Single_Population
+Single_Population_Pct
+Divorced_Population
+Divorced_Population_Pct
+Separated_Population
+Separated_Population_Pct
+Widowed_Population
+Widowed_Population_Pct
+Common_Law_Population
+Common_Law_Population_Pct
+Combined_Married_Population
+Combined_Married_Population_Pct
+Not_Married_Population
+Not_Married_Population_Pct
+Property_Tax_Total
+Avg_Property_Tax
+Mortgage_Payments_Total
+Avg_Mortgage_Payment
+Condo_Fees_Total
+Avg_Condo_Fees
+Total_Income
+Current_Year_Total_Income
+Discretionary_Income
+Disposable_Income
+Financial_Services_Total
+Avg_Financial_Services
+Bank_Service_Charges_Total
+Avg_Bank_Service_Charges
+Mortgage_Applications
