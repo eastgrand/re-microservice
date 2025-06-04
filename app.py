@@ -476,12 +476,14 @@ def analysis_worker(query):
                 
                 for feature in model_only_features:
                     shap_col = f'shap_{feature}'
-                    if shap_col in precalc_subset.columns:
+                    if shap_col in precalc_df.columns:  # Check against full dataframe, not subset
                         matching_shap_features.append(feature)
                         shap_values_list.append(precalc_subset[shap_col].values)
                 
                 if len(matching_shap_features) == 0:
                     logger.error("No matching SHAP features found")
+                    logger.error(f"Model features: {model_only_features[:5]}...")
+                    logger.error(f"Available SHAP columns: {[col for col in precalc_df.columns if col.startswith('shap_')][:5]}...")
                     return {
                         "success": False,
                         "error": "No matching SHAP features found in pre-calculated data",
