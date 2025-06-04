@@ -17,7 +17,10 @@ services:
     startCommand: >-
       echo "Starting web service..." &&
       export PYTHONPATH=$PYTHONPATH:$(pwd) &&
-      gunicorn --config gunicorn_config.py app:app --bind 0.0.0.0:$PORT
+      echo "Testing app import..." &&
+      python3 -c "from app import app; print('✅ App import successful')" &&
+      echo "Starting gunicorn..." &&
+      gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile -
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
         value: "true"
