@@ -750,6 +750,8 @@ def analysis_worker(query):
                 "detected_analysis_type": query_intent.get('analysis_type', 'correlation')
             }
         
+        # --- Sanitize response for JSON ---
+        response = sanitize_for_json(response)
         return response
     except Exception as e:
         import traceback
@@ -757,7 +759,19 @@ def analysis_worker(query):
         logger.error(f"[ANALYSIS JOB ERROR] Exception: {e}\nTraceback:\n{tb}")
         return {"success": False, "error": str(e), "traceback": tb}
 
-
+def sanitize_for_json(obj):
+    """Recursively replace NaN, Infinity, -Infinity with None for JSON serialization."""
+    import math
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(v) for v in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    else:
+        return obj
 
 # --- ASYNC /analyze ENDPOINT FOR RENDER ---
 @cross_origin(origins="*", methods=['POST', 'OPTIONS'], headers=['Content-Type', 'X-API-KEY'], supports_credentials=True)
