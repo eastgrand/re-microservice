@@ -751,8 +751,7 @@ def analysis_worker(query):
             }
         
         # --- Sanitize response for JSON ---
-        response = sanitize_for_json(response)
-        return response
+        return sanitize_for_json(response)
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
