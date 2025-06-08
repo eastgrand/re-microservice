@@ -435,17 +435,7 @@ def analysis_worker(query):
         logger.info("Loading and filtering data...")
         filtered_data = dataset.copy()
         
-        # Apply minimum applications filter if specified - MOVED TO TOP
-        min_applications = query.get('minApplications', 1)
-        if min_applications > 1:
-            if 'FREQUENCY' in filtered_data.columns:
-                initial_count = len(filtered_data)
-                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
-                logger.info(f"Applied minimum applications filter (>= {min_applications}): {initial_count} -> {len(filtered_data)} rows")
-            else:
-                logger.warning(f"FREQUENCY column not found in dataset - cannot apply minimum applications filter")
-        
-        # Apply filters more efficiently
+        # Apply demographic filters first
         for filter_item in filters:
             if isinstance(filter_item, str):
                 if '>' in filter_item:
@@ -465,6 +455,16 @@ def analysis_worker(query):
                         threshold = filtered_data[feature].quantile(0.75)
                         filtered_data = filtered_data[filtered_data[feature] > threshold]
         
+        # Then apply minimum applications filter
+        min_applications = query.get('minApplications', 1)
+        if min_applications > 1:
+            if 'FREQUENCY' in filtered_data.columns:
+                initial_count = len(filtered_data)
+                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
+                logger.info(f"Applied minimum applications filter (>= {min_applications}): {initial_count} -> {len(filtered_data)} rows")
+            else:
+                logger.warning(f"FREQUENCY column not found in dataset - cannot apply minimum applications filter")
+        
         logger.info(f"Data filtered. Shape: {filtered_data.shape}")
         
         # Check if we have any data left after filtering
@@ -472,12 +472,12 @@ def analysis_worker(query):
             logger.warning("No data remaining after applying filters")
             return {
                 "success": False,
-                "error": f"No data found matching the minimum applications threshold of {min_applications}",
+                "error": f"No data found matching the demographic filters and minimum applications threshold of {min_applications}",
                 "results": [],
-                "summary": f"No areas found with at least {min_applications} mortgage applications."
+                "summary": f"No areas found matching the demographic criteria with at least {min_applications} mortgage applications."
             }
         
-        # Optimize data preparation
+        # Finally sort by target variable
         top_data = filtered_data.sort_values(by=target_field, ascending=False)
         
         # With pre-calculated SHAP values, we can analyze ALL qualifying geographic areas
@@ -745,6 +745,9 @@ def analysis_worker(query):
             "shap_values": shap_values_dict,
             "version_info": version_info
         }
+        
+        # --- Add visualizationData for frontend compatibility ---
+        response['visualizationData'] = [{'features': results}]
         
         # Add query intent information if available
         if query_intent:
