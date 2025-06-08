@@ -484,14 +484,6 @@ def analysis_worker(query):
         # No need to limit for performance - geographic analysis requires spatial completeness
         logger.info(f"Preparing to analyze {len(top_data)} qualifying geographic areas (no artificial limits)")
         
-        # Only apply limits if the dataset is extremely large (>500 areas) to prevent memory issues
-        max_analysis_rows = min(500, len(top_data))  # Allow up to 500 areas
-        if len(top_data) > max_analysis_rows:
-            logger.info(f"Large dataset detected. Limiting analysis to top {max_analysis_rows} areas (from {len(top_data)} total) for memory management")
-            top_data = top_data.head(max_analysis_rows)
-        else:
-            logger.info(f"Analyzing all {len(top_data)} qualifying geographic areas for complete spatial coverage")
-        
         X = top_data.copy()
         
         # Apply field mappings to match model expectations
