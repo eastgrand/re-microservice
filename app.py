@@ -21,6 +21,8 @@ import psutil
 import threading
 import signal
 import xgboost as xgb
+import json
+import math
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
@@ -59,7 +61,7 @@ CORS(app, resources={
     r"/*": {
         "origins": "*",
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "X-API-KEY"],
+        "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
         "supports_credentials": True
     }
 })
@@ -176,7 +178,15 @@ def require_api_key(f):
             return f(*args, **kwargs)
         if not REQUIRE_AUTH:
             return f(*args, **kwargs)
-        api_key = request.headers.get('X-API-KEY')
+        
+        # Check for standard 'Authorization: Bearer <token>' header first
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            api_key = auth_header.split(' ')[1]
+        else:
+            # Fallback to 'X-API-KEY' for backward compatibility
+            api_key = request.headers.get('X-API-KEY')
+
         if not api_key or api_key != API_KEY:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
         return f(*args, **kwargs)
@@ -650,29 +660,16 @@ def analysis_worker(query):
         
         results = []
         for idx, row in top_data.iterrows():
-            result = {}
-            # Use ID field as zip_code if available
-            if 'ID' in row:
-                result['zip_code'] = str(row['ID'])
-            # Add latitude and longitude if available (from Shape fields)
-            if 'Shape__Area' in row and 'Shape__Length' in row:
-                # Create proxy coordinates based on shape data
-                result['latitude'] = float(row['Shape__Area']) / 1000000 + 45.0  # Rough Canadian latitude
-                result['longitude'] = float(row['Shape__Length']) / 1000000 - 75.0  # Rough Canadian longitude
-            # Add the target variable
-            if target_field in row:
-                result[target_field.lower()] = float(row[target_field])
-            # Add other key demographic fields
-            key_fields = [
-                '2024 Total Population', '2024 Household Average Income (Current Year $)',
-                '2024 Visible Minority Total Population (%)', 'FREQUENCY', 'SUM_FUNDED'
-            ]
-            for field in key_fields:
-                if field in row:
-                    try:
-                        result[field.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('$', '')] = float(row[field])
-                    except (ValueError, TypeError):
-                        result[field.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('$', '')] = str(row[field])
+            # Start with all columns from the row
+            result = row.to_dict()
+
+            # The original geometry from the data source is preserved by to_dict().
+            # The incorrect proxy coordinate logic is now removed.
+            
+            # Ensure zip_code is a string if it exists for compatibility
+            if 'ID' in result:
+                result['zip_code'] = str(result['ID'])
+            
             results.append(result)
         
         # Use enhanced results if query-aware analysis is available, otherwise standard
@@ -760,7 +757,6 @@ def analysis_worker(query):
 
 def sanitize_for_json(obj):
     """Recursively replace NaN, Infinity, -Infinity with None for JSON serialization."""
-    import math
     if isinstance(obj, dict):
         return {k: sanitize_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -769,6 +765,12 @@ def sanitize_for_json(obj):
         if math.isnan(obj) or math.isinf(obj):
             return None
         return obj
+    elif isinstance(obj, (np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.float64, np.float32)):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return float(obj)
     else:
         return obj
 
