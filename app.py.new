@@ -1,0 +1,339 @@
+import os
+import sys
+import logging
+import traceback
+import gc
+import pickle
+import platform
+import shutil
+import numpy as np
+import pandas as pd
+import shap
+from flask import Flask, request, jsonify
+from flask_cors import CORS, cross_origin
+from functools import wraps
+from dotenv import load_dotenv
+from data_versioning import DataVersionTracker
+import uuid
+from collections import defaultdict
+import time
+import psutil
+import threading
+import signal
+import xgboost as xgb
+import json
+import math
+from typing import List, Dict, Tuple
+
+# Import field mappings and target variable
+from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
+
+# Import query-aware analysis functions - with graceful fallback
+QUERY_AWARE_AVAILABLE = False  # Initialize as module global
+try:
+    from query_aware_analysis import enhanced_query_aware_analysis, analyze_query_intent
+    QUERY_AWARE_AVAILABLE = True
+    print("✅ Query-aware analysis imports successful")
+except ImportError as e:
+    print(f"⚠️ Query-aware analysis not available: {e}")
+    QUERY_AWARE_AVAILABLE = False
+    # Define placeholder functions
+    def enhanced_query_aware_analysis(*args, **kwargs):
+        return {"error": "Query-aware analysis not available"}
+    def analyze_query_intent(query):
+        return {"error": "Query intent analysis not available"}
+
+print(f"🔧 Module loaded - Query-aware available: {QUERY_AWARE_AVAILABLE}")
+
+# Redis connection patch for better stability
+from redis_connection_patch import apply_all_patches
+from worker_process_fix import apply_all_worker_patches
+# Memory optimization for SHAP analysis
+try:
+    from shap_memory_fix import apply_memory_patches
+except ImportError:
+    print("SHAP memory optimization not available. For better performance, run ./deploy_shap_fix.sh")
+
+# --- FLASK APP SETUP (must come after imports) ---
+app = Flask(__name__)
+
+# Initialize CORS with proper configuration
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-API-KEY"],
+        "supports_credentials": True
+    }
+})
+
+@app.route('/')
+def hello_world():
+    return jsonify({
+        "message": "SHAP Microservice is running", 
+        "status": "healthy",
+        "query_aware_available": QUERY_AWARE_AVAILABLE
+    }), 200
+
+print(f"🚀 Flask app created successfully - Query-aware: {QUERY_AWARE_AVAILABLE}")
+
+# --- /analyze GET handler (added for friendly error) ---
+@app.route('/analyze', methods=['GET'])
+def analyze_get():
+    """GET handler for /analyze to provide a helpful message instead of 404."""
+    return jsonify({
+        "message": "Use POST to /analyze to submit a job for SHAP/XGBoost analysis. This endpoint only accepts POST for analysis jobs.",
+        "usage": {
+            "POST /analyze": "Submit a JSON body with analysis_type, target_variable, and demographic_filters to start an async job.",
+            "GET /job_status/<job_id>": "Poll for job status/results."
+        },
+        "status": 405
+    }), 405
+
+
+# --- REDIS/RQ IMPORTS FOR ASYNC JOBS ---
+import redis
+from rq import Queue, get_current_job
+
+# --- PATHS FOR MODEL, FEATURE NAMES, AND DATASET ---
+MODEL_PATH = "models/xgboost_model.pkl"  # Update if your model file is named differently
+FEATURE_NAMES_PATH = "models/feature_names.txt"  # Update if your feature names file is named differently
+TRAINING_DATASET_PATH = "data/nesto_merge_0.csv"  # Training dataset
+JOINED_DATASET_PATH = "data/joined_data.csv"  # Joined dataset for analysis
+
+# --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
+DEFAULT_ANALYSIS_TYPE = 'correlation'
+
+# Logging setup (must be before any use of logger)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("shap-microservice")
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+numeric_level = getattr(logging, LOG_LEVEL.upper(), None)
+if not isinstance(numeric_level, int):
+    numeric_level = getattr(logging, 'INFO')
+logger.setLevel(numeric_level)
+
+# --- REDIS/RQ SETUP ---
+REDIS_URL = os.getenv('REDIS_URL', 'rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379')
+logger = logging.getLogger("shap-microservice")
+logger.info(f"[DEBUG] Using Redis URL: {REDIS_URL}")
+
+# Initialize Redis connection and queue more gracefully
+redis_conn = None
+queue = None
+
+# First create a Flask application context
+with app.app_context():
+    try:
+        # Apply Redis connection patches for better stability
+        apply_all_worker_patches(app)
+        
+        # Create Redis connection with improved parameters
+        logger.info("Attempting to connect to Redis...")
+        redis_conn = redis.from_url(
+            REDIS_URL,
+            socket_timeout=10,
+            socket_connect_timeout=10,
+            socket_keepalive=True,
+            health_check_interval=30,
+            retry_on_timeout=True,
+            ssl_cert_reqs=None  # Don't verify SSL certificate
+        )
+        
+        # Test the connection with timeout
+        redis_conn.ping()
+        logger.info("Successfully connected to Redis")
+        
+        # Store Redis connection in app config for endpoint access
+        app.config['redis_conn'] = redis_conn
+        
+        # Initialize the job queue with the connection
+        logger.info("Initializing Redis Queue for job processing...")
+        queue = Queue('shap-jobs', connection=redis_conn)
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis connection: {str(e)}")
+        logger.error("App will start without Redis - some features may be unavailable")
+        # Don't raise the exception - let the app start without Redis
+        app.config['redis_conn'] = None
+
+load_dotenv()
+API_KEY = os.getenv('API_KEY')
+REQUIRE_AUTH = True  # Re-enable API key requirement for Render
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Allow OPTIONS requests to pass through without API key check for CORS preflight
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+        if not REQUIRE_AUTH:
+            return f(*args, **kwargs)
+        
+        # Check for standard 'Authorization: Bearer <token>' header first
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            api_key = auth_header.split(' ')[1]
+        else:
+            # Fallback to 'X-API-KEY' for backward compatibility
+            api_key = request.headers.get('X-API-KEY')
+
+        if not api_key or api_key != API_KEY:
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Error handlers
+class APIError(Exception):
+    def __init__(self, message, status_code=400):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
+
+@app.errorhandler(APIError)
+def handle_api_error(error):
+    response = jsonify({"success": False, "error": error.message})
+    response.status_code = error.status_code
+    return response
+
+@app.errorhandler(Exception)
+def handle_generic_exception(error):
+    logger.error(f"Unhandled exception: {str(error)}")
+    logger.error(traceback.format_exc())
+    response = jsonify({"success": False, "error": "An internal server error occurred. Please try again later."})
+    response.status_code = 500
+    return response
+
+def get_redis_connection():
+    """Get Redis connection from app config or create a new one"""
+    if hasattr(app, 'config') and 'redis_conn' in app.config:
+        return app.config['redis_conn']
+    
+    # Try to create a new connection
+    try:
+        import redis
+        import os
+        
+        redis_url = os.environ.get('REDIS_URL')
+        if not redis_url:
+            logger.error("REDIS_URL environment variable not set")
+            return None
+            
+        # Create Redis connection with improved parameters
+        redis_conn = redis.from_url(
+            redis_url,
+            socket_timeout=int(os.environ.get('REDIS_TIMEOUT', '10')),
+            socket_connect_timeout=int(os.environ.get('REDIS_CONNECT_TIMEOUT', '10')),
+            socket_keepalive=os.environ.get('REDIS_SOCKET_KEEPALIVE', 'true').lower() == 'true',
+            health_check_interval=int(os.environ.get('REDIS_HEALTH_CHECK_INTERVAL', '30')),
+            retry_on_timeout=True
+        )
+        
+        # Store in app config for future use
+        if hasattr(app, 'config'):
+            app.config['redis_conn'] = redis_conn
+            
+        return redis_conn
+    except Exception as e:
+        logger.error(f"Error creating Redis connection: {str(e)}")
+        return None
+
+def analysis_worker(query):
+    """Worker function to process analysis requests"""
+    try:
+        # Extract query parameters
+        user_query = query.get('query', '')
+        analysis_type = query.get('analysis_type', 'unknown')
+        target_field = query.get('target_variable', 'FREQUENCY')
+        demographic_filters = query.get('demographic_filters', [])
+        conversation_context = query.get('conversationContext', '')
+        min_applications = query.get('minApplications', 1)
+
+        # Load and filter data
+        dataset_path = 'data/cleaned_data.csv'
+        data = pd.read_csv(dataset_path)
+        filtered_data = data.copy()
+
+        # Special handling for application count queries
+        if target_field.lower() == 'frequency' and ('application' in user_query.lower() or analysis_type == 'topN'):
+            # Sort by FREQUENCY in descending order
+            filtered_data = filtered_data.sort_values('FREQUENCY', ascending=False)
+            
+            # Apply minimum applications filter
+            if min_applications > 1:
+                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
+            
+            # Get top results
+            results = filtered_data.head(10).to_dict('records')
+            
+            # Calculate feature importance specifically for application counts
+            feature_importance = calculate_feature_importance_for_applications(filtered_data)
+            
+            # Generate analysis using query-aware analysis
+            try:
+                from enhanced_analysis_worker import analyze_query_intent
+                enhanced_analysis = analyze_query_intent(
+                    user_query,
+                    target_field,
+                    results,
+                    feature_importance,
+                    conversation_context
+                )
+                
+                return {
+                    'success': True,
+                    'results': results,
+                    'summary': enhanced_analysis['summary'],
+                    'feature_importance': enhanced_analysis['feature_importance']
+                }
+                
+            except Exception as e:
+                logger.warning(f"Query-aware analysis failed for application query: {str(e)}")
+                # Fall back to standard summary
+                summary = generate_analysis_summary(
+                    user_query,
+                    target_field,
+                    results,
+                    feature_importance,
+                    query_type='topN'
+                )
+                
+                return {
+                    'success': True,
+                    'results': results,
+                    'summary': summary,
+                    'feature_importance': feature_importance
+                }
+        
+        # Handle other query types
+        # ... existing code for other analysis types ...
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    logger.info(f"Starting Flask app on port {port}...")
+    try:
+        # Apply SHAP memory optimization fix if available
+        try:
+            apply_memory_patches(app)
+            logger.info("✅ Applied SHAP memory optimization patches")
+        except NameError:
+            logger.warning("⚠️ SHAP memory optimization not available")
+        except Exception as e:
+            logger.error(f"❌ Error applying memory patches: {str(e)}")
+        
+        # Apply Redis connection patches
+        apply_all_patches(app)
+        logger.info("✅ Applied Redis connection patches")
+        
+        # Apply worker process fixes
+        apply_all_worker_patches(app)
+        logger.info("✅ Applied worker process fixes")
+        
+        app.run(host='0.0.0.0', port=port)
+    except Exception as startup_error:
+        logger.error(f"Error starting application: {str(startup_error)}")
+        sys.exit(1) 
