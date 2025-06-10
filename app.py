@@ -1069,97 +1069,106 @@ def analysis_worker(query):
         conversation_context = query.get('conversationContext', '')
         min_applications = query.get('minApplications', 1)
 
-        # Try to load primary dataset first, fall back to cleaned data if needed
+        # Normalize analysis type for backend consistency
+        if analysis_type == 'topN':
+            analysis_type = 'ranking'
+
+        # Load Data
         try:
-            dataset_path = TRAINING_DATASET_PATH
-            data = pd.read_csv(dataset_path)
+            data = pd.read_csv(TRAINING_DATASET_PATH)
             logger.info(f"Successfully loaded primary dataset: {TRAINING_DATASET_PATH}")
-        except Exception as e:
-            logger.warning(f"Failed to load primary dataset: {str(e)}")
-            dataset_path = 'data/cleaned_data.csv'
-            try:
-                data = pd.read_csv(dataset_path)
-                logger.info(f"Successfully loaded fallback dataset: {dataset_path}")
-            except Exception as e:
-                logger.error(f"Failed to load both primary and fallback datasets: {str(e)}")
-                raise APIError("Failed to load required data for analysis")
+        except Exception:
+            data = pd.read_csv('data/cleaned_data.csv')
+            logger.info("Successfully loaded fallback dataset: data/cleaned_data.csv")
 
-        # Ensure required columns exist
-        required_columns = ['FREQUENCY', 'CONVERSION_RATE']
-        if not all(col in data.columns for col in required_columns):
-            missing = [col for col in required_columns if col not in data.columns]
-            raise APIError(f"Required columns missing from dataset: {', '.join(missing)}")
+        # --- General Purpose Filtering Step ---
+        data_to_process = data.copy()
+        joint_high_fields = []
+        if demographic_filters:
+            logger.info(f"Applying {len(demographic_filters)} demographic filters.")
+            for filt in demographic_filters:
+                if not isinstance(filt, dict):
+                    logger.warning(f"Skipping non-dictionary filter: {filt}")
+                    continue
 
-        # --- Simplified Analysis Logic ---
+                field = filt.get('field')
+                op = filt.get('op')
+                value = filt.get('value')
+
+                if analysis_type == 'jointHigh' and field:
+                    joint_high_fields.append(field)
+                elif field and op and value is not None:
+                    if field not in data_to_process.columns:
+                        logger.warning(f"Field '{field}' from filter not in data columns. Skipping.")
+                        continue
+                    try:
+                        if op == '>': data_to_process = data_to_process[data_to_process[field] > value]
+                        elif op == '>=': data_to_process = data_to_process[data_to_process[field] >= value]
+                        elif op == '<': data_to_process = data_to_process[data_to_process[field] < value]
+                        elif op == '<=': data_to_process = data_to_process[data_to_process[field] <= value]
+                        elif op == '==':
+                            # Case-insensitive comparison for strings
+                            if isinstance(data_to_process[field].dtype, object):
+                                data_to_process = data_to_process[data_to_process[field].str.lower() == str(value).lower()]
+                            else:
+                                data_to_process = data_to_process[data_to_process[field] == value]
+                        elif op == '!=':
+                            if isinstance(data_to_process[field].dtype, object):
+                                data_to_process = data_to_process[data_to_process[field].str.lower() != str(value).lower()]
+                            else:
+                                data_to_process = data_to_process[data_to_process[field] != value]
+                        else:
+                            logger.warning(f"Unsupported operator '{op}' in filter. Skipping.")
+                    except Exception as e:
+                        logger.error(f"Could not apply filter {filt}: {e}")
+
+        # --- Analysis Logic ---
         results = []
         feature_importance = []
         analysis_summary = ""
-        confidence = 0.85  # Default confidence
+        confidence = 0.85
 
         if analysis_type == 'correlation':
-            if QUERY_AWARE_AVAILABLE:
-                logger.info("Performing query-aware SHAP analysis for correlation...")
-                shap_results = enhanced_query_aware_analysis(
-                    query=user_query, data=data, model=model, feature_names=feature_names,
-                    target_variable=target_field, analysis_type=analysis_type
-                )
-                feature_importance = shap_results.get("feature_importance", [])
-                analysis_summary = shap_results.get("summary", "Correlation analysis complete.")
-                results = shap_results.get("results", [])
-                confidence = shap_results.get("confidence", 0.85)
-            else:
-                raise APIError("Correlation analysis requires the query-aware module, which is not available.")
-
+            results = data_to_process.to_dict(orient='records')
+            analysis_summary = "Correlation analysis complete."
         elif analysis_type == 'ranking':
-            filtered_data = data.sort_values(target_field, ascending=False).head(10)
+            filtered_data = data_to_process.sort_values(target_field, ascending=False).head(10)
             results = filtered_data.to_dict(orient='records')
             feature_importance = calculate_feature_importance_for_applications(filtered_data)
             analysis_summary = f"Top 10 areas ranked by {target_field}."
-
         elif analysis_type == 'distribution':
-            results = data.to_dict(orient='records')
-            feature_importance = calculate_feature_importance_for_applications(data)
+            results = data_to_process.to_dict(orient='records')
+            feature_importance = calculate_feature_importance_for_applications(data_to_process)
             analysis_summary = f"Distribution analysis for {target_field}."
-
         elif analysis_type == 'jointHigh':
-            if len(demographic_filters) >= 2:
-                # Extract field names from the filter objects
-                field1 = demographic_filters[0].get('field') if isinstance(demographic_filters[0], dict) else demographic_filters[0]
-                field2 = demographic_filters[1].get('field') if isinstance(demographic_filters[1], dict) else demographic_filters[1]
-
-                if not field1 or not field2:
-                    raise APIError("Invalid demographic_filters structure for jointHigh analysis. Expected objects with a 'field' key.")
-
-                if field1 in data.columns and field2 in data.columns:
-                    q1 = data[field1].quantile(0.75)
-                    q2 = data[field2].quantile(0.75)
-                    filtered_data = data[(data[field1] >= q1) & (data[field2] >= q2)]
+            if len(joint_high_fields) >= 2:
+                field1, field2 = joint_high_fields[0], joint_high_fields[1]
+                if field1 in data_to_process.columns and field2 in data_to_process.columns:
+                    q1 = data_to_process[field1].quantile(0.75)
+                    q2 = data_to_process[field2].quantile(0.75)
+                    filtered_data = data_to_process[(data_to_process[field1] >= q1) & (data_to_process[field2] >= q2)]
                     results = filtered_data.to_dict(orient='records')
                     feature_importance = calculate_feature_importance_for_applications(filtered_data)
                     analysis_summary = f"Showing areas with high values for both {field1} and {field2}."
                 else:
-                    raise APIError(f"One or both fields for jointHigh analysis not found in dataset: {field1}, {field2}")
+                    raise APIError(f"One or both fields for jointHigh not found: {field1}, {field2}")
             else:
-                analysis_summary = "Joint-high analysis requires at least two demographic filters. Please refine your query."
+                analysis_summary = "Joint-high analysis requires at least two fields. Please refine your query."
                 results = []
         else:
             raise APIError(f"Unsupported analysis type: {analysis_type}")
 
-        # --- Final Response Structure ---
-        response_data = {
+        return {
             'success': True,
             'results': sanitize_for_json(results),
             'summary': analysis_summary,
             'feature_importance': sanitize_for_json(feature_importance),
             'confidence': confidence,
-            'visualizationData': [] # Placeholder for future enhancement
+            'visualizationData': []
         }
-        return response_data
-
     except Exception as e:
         logger.error(f"Error in analysis worker: {str(e)}")
         logger.error(traceback.format_exc())
-        # Re-raise as an APIError to be handled by the Flask error handler
         raise APIError(f"Analysis failed: {str(e)}")
 
 if __name__ == '__main__':
