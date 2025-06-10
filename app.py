@@ -1123,7 +1123,13 @@ def analysis_worker(query):
 
         elif analysis_type == 'jointHigh':
             if len(demographic_filters) >= 2:
-                field1, field2 = demographic_filters[0], demographic_filters[1]
+                # Extract field names from the filter objects
+                field1 = demographic_filters[0].get('field') if isinstance(demographic_filters[0], dict) else demographic_filters[0]
+                field2 = demographic_filters[1].get('field') if isinstance(demographic_filters[1], dict) else demographic_filters[1]
+
+                if not field1 or not field2:
+                    raise APIError("Invalid demographic_filters structure for jointHigh analysis. Expected objects with a 'field' key.")
+
                 if field1 in data.columns and field2 in data.columns:
                     q1 = data[field1].quantile(0.75)
                     q2 = data[field2].quantile(0.75)
@@ -1132,11 +1138,10 @@ def analysis_worker(query):
                     feature_importance = calculate_feature_importance_for_applications(filtered_data)
                     analysis_summary = f"Showing areas with high values for both {field1} and {field2}."
                 else:
-                    raise APIError(f"One or both fields for jointHigh analysis not found: {field1}, {field2}")
+                    raise APIError(f"One or both fields for jointHigh analysis not found in dataset: {field1}, {field2}")
             else:
-                # Fallback as per reference doc
                 analysis_summary = "Joint-high analysis requires at least two demographic filters. Please refine your query."
-                results = [] # Return no results if query is invalid
+                results = []
         else:
             raise APIError(f"Unsupported analysis type: {analysis_type}")
 
