@@ -1069,10 +1069,28 @@ def analysis_worker(query):
         conversation_context = query.get('conversationContext', '')
         min_applications = query.get('minApplications', 1)
 
-        # Load and filter data
-        dataset_path = 'data/cleaned_data.csv'
-        data = pd.read_csv(dataset_path)
+        # Try to load primary dataset first, fall back to cleaned data if needed
+        try:
+            dataset_path = TRAINING_DATASET_PATH  # Try primary dataset first
+            data = pd.read_csv(dataset_path)
+            logger.info(f"Successfully loaded primary dataset: {TRAINING_DATASET_PATH}")
+        except Exception as e:
+            logger.warning(f"Failed to load primary dataset: {str(e)}")
+            dataset_path = 'data/cleaned_data.csv'  # Fall back to cleaned data
+            try:
+                data = pd.read_csv(dataset_path)
+                logger.info(f"Successfully loaded fallback dataset: {dataset_path}")
+            except Exception as e:
+                logger.error(f"Failed to load both primary and fallback datasets: {str(e)}")
+                raise APIError("Failed to load required data for analysis")
+
         filtered_data = data.copy()
+
+        # Ensure required columns exist
+        required_columns = ['FREQUENCY', 'CONVERSION_RATE']
+        missing_columns = [col for col in required_columns if col not in filtered_data.columns]
+        if missing_columns:
+            raise APIError(f"Required columns missing from dataset: {', '.join(missing_columns)}")
 
         # Special handling for application count queries
         if target_field.lower() == 'frequency' and ('application' in user_query.lower() or analysis_type == 'topN'):
