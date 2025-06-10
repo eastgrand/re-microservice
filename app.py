@@ -1071,12 +1071,12 @@ def analysis_worker(query):
 
         # Try to load primary dataset first, fall back to cleaned data if needed
         try:
-            dataset_path = TRAINING_DATASET_PATH  # Try primary dataset first
+            dataset_path = TRAINING_DATASET_PATH
             data = pd.read_csv(dataset_path)
             logger.info(f"Successfully loaded primary dataset: {TRAINING_DATASET_PATH}")
         except Exception as e:
             logger.warning(f"Failed to load primary dataset: {str(e)}")
-            dataset_path = 'data/cleaned_data.csv'  # Fall back to cleaned data
+            dataset_path = 'data/cleaned_data.csv'
             try:
                 data = pd.read_csv(dataset_path)
                 logger.info(f"Successfully loaded fallback dataset: {dataset_path}")
@@ -1084,139 +1084,77 @@ def analysis_worker(query):
                 logger.error(f"Failed to load both primary and fallback datasets: {str(e)}")
                 raise APIError("Failed to load required data for analysis")
 
-        filtered_data = data.copy()
-
         # Ensure required columns exist
         required_columns = ['FREQUENCY', 'CONVERSION_RATE']
-        missing_columns = [col for col in required_columns if col not in filtered_data.columns]
-        if missing_columns:
-            raise APIError(f"Required columns missing from dataset: {', '.join(missing_columns)}")
+        if not all(col in data.columns for col in required_columns):
+            missing = [col for col in required_columns if col not in data.columns]
+            raise APIError(f"Required columns missing from dataset: {', '.join(missing)}")
 
-        # Special handling for application count queries
-        if target_field.lower() == 'frequency' and ('application' in user_query.lower() or analysis_type == 'topN'):
-            # Sort by FREQUENCY in descending order
-            filtered_data = filtered_data.sort_values('FREQUENCY', ascending=False)
-            
-            # Apply minimum applications filter
-            if min_applications > 1:
-                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
-            
-            # Get top results
-            results = filtered_data.head(10).to_dict('records')
-            
-            # Calculate feature importance specifically for application counts
+        # --- Simplified Analysis Logic ---
+        results = []
+        feature_importance = []
+        analysis_summary = ""
+        confidence = 0.85  # Default confidence
+
+        if analysis_type == 'correlation':
+            if QUERY_AWARE_AVAILABLE:
+                logger.info("Performing query-aware SHAP analysis for correlation...")
+                shap_results = enhanced_query_aware_analysis(
+                    query=user_query, data=data, model=model, feature_names=feature_names,
+                    target_variable=target_field, analysis_type=analysis_type
+                )
+                feature_importance = shap_results.get("feature_importance", [])
+                analysis_summary = shap_results.get("summary", "Correlation analysis complete.")
+                results = shap_results.get("results", [])
+                confidence = shap_results.get("confidence", 0.85)
+            else:
+                raise APIError("Correlation analysis requires the query-aware module, which is not available.")
+
+        elif analysis_type == 'ranking':
+            filtered_data = data.sort_values(target_field, ascending=False).head(10)
+            results = filtered_data.to_dict(orient='records')
             feature_importance = calculate_feature_importance_for_applications(filtered_data)
-            
-            # Generate analysis using query-aware analysis
-            try:
-                from enhanced_analysis_worker import analyze_query_intent
-                enhanced_analysis = analyze_query_intent(
-                    user_query,
-                    target_field,
-                    results,
-                    feature_importance,
-                    conversation_context
-                )
-                
-                return {
-                    'success': True,
-                    'results': results,
-                    'summary': enhanced_analysis['summary'],
-                    'feature_importance': enhanced_analysis['feature_importance']
-                }
-                
-            except Exception as e:
-                logger.warning(f"Query-aware analysis failed for application query: {str(e)}")
-                # Fall back to standard summary
-                summary = generate_analysis_summary(
-                    user_query,
-                    target_field,
-                    results,
-                    feature_importance,
-                    query_type='topN'
-                )
-                
-                return {
-                    'success': True,
-                    'results': results,
-                    'summary': summary,
-                    'feature_importance': feature_importance
-                }
-        
-        # Handle other analysis types
-        if analysis_type in ['correlation', 'distribution', 'ranking']:
-            # Ensure model is loaded
-            ensure_model_loaded()
-            
-            # Create memory-optimized explainer
-            explainer = create_memory_optimized_explainer(model, filtered_data)
-            
-            # Calculate SHAP values
-            shap_values = explainer.shap_values(filtered_data)
-            
-            # Calculate feature importance
-            feature_importance = []
-            for i, col in enumerate(filtered_data.columns):
-                if col != target_field:
-                    importance = np.abs(shap_values[:, i]).mean()
-                    feature_importance.append({
-                        'feature': col,
-                        'importance': float(importance)
-                    })
-            
-            # Sort by importance
-            feature_importance.sort(key=lambda x: x['importance'], reverse=True)
-            
-            # Get results based on analysis type
-            if analysis_type == 'correlation':
-                results = filtered_data.sort_values(target_field, ascending=False).head(10).to_dict('records')
-            elif analysis_type == 'distribution':
-                results = filtered_data.describe().to_dict()
-            else:  # ranking
-                results = filtered_data.nlargest(10, target_field).to_dict('records')
-            
-            # Generate analysis using query-aware analysis if available
-            try:
-                from enhanced_analysis_worker import analyze_query_intent
-                enhanced_analysis = analyze_query_intent(
-                    user_query,
-                    target_field,
-                    results,
-                    feature_importance,
-                    conversation_context
-                )
-                
-                return {
-                    'success': True,
-                    'results': results,
-                    'summary': enhanced_analysis['summary'],
-                    'feature_importance': feature_importance
-                }
-                
-            except Exception as e:
-                logger.warning(f"Query-aware analysis failed: {str(e)}")
-                # Fall back to standard summary
-                summary = generate_analysis_summary(
-                    user_query,
-                    target_field,
-                    results,
-                    feature_importance,
-                    query_type=analysis_type
-                )
-                
-                return {
-                    'success': True,
-                    'results': results,
-                    'summary': summary,
-                    'feature_importance': feature_importance
-                }
-        
-        # Unknown analysis type
-        raise APIError(f"Unsupported analysis type: {analysis_type}")
-        
+            analysis_summary = f"Top 10 areas ranked by {target_field}."
+
+        elif analysis_type == 'distribution':
+            results = data.to_dict(orient='records')
+            feature_importance = calculate_feature_importance_for_applications(data)
+            analysis_summary = f"Distribution analysis for {target_field}."
+
+        elif analysis_type == 'jointHigh':
+            if len(demographic_filters) >= 2:
+                field1, field2 = demographic_filters[0], demographic_filters[1]
+                if field1 in data.columns and field2 in data.columns:
+                    q1 = data[field1].quantile(0.75)
+                    q2 = data[field2].quantile(0.75)
+                    filtered_data = data[(data[field1] >= q1) & (data[field2] >= q2)]
+                    results = filtered_data.to_dict(orient='records')
+                    feature_importance = calculate_feature_importance_for_applications(filtered_data)
+                    analysis_summary = f"Showing areas with high values for both {field1} and {field2}."
+                else:
+                    raise APIError(f"One or both fields for jointHigh analysis not found: {field1}, {field2}")
+            else:
+                # Fallback as per reference doc
+                analysis_summary = "Joint-high analysis requires at least two demographic filters. Please refine your query."
+                results = [] # Return no results if query is invalid
+        else:
+            raise APIError(f"Unsupported analysis type: {analysis_type}")
+
+        # --- Final Response Structure ---
+        response_data = {
+            'success': True,
+            'results': sanitize_for_json(results),
+            'summary': analysis_summary,
+            'feature_importance': sanitize_for_json(feature_importance),
+            'confidence': confidence,
+            'visualizationData': [] # Placeholder for future enhancement
+        }
+        return response_data
+
     except Exception as e:
         logger.error(f"Error in analysis worker: {str(e)}")
         logger.error(traceback.format_exc())
+        # Re-raise as an APIError to be handled by the Flask error handler
         raise APIError(f"Analysis failed: {str(e)}")
 
 if __name__ == '__main__':
