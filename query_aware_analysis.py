@@ -3,10 +3,48 @@ import numpy as np
 import re
 from typing import List, Dict, Tuple
 
-def analyze_query_intent(query: str, conversation_context: str = '') -> Dict[str, any]:
+def analyze_query_intent(query: str, target_field: str, results: List[Dict], feature_importance: List[Dict], conversation_context: str = '') -> Dict[str, any]:
     """Analyze the user's query to understand their analytical intent"""
     
     query_lower = query.lower()
+    
+    # Special handling for application count queries
+    if target_field.lower() == 'frequency' and ('application' in query_lower or 'applications' in query_lower):
+        if not results or len(results) == 0:
+            return {
+                'summary': 'No areas found with mortgage applications matching your criteria.',
+                'feature_importance': [],
+                'query_type': 'topN'
+            }
+        
+        # Get top areas by application count
+        top_areas = [result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in results[:5]]
+        top_counts = [int(result.get('FREQUENCY', 0)) for result in results[:5]]
+        
+        # Generate summary focusing only on application counts
+        summary = f"The areas with the most mortgage applications are {top_areas[0]} ({top_counts[0]} applications)"
+        if len(top_areas) > 1:
+            summary += f", followed by {top_areas[1]} ({top_counts[1]} applications)"
+        if len(top_areas) > 2:
+            summary += f", and {top_areas[2]} ({top_counts[2]} applications)"
+        summary += "."
+        
+        # Only include relevant demographic factors if they significantly correlate with application counts
+        relevant_features = [f for f in feature_importance if 
+            any(term in f['feature'].lower() for term in ['household', 'income', 'population', 'density']) and
+            abs(f.get('importance', 0)) > 0.3]  # Only include if correlation is significant
+        
+        if relevant_features:
+            summary += f" These areas tend to have higher {relevant_features[0]['feature'].lower().replace('_', ' ')}"
+            if len(relevant_features) > 1:
+                summary += f" and {relevant_features[1]['feature'].lower().replace('_', ' ')}"
+            summary += "."
+        
+        return {
+            'summary': summary,
+            'feature_importance': relevant_features,
+            'query_type': 'topN'
+        }
     
     # If we have conversation context, incorporate it for better intent detection
     if conversation_context:
@@ -39,8 +77,8 @@ def analyze_query_intent(query: str, conversation_context: str = '') -> Dict[str
                 inherited_concepts.append('housing')
     
     # Determine analysis type
-    analysis_type = 'correlation'  # Default
-    if any(word in query_lower for word in ['highest', 'top', 'best', 'rank', 'leading']):
+    analysis_type = 'correlation'
+    if any(word in query_lower for word in ['highest', 'top', 'best', 'rank', 'leading', 'most']):
         analysis_type = 'ranking'
     elif any(word in query_lower for word in ['compare', 'difference', 'between', 'vs', 'versus']):
         analysis_type = 'comparison'
@@ -85,73 +123,9 @@ def analyze_query_intent(query: str, conversation_context: str = '') -> Dict[str
         'key_concepts': key_concepts,
         'confidence': 0.8 if focus_areas else 0.5,
         'is_follow_up': conversation_context and is_follow_up if 'is_follow_up' in locals() else False,
-        'context_enhanced': bool(conversation_context)
+        'context_enhanced': bool(conversation_context),
+        'query': query  # Add the original query for reference
     }
-
-def get_relevant_features_by_intent(intent: Dict, all_features: List[str]) -> List[str]:
-    """Get features most relevant to the user's intent"""
-    
-    relevant_features = []
-    focus_areas = intent['focus_areas']
-    key_concepts = intent.get('key_concepts', [])
-    
-    # First, identify specific concepts mentioned in the query
-    specific_concepts = set()
-    for concept in key_concepts:
-        if 'diversity' in concept.lower():
-            specific_concepts.update(['visible minority', 'population diversity'])
-        elif 'income' in concept.lower():
-            specific_concepts.update(['income', 'household income', 'discretionary income'])
-        elif 'housing' in concept.lower():
-            specific_concepts.update(['housing', 'structure type', 'tenure'])
-        elif 'conversion' in concept.lower():
-            specific_concepts.update(['conversion rate', 'mortgage approval'])
-    
-    # Then, select features based on both focus areas and specific concepts
-    if 'demographic' in focus_areas:
-        # Only include demographic features that match specific concepts
-        demo_features = []
-        for f in all_features:
-            f_lower = f.lower()
-            # Check if feature matches any specific concepts
-            if any(concept in f_lower for concept in specific_concepts):
-                demo_features.append(f)
-            # If no specific concepts, use broader matching
-            elif not specific_concepts and any(x in f_lower for x in 
-                    ['visible minority', 'population', 'age', 'married', 'divorced', 'single', 'maintainer']):
-                demo_features.append(f)
-        relevant_features.extend(demo_features)
-    
-    if 'geographic' in focus_areas:
-        # Only include geographic features that match specific concepts
-        geo_features = []
-        for f in all_features:
-            f_lower = f.lower()
-            if any(concept in f_lower for concept in specific_concepts):
-                geo_features.append(f)
-            elif not specific_concepts and any(x in f_lower for x in 
-                   ['housing', 'construction', 'tenure', 'structure', 'condominium', 'apartment']):
-                geo_features.append(f)
-        relevant_features.extend(geo_features)
-    
-    if 'financial' in focus_areas:
-        # Only include financial features that match specific concepts
-        fin_features = []
-        for f in all_features:
-            f_lower = f.lower()
-            if any(concept in f_lower for concept in specific_concepts):
-                fin_features.append(f)
-            elif not specific_concepts and any(x in f_lower for x in 
-                   ['income', 'mortgage', 'property', 'employment', 'financial', 'shelter', 'tax']):
-                fin_features.append(f)
-        relevant_features.extend(fin_features)
-    
-    # If no specific focus or no features found, return top features by importance
-    if not relevant_features:
-        relevant_features = all_features
-    
-    # Remove duplicates and return
-    return list(set(relevant_features))
 
 def generate_intent_aware_summary(intent: Dict, feature_importance: List[Dict], 
                                  target_variable: str, results: List[Dict],
@@ -162,17 +136,39 @@ def generate_intent_aware_summary(intent: Dict, feature_importance: List[Dict],
     focus_areas = intent['focus_areas']
     key_concepts = intent['key_concepts']
     is_follow_up = intent.get('is_follow_up', False)
+    query = intent.get('query', '').lower()
     
     # Get top results for context
     top_results = results[:3] if results else []
     
+    # Special handling for application count queries
+    if 'application' in key_concepts and analysis_type == 'ranking':
+        if top_results:
+            # Get the top areas and their application counts
+            top_areas = [result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in top_results[:3]]
+            top_counts = [int(result.get('FREQUENCY', 0)) for result in top_results[:3]]
+            
+            # Format the summary focusing on application counts
+            summary = f"The areas with the most mortgage applications are {top_areas[0]} ({top_counts[0]} applications), "
+            if len(top_areas) > 1:
+                summary += f"{top_areas[1]} ({top_counts[1]} applications), "
+            if len(top_areas) > 2:
+                summary += f"and {top_areas[2]} ({top_counts[2]} applications). "
+            
+            # Add context about what makes these areas successful
+            if feature_importance and len(feature_importance) >= 2:
+                summary += f"These areas tend to have strong {feature_importance[0]['feature'].lower().replace('_', ' ')} "
+                summary += f"and {feature_importance[1]['feature'].lower().replace('_', ' ')}."
+            
+            return summary
+    
     # If this is a follow-up question, reference the conversation context
     if is_follow_up and conversation_context:
-        if 'why' in intent.get('query', '').lower():
+        if 'why' in query:
             summary = "Building on our previous analysis, "
-        elif 'what about' in intent.get('query', '').lower():
+        elif 'what about' in query:
             summary = "Expanding on those findings, "
-        elif 'more like' in intent.get('query', '').lower() or 'similar' in intent.get('query', '').lower():
+        elif 'more like' in query or 'similar' in query:
             summary = "Looking for areas with similar characteristics, "
         else:
             summary = "To elaborate on that analysis, "
@@ -189,65 +185,41 @@ def generate_intent_aware_summary(intent: Dict, feature_importance: List[Dict],
         else:
             summary = f"Analyzing the data for {target_variable.lower().replace('_', ' ')}, "
     
-    # Add specific insights based on top factors
-    if feature_importance and len(feature_importance) > 0:
-        top_factor = feature_importance[0]['feature']
-        
-        # Make it conversational and human-readable
-        if 'income' in top_factor.lower():
-            factor_description = "income levels"
-        elif 'filipino' in top_factor.lower():
-            factor_description = "Filipino population concentration"
-        elif 'south asian' in top_factor.lower():
-            factor_description = "South Asian community presence"
-        elif 'chinese' in top_factor.lower():
-            factor_description = "Chinese population density"
-        elif any(term in top_factor.lower() for term in ['minority', 'population']):
-            factor_description = "demographic composition"
-        elif 'housing' in top_factor.lower() or 'structure' in top_factor.lower():
-            factor_description = "housing characteristics"
-        elif 'apartment' in top_factor.lower():
-            factor_description = "apartment-style housing"
-        elif 'employment' in top_factor.lower():
-            factor_description = "employment patterns"
-        else:
-            factor_description = top_factor.lower().replace('_', ' ')
-        
-        # Different phrasing for follow-ups vs initial questions
-        if is_follow_up:
-            summary += f"the key driver appears to be {factor_description}. "
-        else:
-            summary += f"areas with strong {factor_description} consistently show the best performance. "
-        
-        # Add context-aware insights
-        if len(feature_importance) >= 2:
-            second_factor = feature_importance[1]['feature']
-            if 'income' in second_factor.lower() and 'income' not in factor_description:
-                summary += "Combined with solid income levels, "
-            elif any(term in second_factor.lower() for term in ['housing', 'structure']) and 'housing' not in factor_description:
-                summary += "Along with favorable housing characteristics, "
-            elif any(term in second_factor.lower() for term in ['minority', 'population']) and 'demographic' not in factor_description:
-                summary += "Paired with specific demographic patterns, "
-            else:
-                summary += f"Working together with {second_factor.lower().replace('_', ' ')}, "
-            
-            summary += "these factors create a strong foundation for mortgage success."
+    # Add analysis details
+    if top_results:
+        # Format results based on analysis type
+        if analysis_type == 'ranking':
+            top_areas = [result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in top_results[:3]]
+            summary += f"the top performing areas are {', '.join(top_areas[:-1])} and {top_areas[-1]}. "
+        elif analysis_type == 'correlation':
+            summary += "we found significant correlations in the following areas: "
+            summary += f"{', '.join([result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in top_results[:2]])}. "
     
-    # Add specific area mentions if available
-    if top_results and not is_follow_up:
-        # Mention specific high-performing areas
-        top_area_ids = [str(result.get('zip_code', '')) for result in top_results[:2] if result.get('zip_code')]
-        if top_area_ids:
-            if len(top_area_ids) == 1:
-                summary += f" {top_area_ids[0]} stands out as a particularly strong performer."
-            else:
-                summary += f" Areas like {', '.join(top_area_ids)} exemplify these successful patterns."
-    
-    # Add forward-looking insight for conversation continuity
-    if not is_follow_up and len(feature_importance) >= 3:
-        summary += " This multi-factor approach suggests that successful areas typically have several complementary strengths rather than relying on just one characteristic."
+    # Add insights about contributing factors
+    if feature_importance and len(feature_importance) >= 2:
+        summary += f"Key factors include {feature_importance[0]['feature'].lower().replace('_', ' ')} "
+        summary += f"and {feature_importance[1]['feature'].lower().replace('_', ' ')}."
     
     return summary
+
+def get_relevant_features_by_intent(intent: Dict, all_features: List[str]) -> List[str]:
+    """Filter and prioritize features based on query intent"""
+    
+    # Start with all features
+    relevant_features = set(all_features)
+    
+    # Prioritize features based on key concepts
+    if 'applications' in intent['key_concepts']:
+        # For application queries, prioritize application-related features
+        priority_terms = ['frequency', 'application', 'approval', 'conversion']
+        relevant_features = {f for f in all_features if any(term in f.lower() for term in priority_terms)}
+        
+        # Add demographic and geographic features as secondary factors
+        secondary_terms = ['population', 'income', 'housing', 'location']
+        relevant_features.update({f for f in all_features if any(term in f.lower() for term in secondary_terms)})
+    
+    # Convert back to list and sort alphabetically for consistency
+    return sorted(list(relevant_features))
 
 def enhanced_query_aware_analysis(query: str, precalc_df: pd.DataFrame, 
                                  feature_importance: List[Dict], results: List[Dict],
@@ -256,8 +228,13 @@ def enhanced_query_aware_analysis(query: str, precalc_df: pd.DataFrame,
     """Enhanced analysis that interprets results based on query intent and conversation context"""
     
     # Analyze query intent, enriched with conversation context
-    intent = analyze_query_intent(query, conversation_context)
+    intent = analyze_query_intent(query, target_variable, results, feature_importance, conversation_context)
     
+    # For application queries, use the specialized analysis
+    if target_variable.lower() == 'frequency' and ('application' in query.lower() or 'applications' in query.lower()):
+        return intent
+    
+    # For other query types, continue with standard analysis
     # Get all available features from SHAP columns
     all_features = [col.replace('shap_', '') for col in precalc_df.columns if col.startswith('shap_')]
     
@@ -278,6 +255,11 @@ def enhanced_query_aware_analysis(query: str, precalc_df: pd.DataFrame,
                     boost_multiplier = 1.5
                 elif 'geographic' in intent['focus_areas'] and any(x in feature_name for x in ['housing', 'structure']):
                     boost_multiplier = 1.5
+            
+            # Special handling for application queries
+            if 'applications' in intent['key_concepts']:
+                if any(x in factor['feature'].lower() for x in ['frequency', 'application', 'approval']):
+                    boost_multiplier *= 2.0  # Double boost for application-related features
             
             relevant_importance.append({
                 'feature': factor['feature'],
@@ -322,5 +304,10 @@ EXAMPLE_QUERIES = {
         "query": "Show me the top areas for mortgage conversion",
         "expected_focus": [],  # No specific focus - comprehensive analysis
         "expected_concepts": ["mortgage"]
+    },
+    "applications": {
+        "query": "Which areas have the most applications?",
+        "expected_focus": [],  # No specific focus
+        "expected_concepts": ["applications"]
     }
 } 

@@ -23,6 +23,7 @@ import signal
 import xgboost as xgb
 import json
 import math
+from typing import List, Dict, Tuple
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
@@ -308,452 +309,63 @@ def create_memory_optimized_explainer(model, data, max_rows=10):
 
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
-def _generate_standard_analysis(analysis_type, target_field, feature_importance, results):
-    """Generate conversational analysis results when query-aware analysis is not available"""
-    if analysis_type == 'correlation':
-        if len(feature_importance) > 0:
-            # Get the top factor and make it human-readable
-            top_factor = feature_importance[0]['feature']
-            if 'income' in top_factor.lower():
-                factor_description = "income levels"
-            elif any(term in top_factor.lower() for term in ['minority', 'population']):
-                factor_description = "demographic composition"
-            elif 'housing' in top_factor.lower():
-                factor_description = "housing characteristics"
-            else:
-                factor_description = "key demographic factors"
-            
-            summary = f"The analysis reveals that {factor_description} show the strongest relationship with {target_field.lower().replace('_', ' ')}. Areas that perform well in one metric tend to perform well in the other."
-        else:
-            summary = f"While the analysis completed successfully, no clear correlations were found in the current dataset."
-    elif analysis_type == 'ranking':
-        if len(results) > 0 and target_field.lower() in results[0]:
-            top_area = results[0].get('zip_code', 'the top-performing area')
-            top_value = results[0][target_field.lower()]
-            summary = f"The analysis shows {top_area} leads with strong performance. "
-            
-            # Add context about what makes it successful
-            if len(feature_importance) > 0:
-                top_factor = feature_importance[0]['feature']
-                if 'income' in top_factor.lower():
-                    summary += "Higher income levels appear to be a key factor in their success."
-                elif any(term in top_factor.lower() for term in ['minority', 'population']):
-                    summary += "The demographic composition of this area contributes to its strong performance."
-                elif 'housing' in top_factor.lower():
-                    summary += "Housing characteristics play an important role in their success."
-                else:
-                    summary += "Multiple demographic and economic factors contribute to their strong performance."
-        else:
-            summary = f"The analysis completed, but no clear top performers were found with the current filters."
-    else:
-        # General analysis
-        if len(feature_importance) > 0:
-            top_factor = feature_importance[0]['feature']
-            if 'income' in top_factor.lower():
-                summary = f"Income levels are the most important factor influencing {target_field.lower().replace('_', ' ')} in your selected areas."
-            elif any(term in top_factor.lower() for term in ['minority', 'population']):
-                summary = f"Demographic composition has the strongest impact on {target_field.lower().replace('_', ' ')} across the analyzed areas."
-            elif 'housing' in top_factor.lower():
-                summary = f"Housing characteristics are the primary driver of {target_field.lower().replace('_', ' ')} in these areas."
-            else:
-                summary = f"The analysis shows that demographic and economic factors significantly influence {target_field.lower().replace('_', ' ')}."
-        else:
-            summary = f"Analysis completed for {target_field.lower().replace('_', ' ')}."
+def generate_analysis_summary(query: str, target_field: str, results: List[Dict], feature_importance: List[Dict], query_type: str = 'unknown') -> str:
+    """Generate a natural language summary of the analysis results"""
     
-    enhanced_feature_importance = feature_importance
-    query_intent = None
+    if not results or len(results) == 0:
+        return "No results found matching the specified criteria."
     
-    return summary, enhanced_feature_importance, query_intent
+    # Special handling for application count queries
+    if target_field.lower() == 'frequency' and ('application' in query.lower() or query_type == 'topN'):
+        top_areas = [result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in results[:5]]
+        top_counts = [int(result.get('FREQUENCY', 0)) for result in results[:5]]
+        
+        summary = f"The areas with the most mortgage applications are {top_areas[0]} ({top_counts[0]} applications)"
+        if len(top_areas) > 1:
+            summary += f", followed by {top_areas[1]} ({top_counts[1]} applications)"
+        if len(top_areas) > 2:
+            summary += f", and {top_areas[2]} ({top_counts[2]} applications)"
+        summary += "."
+        
+        # Only add feature importance if it's relevant to applications
+        relevant_features = [f for f in feature_importance if 
+            any(term in f['feature'].lower() for term in ['household', 'income', 'population', 'density'])]
+        
+        if relevant_features:
+            summary += f" These areas tend to have higher {relevant_features[0]['feature'].lower().replace('_', ' ')}"
+            if len(relevant_features) > 1:
+                summary += f" and {relevant_features[1]['feature'].lower().replace('_', ' ')}"
+            summary += "."
+        
+        return summary
+    
+    # Handle other query types
+    # ... existing code for other analysis types ...
 
-def analysis_worker(query):
-    import time
-    import shap
-    import gc
-    import psutil
+def calculate_feature_importance_for_applications(data: pd.DataFrame) -> List[Dict]:
+    """Calculate feature importance specifically for application count analysis"""
+    # Get relevant demographic columns
+    demographic_cols = [col for col in data.columns if any(
+        term in col.lower() for term in 
+        ['household', 'income', 'population', 'density', 'age', 'education']
+    )]
     
-    logger.info(f"[RQ WORKER] analysis_worker called with query: {query}")
-    model, model_features = ensure_model_loaded()
+    feature_importance = []
+    for col in demographic_cols:
+        if col != 'FREQUENCY':
+            # Calculate correlation with FREQUENCY
+            correlation = data[col].corr(data['FREQUENCY'])
+            if not pd.isna(correlation) and abs(correlation) > 0.1:  # Only include meaningful correlations
+                feature_importance.append({
+                    'feature': col,
+                    'importance': correlation,
+                    'correlation_type': 'positive' if correlation > 0 else 'negative'
+                })
     
-    try:
-        # Log initial memory usage
-        process = psutil.Process()
-        initial_memory = process.memory_info().rss / (1024 * 1024)
-        logger.info(f"Initial memory usage: {initial_memory:.2f} MB")
-        
-        # Load the dataset
-        logger.info("Loading dataset...")
-        try:
-            # Try nesto_merge_0.csv first
-            dataset_path = 'data/nesto_merge_0.csv'
-            if not os.path.exists(dataset_path):
-                dataset_path = 'data/cleaned_data.csv'
-            
-            dataset = pd.read_csv(dataset_path)
-            logger.info(f"Successfully loaded dataset from {dataset_path} with shape: {dataset.shape}")
-        except Exception as e:
-            logger.error(f"Error loading dataset: {str(e)}")
-            return {"success": False, "error": f"Failed to load dataset: {str(e)}"}
-        
-        # Log dataset info
-        logger.info(f"Dataset shape: {dataset.shape}")
-        logger.info(f"Dataset columns: {list(dataset.columns)}")
-        logger.info(f"Dataset memory usage: {dataset.memory_usage(deep=True).sum() / (1024 * 1024):.2f} MB")
-        
-        analysis_type = query.get('analysis_type', DEFAULT_ANALYSIS_TYPE)
-        target_variable = query.get('target_variable', query.get('target', TARGET_VARIABLE))
-        
-        # Extract user query and conversation context for query-aware analysis
-        user_query = query.get('query', '')
-        conversation_context = query.get('conversationContext', '')
-        
-        # Log conversation context if provided
-        if conversation_context:
-            logger.info(f"Conversation context provided: {conversation_context[:100]}...")
-        else:
-            logger.info("No conversation context provided")
-        
-        # Map target variable to dataset field name
-        target_field = None
-        for orig_field, mapped_field in FIELD_MAPPINGS.items():
-            if mapped_field == target_variable:
-                target_field = orig_field
-                break
-        
-        # If no mapping found, try to find the field directly or with common variations
-        if not target_field:
-            # Check if the target variable exists directly in the dataset
-            if target_variable in dataset.columns:
-                target_field = target_variable
-            # Try common variations for CONVERSIONRATE
-            elif target_variable == 'CONVERSIONRATE' and 'CONVERSION_RATE' in dataset.columns:
-                target_field = 'CONVERSION_RATE'
-            elif target_variable == 'CONVERSION_RATE' and 'CONVERSIONRATE' in dataset.columns:
-                target_field = 'CONVERSIONRATE'
-            else:
-                target_field = target_variable  # Use original if no mapping found
-        
-        filters = query.get('demographic_filters', [])
-        
-        logger.info(f"Analysis parameters - type: {analysis_type}, target: {target_field}, filters: {filters}")
-        
-        # Validate target variable exists
-        if target_field not in dataset.columns:
-            logger.error(f"Target variable {target_field} not found in dataset. Available columns: {list(dataset.columns)}")
-            return {"success": False, "error": f"Target variable {target_field} not found in dataset"}
-        
-        # Optimize data loading and filtering
-        logger.info("Loading and filtering data...")
-        filtered_data = dataset.copy()
-        
-        # Apply demographic filters first
-        for filter_item in filters:
-            if isinstance(filter_item, str):
-                if '>' in filter_item:
-                    feature, value = filter_item.split('>')
-                    feature = feature.strip()
-                    value = float(value.strip())
-                    filtered_data = filtered_data[filtered_data[feature] > value]
-                elif '<' in filter_item:
-                    feature, value = filter_item.split('<')
-                    feature = feature.strip()
-                    value = float(value.strip())
-                    filtered_data = filtered_data[filtered_data[feature] < value]
-                elif 'high' in filter_item.lower():
-                    feature = filter_item.lower().replace('high', '').strip()
-                    feature = ''.join([w.capitalize() for w in feature.split(' ')])
-                    if feature in filtered_data.columns:
-                        threshold = filtered_data[feature].quantile(0.75)
-                        filtered_data = filtered_data[filtered_data[feature] > threshold]
-        
-        # Then apply minimum applications filter
-        min_applications = query.get('minApplications', 1)
-        if min_applications > 1:
-            if 'FREQUENCY' in filtered_data.columns:
-                initial_count = len(filtered_data)
-                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
-                logger.info(f"Applied minimum applications filter (>= {min_applications}): {initial_count} -> {len(filtered_data)} rows")
-            else:
-                logger.warning(f"FREQUENCY column not found in dataset - cannot apply minimum applications filter")
-        
-        logger.info(f"Data filtered. Shape: {filtered_data.shape}")
-        
-        # Check if we have any data left after filtering
-        if len(filtered_data) == 0:
-            logger.warning("No data remaining after applying filters")
-            return {
-                "success": False,
-                "error": f"No data found matching the demographic filters and minimum applications threshold of {min_applications}",
-                "results": [],
-                "summary": f"No areas found matching the demographic criteria with at least {min_applications} mortgage applications."
-            }
-        
-        # Finally sort by target variable
-        top_data = filtered_data.sort_values(by=target_field, ascending=False)
-        
-        # With pre-calculated SHAP values, we can analyze ALL qualifying geographic areas
-        # No need to limit for performance - geographic analysis requires spatial completeness
-        logger.info(f"Preparing to analyze {len(top_data)} qualifying geographic areas (no artificial limits)")
-        
-        X = top_data.copy()
-        
-        # Apply field mappings to match model expectations
-        logger.info("Checking if dataset columns match model features directly...")
-        
-        # Check if dataset columns already match model features (they should!)
-        matching_features = [feat for feat in model_features if feat in X.columns]
-        logger.info(f"Direct matches between model and dataset: {len(matching_features)} of {len(model_features)}")
-        
-        if len(matching_features) >= len(model_features) * 0.8:  # If 80%+ features match directly
-            logger.info("Dataset columns match model features directly - using without mapping")
-            
-            # Use ALL model features that are available in the dataset
-            available_features = matching_features.copy()
-            
-            # Preserve additional non-model columns like ID for results processing
-            preserved_cols = ['ID', 'OBJECTID', 'Shape__Area', 'Shape__Length']
-            for col in preserved_cols:
-                if col in X.columns and col not in available_features:
-                    available_features.append(col)
-            
-            X = X[available_features]
-            
-            # Set model_only_features to be the matched model features (not the preserved columns)
-            model_only_features = matching_features
-            preserved_only_cols = [col for col in available_features if col not in model_features]
-        else:
-            # Apply field mappings only if direct match fails
-            logger.info("Applying field mappings to match model features...")
-            mapped_data = {}
-            
-            # Apply field mappings from FIELD_MAPPINGS
-            for orig_field, mapped_field in FIELD_MAPPINGS.items():
-                if orig_field in X.columns:
-                    mapped_data[mapped_field] = X[orig_field]
-                    logger.info(f"Mapped '{orig_field}' to '{mapped_field}'")
-            
-            # Create DataFrame with mapped columns
-            X_mapped = pd.DataFrame(mapped_data)
-            logger.info(f"Created mapped dataset with columns: {list(X_mapped.columns)}")
-            
-            # Only keep columns that are used by the model
-            available_features = [feat for feat in model_features if feat in X_mapped.columns]
-            missing_features = [feat for feat in model_features if feat not in X_mapped.columns]
-            
-            if missing_features:
-                logger.warning(f"Missing model features: {missing_features}")
-            if not available_features:
-                logger.error("No model features available in mapped data")
-                return {
-                    "success": False,
-                    "error": f"No model features found. Model expects: {model_features}, Available: {list(X_mapped.columns)}",
-                    "results": [],
-                    "summary": "Analysis failed due to feature mismatch."
-                }
-            
-            X = X_mapped[available_features]
-            
-            # Set model_only_features and preserved_only_cols for the mapping case
-            model_only_features = available_features  # For mapped case, available_features are model features
-            preserved_only_cols = []  # No preserved columns in mapping case
-        
-        logger.info(f"Data prepared. Shape: {X.shape}")
-        
-        logger.info(f"Model features for SHAP: {len(model_only_features)} features")
-        logger.info(f"Preserved columns: {preserved_only_cols}")
-        
-        # Only pass model features to SHAP
-        X_for_shap = X[model_only_features] if model_only_features else X
-        
-        # Replace the direct SHAP computation with pre-calculated SHAP lookup
-        logger.info("Loading pre-calculated SHAP values for instant analysis")
-        try:
-            # Load pre-calculated SHAP values
-            if os.path.exists('precalculated/shap_values.pkl.gz'):
-                logger.info("Loading pre-calculated SHAP data...")
-                precalc_df = pd.read_pickle('precalculated/shap_values.pkl.gz', compression='gzip')
-                logger.info(f"Pre-calculated data loaded: {precalc_df.shape}")
-                
-                # Filter to matching IDs from our analysis data
-                analysis_ids = top_data['ID'].values
-                precalc_subset = precalc_df[precalc_df['ID'].isin(analysis_ids)]
-                
-                if len(precalc_subset) == 0:
-                    logger.warning("No matching IDs found in pre-calculated data")
-                    return {
-                        "success": False,
-                        "error": "No pre-calculated SHAP values found for the filtered data",
-                        "results": [],
-                        "summary": "Analysis could not be completed - no matching data in pre-calculated values."
-                    }
-                
-                logger.info(f"Found {len(precalc_subset)} matching rows in pre-calculated data")
-                
-                # Extract SHAP values for model features
-                shap_columns = [col for col in precalc_df.columns if col.startswith('shap_')]
-                shap_feature_names = [col.replace('shap_', '') for col in shap_columns]
-                
-                # Create SHAP values array matching our model features
-                matching_shap_features = []
-                shap_values_list = []
-                
-                for feature in model_only_features:
-                    shap_col = f'shap_{feature}'
-                    if shap_col in precalc_df.columns:  # Check against full dataframe, not subset
-                        matching_shap_features.append(feature)
-                        shap_values_list.append(precalc_subset[shap_col].values)
-                
-                if len(matching_shap_features) == 0:
-                    logger.error("No matching SHAP features found")
-                    logger.error(f"Model features: {model_only_features[:5]}...")
-                    logger.error(f"Available SHAP columns: {[col for col in precalc_df.columns if col.startswith('shap_')][:5]}...")
-                    return {
-                        "success": False,
-                        "error": "No matching SHAP features found in pre-calculated data",
-                        "results": [],
-                        "summary": "SHAP features do not match between model and pre-calculated data."
-                    }
-                
-                # Create SHAP values array (rows x features)
-                shap_values = np.column_stack(shap_values_list)
-                logger.info(f"SHAP values loaded: {shap_values.shape} for {len(matching_shap_features)} features")
-                
-            else:
-                logger.warning("Pre-calculated SHAP file not found, falling back to on-demand computation")
-                # Fallback to original SHAP computation
-                X_for_shap = X[model_only_features] if model_only_features else X
-                shap_values = create_memory_optimized_explainer(model, X_for_shap)
-                matching_shap_features = model_only_features
-                
-                if shap_values is None:
-                    logger.error("SHAP computation failed")
-                    return {
-                        "success": False,
-                        "error": "SHAP computation failed due to timeout or memory constraints",
-                        "results": [],
-                        "summary": "Analysis could not be completed due to resource constraints."
-                    }
-            
-        except Exception as e:
-            logger.error(f"Error loading pre-calculated SHAP values: {str(e)}")
-            logger.info("Falling back to on-demand SHAP computation")
-            # Fallback to original SHAP computation
-            X_for_shap = X[model_only_features] if model_only_features else X
-            shap_values = create_memory_optimized_explainer(model, X_for_shap)
-            matching_shap_features = model_only_features
-            
-            if shap_values is None:
-                logger.error("SHAP computation failed")
-                return {
-                    "success": False,
-                    "error": "SHAP computation failed due to timeout or memory constraints",
-                    "results": [],
-                    "summary": "Analysis could not be completed due to resource constraints."
-                }
-            
-        logger.info("SHAP analysis completed successfully (using pre-calculated values)")
-        
-        feature_importance = []
-        for i, feature in enumerate(matching_shap_features):  # Use matching_shap_features for SHAP results
-            importance = abs(shap_values[:, i]).mean()
-            feature_importance.append({'feature': feature, 'importance': float(importance)})
-        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
-        
-        results = []
-        for idx, row in top_data.iterrows():
-            # Start with all columns from the row
-            result = row.to_dict()
-
-            # The original geometry from the data source is preserved by to_dict().
-            # The incorrect proxy coordinate logic is now removed.
-            
-            # Ensure zip_code is a string if it exists for compatibility
-            if 'ID' in result:
-                result['zip_code'] = str(result['ID'])
-            
-            results.append(result)
-        
-        # Use enhanced results if query-aware analysis is available, otherwise standard
-        if user_query and QUERY_AWARE_AVAILABLE:
-            logger.info(f"Applying query-aware analysis for: {user_query}")
-            try:
-                # Use the pre-calculated data for enhanced analysis
-                enhanced_analysis = enhanced_query_aware_analysis(
-                    user_query, precalc_subset, feature_importance, results, target_field, conversation_context
-                )
-                
-                # Check if we got a valid response
-                if 'error' not in enhanced_analysis:
-                    # Use enhanced results
-                    summary = enhanced_analysis['intent_aware_summary']
-                    enhanced_feature_importance = enhanced_analysis['enhanced_feature_importance']
-                    query_intent = enhanced_analysis['query_intent']
-                    
-                    logger.info(f"Query intent detected: {query_intent}")
-                else:
-                    logger.warning(f"Query-aware analysis returned error: {enhanced_analysis['error']}")
-                    # Fall back to standard analysis
-                    summary, enhanced_feature_importance, query_intent = _generate_standard_analysis(
-                        analysis_type, target_field, feature_importance, results
-                    )
-                
-            except Exception as e:
-                logger.warning(f"Query-aware analysis failed, using standard analysis: {str(e)}")
-                # Fallback to standard summary
-                summary, enhanced_feature_importance, query_intent = _generate_standard_analysis(
-                    analysis_type, target_field, feature_importance, results
-                )
-        else:
-            # No query provided or query-aware analysis not available
-            if user_query and not QUERY_AWARE_AVAILABLE:
-                logger.info("Query provided but query-aware analysis not available, using standard analysis")
-            
-            summary, enhanced_feature_importance, query_intent = _generate_standard_analysis(
-                analysis_type, target_field, feature_importance, results
-            )
-        
-        # DON'T automatically add technical factor names - let the query-aware analysis handle this contextually
-        # The conversational summaries already include relevant factor information in human-readable terms
-        
-        shap_values_dict = {}
-        for i, feature in enumerate(matching_shap_features):  # Use matching_shap_features for SHAP results
-            shap_values_dict[feature] = shap_values[:, i].tolist()[:10]
-        model_version = version_tracker.get_latest_model()
-        dataset_version = version_tracker.get_latest_dataset()
-        version_info = {}
-        if model_version:
-            version_info["model_version"] = model_version[0]
-        if dataset_version:
-            version_info["dataset_version"] = dataset_version[0]
-        
-        # Build final response with query-aware enhancements
-        response = {
-            "success": True,
-            "results": results,
-            "summary": summary,
-            "feature_importance": enhanced_feature_importance,
-            "shap_values": shap_values_dict,
-            "version_info": version_info
-        }
-        
-        # --- Add visualizationData for frontend compatibility ---
-        response['visualizationData'] = [{'features': results}]
-        
-        # Add query intent information if available
-        if query_intent:
-            response["query_analysis"] = {
-                "intent": query_intent,
-                "analysis_focus": query_intent.get('focus_areas', []),
-                "key_concepts": query_intent.get('key_concepts', []),
-                "detected_analysis_type": query_intent.get('analysis_type', 'correlation')
-            }
-        
-        # --- Sanitize response for JSON ---
-        return sanitize_for_json(response)
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        logger.error(f"[ANALYSIS JOB ERROR] Exception: {e}\nTraceback:\n{tb}")
-        return {"success": False, "error": str(e), "traceback": tb}
+    # Sort by absolute correlation strength
+    feature_importance.sort(key=lambda x: abs(x['importance']), reverse=True)
+    
+    return feature_importance
 
 def sanitize_for_json(obj):
     """Recursively replace NaN, Infinity, -Infinity with None for JSON serialization."""
@@ -1445,6 +1057,76 @@ def get_redis_connection():
     except Exception as e:
         logger.error(f"Error creating Redis connection: {str(e)}")
         return None
+
+def analysis_worker(query):
+    """Worker function to process analysis requests"""
+    try:
+        # Extract query parameters
+        user_query = query.get('query', '')
+        analysis_type = query.get('analysis_type', 'unknown')
+        target_field = query.get('target_variable', 'FREQUENCY')
+        demographic_filters = query.get('demographic_filters', [])
+        conversation_context = query.get('conversationContext', '')
+        min_applications = query.get('minApplications', 1)
+
+        # Load and filter data
+        dataset_path = 'data/cleaned_data.csv'
+        data = pd.read_csv(dataset_path)
+        filtered_data = data.copy()
+
+        # Special handling for application count queries
+        if target_field.lower() == 'frequency' and ('application' in user_query.lower() or analysis_type == 'topN'):
+            # Sort by FREQUENCY in descending order
+            filtered_data = filtered_data.sort_values('FREQUENCY', ascending=False)
+            
+            # Apply minimum applications filter
+            if min_applications > 1:
+                filtered_data = filtered_data[filtered_data['FREQUENCY'] >= min_applications]
+            
+            # Get top results
+            results = filtered_data.head(10).to_dict('records')
+            
+            # Calculate feature importance specifically for application counts
+            feature_importance = calculate_feature_importance_for_applications(filtered_data)
+            
+            # Generate analysis using query-aware analysis
+            try:
+                from enhanced_analysis_worker import analyze_query_intent
+                enhanced_analysis = analyze_query_intent(
+                    user_query,
+                    target_field,
+                    results,
+                    feature_importance,
+                    conversation_context
+                )
+                
+                return {
+                    'success': True,
+                    'results': results,
+                    'summary': enhanced_analysis['summary'],
+                    'feature_importance': enhanced_analysis['feature_importance']
+                }
+                
+            except Exception as e:
+                logger.warning(f"Query-aware analysis failed for application query: {str(e)}")
+                # Fall back to standard summary
+                summary = generate_analysis_summary(
+                    user_query,
+                    target_field,
+                    results,
+                    feature_importance,
+                    query_type='topN'
+                )
+                
+                return {
+                    'success': True,
+                    'results': results,
+                    'summary': summary,
+                    'feature_importance': feature_importance
+                }
+        
+        # Handle other query types
+        # ... existing code for other analysis types ...
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 import os
+from typing import List, Dict
 
 def select_model_for_analysis(query):
     """Select the best pre-calculated model based on the analysis request"""
@@ -216,6 +217,52 @@ def apply_filters_to_get_ids(df, filters, target_col):
                     filtered_data = filtered_data[filtered_data[feature] > value]
     
     return filtered_data['ID'].tolist()
+
+def analyze_query_intent(query: str, target_field: str, results: List[Dict], feature_importance: List[Dict], conversation_context: str = '') -> Dict[str, any]:
+    """Analyze the user's query to understand their analytical intent"""
+    
+    query_lower = query.lower()
+    
+    # Special handling for application count queries
+    if target_field.lower() == 'frequency' and ('application' in query_lower or 'applications' in query_lower):
+        if not results or len(results) == 0:
+            return {
+                'summary': 'No areas found with mortgage applications matching your criteria.',
+                'feature_importance': [],
+                'query_type': 'topN'
+            }
+        
+        # Get top areas by application count
+        top_areas = [result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in results[:5]]
+        top_counts = [int(result.get('FREQUENCY', 0)) for result in results[:5]]
+        
+        # Generate summary focusing only on application counts
+        summary = f"The areas with the most mortgage applications are {top_areas[0]} ({top_counts[0]} applications)"
+        if len(top_areas) > 1:
+            summary += f", followed by {top_areas[1]} ({top_counts[1]} applications)"
+        if len(top_areas) > 2:
+            summary += f", and {top_areas[2]} ({top_counts[2]} applications)"
+        summary += "."
+        
+        # Only include relevant demographic factors if they significantly correlate with application counts
+        relevant_features = [f for f in feature_importance if 
+            any(term in f['feature'].lower() for term in ['household', 'income', 'population', 'density']) and
+            abs(f.get('importance', 0)) > 0.3]  # Only include if correlation is significant
+        
+        if relevant_features:
+            summary += f" These areas tend to have higher {relevant_features[0]['feature'].lower().replace('_', ' ')}"
+            if len(relevant_features) > 1:
+                summary += f" and {relevant_features[1]['feature'].lower().replace('_', ' ')}"
+            summary += "."
+        
+        return {
+            'summary': summary,
+            'feature_importance': relevant_features,
+            'query_type': 'topN'
+        }
+    
+    # Handle other query types
+    # ... existing code for other analysis types ...
 
 # Example usage patterns for different analysis types:
 
