@@ -1125,8 +1125,81 @@ def analysis_worker(query):
                     'feature_importance': feature_importance
                 }
         
-        # Handle other query types
-        # ... existing code for other analysis types ...
+        # Handle other analysis types
+        if analysis_type in ['correlation', 'distribution', 'ranking']:
+            # Ensure model is loaded
+            ensure_model_loaded()
+            
+            # Create memory-optimized explainer
+            explainer = create_memory_optimized_explainer(model, filtered_data)
+            
+            # Calculate SHAP values
+            shap_values = explainer.shap_values(filtered_data)
+            
+            # Calculate feature importance
+            feature_importance = []
+            for i, col in enumerate(filtered_data.columns):
+                if col != target_field:
+                    importance = np.abs(shap_values[:, i]).mean()
+                    feature_importance.append({
+                        'feature': col,
+                        'importance': float(importance)
+                    })
+            
+            # Sort by importance
+            feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+            
+            # Get results based on analysis type
+            if analysis_type == 'correlation':
+                results = filtered_data.sort_values(target_field, ascending=False).head(10).to_dict('records')
+            elif analysis_type == 'distribution':
+                results = filtered_data.describe().to_dict()
+            else:  # ranking
+                results = filtered_data.nlargest(10, target_field).to_dict('records')
+            
+            # Generate analysis using query-aware analysis if available
+            try:
+                from enhanced_analysis_worker import analyze_query_intent
+                enhanced_analysis = analyze_query_intent(
+                    user_query,
+                    target_field,
+                    results,
+                    feature_importance,
+                    conversation_context
+                )
+                
+                return {
+                    'success': True,
+                    'results': results,
+                    'summary': enhanced_analysis['summary'],
+                    'feature_importance': feature_importance
+                }
+                
+            except Exception as e:
+                logger.warning(f"Query-aware analysis failed: {str(e)}")
+                # Fall back to standard summary
+                summary = generate_analysis_summary(
+                    user_query,
+                    target_field,
+                    results,
+                    feature_importance,
+                    query_type=analysis_type
+                )
+                
+                return {
+                    'success': True,
+                    'results': results,
+                    'summary': summary,
+                    'feature_importance': feature_importance
+                }
+        
+        # Unknown analysis type
+        raise APIError(f"Unsupported analysis type: {analysis_type}")
+        
+    except Exception as e:
+        logger.error(f"Error in analysis worker: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise APIError(f"Analysis failed: {str(e)}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
