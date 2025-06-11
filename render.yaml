@@ -7,7 +7,8 @@ services:
     plan: starter
     buildCommand: >-
       echo "Starting optimized build process" && 
-      pip install -r requirements.txt &&
+      pip cache purge &&
+      pip install --no-cache-dir -r requirements.txt &&
       chmod +x ./render_pre_deploy.sh &&
       echo "Running pre-deployment checks..." &&
       ./render_pre_deploy.sh &&
@@ -43,7 +44,8 @@ services:
     env: python
     buildCommand: >-
       echo "Building optimized worker service" &&
-      pip install -r requirements.txt &&
+      pip cache purge &&
+      pip install --no-cache-dir -r requirements.txt &&
       chmod +x ./render_pre_deploy.sh &&
       ./render_pre_deploy.sh &&
       chmod +x ./deploy_to_render.sh &&

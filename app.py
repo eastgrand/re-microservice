@@ -135,7 +135,7 @@ with app.app_context():
             socket_keepalive=True,
             health_check_interval=30,
             retry_on_timeout=True,
-            ssl_cert_reqs=None  # Don't verify SSL certificate
+            ssl_cert_reqs=None # Don't verify SSL certificate
         )
         
         # Test the connection with timeout
