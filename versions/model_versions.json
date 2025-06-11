@@ -1,1 +1,1 @@
-{}
+{"model_20250611_112512": {"model_path": "models/xgboost_model.pkl", "dataset_version_id": "dataset_20250611_112509", "feature_names_path": "models/feature_names.txt", "metrics": {"rmse": 30.57547314606053, "r2": -0.12388670444488525, "test_size": 334, "cv_rmse_mean": 30.646288633195372, "cv_rmse_std": 0.427979951639532}, "timestamp": "2025-06-11T11:25:12.222012"}}

@@ -1,83 +1,134 @@
-2021 Period of Construction - 1961 to 1980 (Census) (%)
-2021 Period of Construction - 1981 to 1990 (Census) (%)
-2021 Period of Construction - 1991 to 2000 (Census) (%)
-2021 Period of Construction - 2001 to 2005 (Census) (%)
-2021 Period of Construction - 2006 to 2010 (Census) (%)
-2021 Period of Construction - 2011 to 2016 (Census) (%)
-2021 Period of Construction - 2016 to 2021 (Census) (%)
-2021 Period of Construction - 1960 or Before (Census) (%)
-2021 Housing: Apartment or Flat in Duplex (Census) (%)
-2024 Condominium Status - In Condo (%)
-2024 Condominium Status - Not In Condo (%)
-2024 Female Household Population (%)
-2024 Maintainers - 25 to 34 (%)
-2024 Maintainers - 35 to 44 (%)
-2024 Maintainers - 45 to 54 (%)
-2024 Maintainers - 55 to 64 (%)
-2024 Male Household Population (%)
-2024 Pop 15+: Divorced (%)
-2024 Pop 15+: Living Common Law (%)
-2024 Pop 15+: Married (And Not Separated) (%)
-2024 Pop 15+: Married or Living Common-Law (%)
-2024 Pop 15+: Not Married or Common-Law (%)
-2024 Pop 15+: Separated (%)
-2024 Pop 15+: Single (Never Legally Married) (%)
-2024 Pop 15+: Widowed (%)
-2024 Structure Type Apartment, Building Five or More Story (%)
-2024 Structure Type Apartment, Building Fewer Than Five Story (%)
-2024 Structure Type Movable Dwelling (%)
-2024 Structure Type Other Single-Attached House (%)
-2024 Structure Type Row House (%)
-2024 Structure Type Semi-Detached House (%)
-2024 Structure Type Single-Detached House (%)
-2024 Tenure: Band Housing (%)
-2024 Tenure: Owned (%)
-2024 Tenure: Rented (%)
-2024 Visible Minority Arab (%)
-2024 Visible Minority Black (%)
-2024 Visible Minority Chinese (%)
-2024 Visible Minority Filipino (%)
-2024 Visible Minority Japanese (%)
-2024 Visible Minority Korean (%)
-2024 Visible Minority Latin American (%)
-2024 Visible Minority South Asian (%)
-2024 Visible Minority Southeast Asian (%)
-2024 Visible Minority Total Population (%)
-2024 Visible Minority West Asian (%)
-2021-2022 Total Population % Change
-2022-2023 Current$ Household Average Income % Change
-2022-2023 Total Population % Change
-2023-2024 Current$ Household Average Income % Change
-2023-2024 Total Population % Change
-2024 Condominium Charges (Shelter)
-2024 Condominium Charges (Shelter) (Avg)
-2024 Condominium Status - Total Households
-2024 Financial Services
-2024 Financial Services (Avg)
-2024 Household Aggregate Income (Current Year $)
-2024 Household Average Income (Current Year $)
-2024 Household Median Income (Current Year $)
-2024 Household Type - Total Households
-2024 Household Discretionary Aggregate Income
-2024 Household Disposable Aggregate Income
-2024 Household Aggregate Income
-2024 Labour Force - Labour Employment Rate
-2024 Labour Force - Labour Participation Rate
-2024 Labour Force - Labour Unemployment Rate
-2024 Maintainers - Median Age
-2024 Property Taxes (Shelter)
-2024 Property Taxes (Shelter) (Avg)
-2024 Regular Mortgage Payments (Shelter)
-2024 Regular Mortgage Payments (Shelter) (Avg)
-2024 Service Charges for Banks, Other Financial Institutions
-2024 Service Charges for Banks, Other Financial Institutions (Avg)
-2024 Tenure: Total Households
-2024 Total Population
-2024-2025 Current$ Household Average Income % Change
-2024-2025 Total Population % Change
-2025-2026 Current$ Household Average Income % Change
-2025-2026 Total Population % Change
-2026-2027 Current$ Household Average Income % Change
-2026-2027 Total Population % Change
+housing_1961_1980
+housing_1961_1980_pct
+housing_1981_1990
+housing_1981_1990_pct
+housing_1991_2000
+housing_1991_2000_pct
+housing_2001_2005
+housing_2001_2005_pct
+housing_2006_2010
+housing_2006_2010_pct
+housing_2011_2016
+housing_2011_2016_pct
+housing_2016_2021
+housing_2016_2021_pct
+old_housing
+old_housing_pct
+duplex_apartments
+duplex_apt_pct
+two_year_prior_population_change
+prior_year_income_change
+prior_year_population_change
+recent_income_change
+recent_population_change
+condo_fees_total
+avg_condo_fees
+condo_units
+condo_ownership_pct
+non_condo_units
+non_condo_pct
+total_condo_status_households
+female_population
+female_population_pct
+financial_services_total
+avg_financial_services
+current_year_total_income
+income
+median_income
+total_household_types
+discretionary_income
+disposable_income
+total_income
+employment_rate
+labor_participation_rate
+unemployment_rate
+young_adult_maintainers
+young_adult_maintainers_pct
+middle_age_maintainers
+middle_age_maintainers_pct
+mature_maintainers
+mature_maintainers_pct
+senior_maintainers
+senior_maintainers_pct
+age
+male_population
+male_population_pct
+divorced_population
+divorced_population_pct
+common_law_population
+common_law_population_pct
+married_population
+married_population_pct
+combined_married_population
+combined_married_population_pct
+not_married_population
+not_married_population_pct
+separated_population
+separated_population_pct
+single_population
+single_population_pct
+widowed_population
+widowed_population_pct
+property_tax_total
+avg_property_tax
+mortgage_payments_total
+avg_mortgage_payment
+large_apartments
+large_apartment_pct
+small_apartments
+small_apartment_pct
+movable_dwellings
+movable_dwelling_pct
+other_single_attached_houses
+other_attached_house_pct
+row_houses
+row_house_pct
+semi_detached_houses
+semi_detached_house_pct
+single_detached_houses
+single_detached_house_pct
+bank_service_charges_total
+avg_bank_service_charges
+band_housing
+band_housing_pct
+homeownership
+homeownership_pct
+rental_units
+rental_units_pct
+households
+population
+arab_population
+arab_population_pct
+african_american_population
+african_american_population_pct
+asian_population
+asian_population_pct
+filipino_population
+filipino_population_pct
+japanese_population
+japanese_population_pct
+korean_population
+korean_population_pct
+latin_american_population
+latin_american_population_pct
+south_asian_population
+south_asian_population_pct
+southeast_asian_population
+southeast_asian_population_pct
+total_minority_population
+total_minority_population_pct
+west_asian_population
+west_asian_population_pct
+next_year_income_change_projection
+next_year_population_change_projection
+two_year_income_change_projection
+two_year_population_change_projection
+three_year_income_change_projection
+three_year_population_change_projection
 FREQUENCY
 SUM_FUNDED
+conversion_rate
+geographic_area
+geographic_length
+Income
+Age
