@@ -28,9 +28,6 @@ from typing import List, Dict, Tuple
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
-# Import utility for creating dummy models if needed
-from create_dummy_model import create_dummy_model_and_data
-
 # Import custom logging configuration
 from logger_config import setup_logger, get_logger
 
