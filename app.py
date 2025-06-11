@@ -25,6 +25,20 @@ import json
 import math
 from typing import List, Dict, Tuple
 
+# Attempt to import query-aware analysis functions
+try:
+    from query_aware_analysis import enhanced_query_aware_analysis, generate_intent_aware_summary
+    QUERY_AWARE_AVAILABLE = True
+    print("✅ Successfully imported query-aware analysis module.")
+except ImportError as e:
+    QUERY_AWARE_AVAILABLE = False
+    print(f"⚠️ Query-aware analysis module not found or failed to import: {e}. Running in standard mode.")
+    # Define dummy functions if the import fails to prevent runtime errors
+    def enhanced_query_aware_analysis(*args, **kwargs):
+        return {"summary": "Query-aware analysis is not available.", "results": []}
+    def generate_intent_aware_summary(*args, **kwargs):
+        return "Query-aware analysis is not available."
+
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
