@@ -26,7 +26,7 @@ import math
 from typing import List, Dict, Tuple
 
 # Import field mappings and target variable
-from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE, map_data_columns
+from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 from query_analyzer import enhanced_query_aware_analysis, QUERY_AWARE_AVAILABLE
 
 # Import query-aware analysis functions - with graceful fallback
@@ -1212,14 +1212,11 @@ def load_and_preprocess_data():
             if not os.path.exists(file_path):
                  raise FileNotFoundError(f"Data file not found at {file_path} or fallback location.")
 
-        df = pd.read_csv(file_path)
-        logger.info(f"Successfully loaded data from {file_path}")
-        
         # Apply the standardized mapping
-        processed_df = map_data_columns(df, FIELD_MAPPINGS)
+        processed_df = pd.read_csv(file_path) # Data is already mapped during build
         
         # Log the columns after mapping to confirm correctness
-        logger.info(f"Columns after mapping: {processed_df.columns.tolist()}")
+        logger.info(f"Columns after loading pre-mapped data: {processed_df.columns.tolist()}")
 
         return processed_df
     except FileNotFoundError as e:
