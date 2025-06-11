@@ -24,6 +24,7 @@ import xgboost as xgb
 import json
 import math
 from typing import List, Dict, Tuple
+from catboost import CatBoostClassifier
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
@@ -1194,6 +1195,51 @@ def analysis_worker(query):
         logger.error(f"Error in analysis worker: {str(e)}")
         logger.error(traceback.format_exc())
         raise APIError(f"Analysis failed: {str(e)}")
+
+def load_and_preprocess_data():
+    """
+    Loads and preprocesses the training data from a CSV file.
+    This function now uses the correct data mapping script.
+    """
+    try:
+        # Corrected file path
+        file_path = os.path.join(os.path.dirname(__name__), 'data', 'nesto_merge_0.csv')
+        
+        if not os.path.exists(file_path):
+            logger.error(f"Data file not found at {file_path}")
+            # Fallback to a known location for Render deployment
+            file_path = '/opt/render/project/src/data/nesto_merge_0.csv'
+            if not os.path.exists(file_path):
+                 raise FileNotFoundError(f"Data file not found at {file_path} or fallback location.")
+
+        df = pd.read_csv(file_path)
+        logger.info(f"Successfully loaded data from {file_path}")
+        
+        # Apply the standardized mapping
+        processed_df = map_data_columns(df, FIELD_MAPPINGS)
+        
+        # Log the columns after mapping to confirm correctness
+        logger.info(f"Columns after mapping: {processed_df.columns.tolist()}")
+
+        return processed_df
+    except FileNotFoundError as e:
+        logger.error(f"Error loading data: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during data loading: {e}")
+        return None
+
+# Load data and model at startup
+data = load_and_preprocess_data()
+if data is None:
+    logger.critical("Failed to load data. The application may not function correctly.")
+
+# Load the model
+model_path = os.path.join(os.path.dirname(__name__), '..', 'models', 'best_catboost_model.cbm')
+model = CatBoostClassifier()
+model.load_model(model_path)
+logger.info("Successfully loaded the CatBoost model.")
+feature_names = model.get_feature_names()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
