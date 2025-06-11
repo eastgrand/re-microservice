@@ -1127,12 +1127,10 @@ def analysis_worker(query):
         if analysis_type == 'correlation':
             logger.info("Performing query-aware SHAP analysis for 'correlation' type...")
             shap_results = enhanced_query_aware_analysis(
-                query=user_query,
-                data=data_to_process,
-                model=model,
-                feature_names=feature_names,
-                target_variable=target_field,
-                analysis_type=analysis_type
+                user_query=user_query,
+                analysis_type=analysis_type,
+                target_field=target_field,
+                demographic_filters=demographic_filters
             )
             feature_importance = shap_results.get("feature_importance", [])
             analysis_summary = shap_results.get("summary", "Correlation analysis complete.")
@@ -1142,12 +1140,10 @@ def analysis_worker(query):
             filtered_data = data_to_process.sort_values(target_field, ascending=False).head(10)
             results = filtered_data.to_dict(orient='records')
             shap_results = enhanced_query_aware_analysis(
-                query=user_query,
-                data=filtered_data,
-                model=model,
-                feature_names=feature_names,
-                target_variable=target_field,
-                analysis_type=analysis_type
+                user_query=user_query,
+                analysis_type=analysis_type,
+                target_field=target_field,
+                demographic_filters=demographic_filters
             )
             feature_importance = shap_results.get("feature_importance", [])
             analysis_summary = shap_results.get("summary", f"Top 10 areas ranked by {target_field}.")
@@ -1164,17 +1160,22 @@ def analysis_worker(query):
                 if field1 and field2 and field1 in data_to_process.columns and field2 in data_to_process.columns:
                     q1 = data_to_process[field1].quantile(0.75)
                     q2 = data_to_process[field2].quantile(0.75)
-                    filtered_data = data_to_process[(data_to_process[field1] >= q1) & (data_to_process[field2] >= q2)]
-                    results = filtered_data.to_dict(orient='records')
+                    data_to_process['joint_score'] = data_to_process[field1] + data_to_process[field2]
                     
+                    # Call the analysis function with the correct arguments
                     shap_results = enhanced_query_aware_analysis(
-                        query=user_query,
-                        data=filtered_data,
-                        model=model,
-                        feature_names=feature_names,
-                        target_variable=target_field,
-                        analysis_type=analysis_type
+                        user_query=user_query,
+                        analysis_type=analysis_type,
+                        target_field=target_field,
+                        demographic_filters=demographic_filters
                     )
+                    
+                    # Add joint_score to results
+                    if 'results' in shap_results and isinstance(shap_results['results'], list):
+                        for res in shap_results['results']:
+                            res['joint_score'] = res.get('joint_score', 0)
+                    results = shap_results.get("results", data_to_process.to_dict(orient='records'))
+                    
                     analysis_summary = shap_results.get("summary", f"Showing areas with high values for both {field1} and {field2}.")
                     feature_importance = shap_results.get("feature_importance", [])
                 else:
