@@ -1,6 +1,6 @@
 # Add RQ and Redis for background job processing
 rq>=1.15
-redis>=4.0
+redis==4.6.0
 flask==2.1.2
 werkzeug==2.2.3
 flask-cors==3.0.10
