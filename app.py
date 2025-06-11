@@ -28,18 +28,6 @@ from typing import List, Dict, Tuple
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
 
-# Import custom logging configuration
-from logger_config import setup_logger, get_logger
-
-# Redis connection patch for better stability
-from redis_connection_patch import apply_all_patches
-from worker_process_fix import apply_all_worker_patches
-# Memory optimization for SHAP analysis
-try:
-    from shap_memory_fix import apply_memory_patches
-except ImportError:
-    print("SHAP memory optimization not available. For better performance, run ./deploy_shap_fix.sh")
-
 # --- FLASK APP SETUP (must come after imports) ---
 app = Flask(__name__)
 
@@ -1230,23 +1218,6 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     logger.info(f"Starting Flask app on port {port}...")
     try:
-        # Apply SHAP memory optimization fix if available
-        try:
-            apply_memory_patches(app)
-            logger.info("✅ Applied SHAP memory optimization patches")
-        except NameError:
-            logger.warning("⚠️ SHAP memory optimization not available")
-        except Exception as e:
-            logger.error(f"❌ Error applying memory patches: {str(e)}")
-        
-        # Apply Redis connection patches
-        apply_all_patches(app)
-        logger.info("✅ Applied Redis connection patches")
-        
-        # Apply worker process fixes
-        apply_all_worker_patches(app)
-        logger.info("✅ Applied worker process fixes")
-        
         app.run(host='0.0.0.0', port=port)
     except Exception as startup_error:
         logger.error(f"Error starting application: {str(startup_error)}")
