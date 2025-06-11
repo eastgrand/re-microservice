@@ -26,8 +26,7 @@ import math
 from typing import List, Dict, Tuple
 
 # Import field mappings and target variable
-from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
-from data.map_nesto_data import map_data_columns
+from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE, map_data_columns
 from query_analyzer import enhanced_query_aware_analysis, QUERY_AWARE_AVAILABLE
 
 # Import query-aware analysis functions - with graceful fallback
