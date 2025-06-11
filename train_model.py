@@ -455,12 +455,12 @@ metrics = {
 if cv_metrics and len(cv_metrics) > 0:
     metrics.update(cv_metrics)
 
-model_version_id = version_tracker.track_model(
-    model_path, 
-    dataset_version_id, 
-    feature_names_path=feature_names_path,
-    metrics=metrics
-)
+model_version_id = version_tracker.track_model({
+    "model_path": model_path,
+    "dataset_version_id": dataset_version_id,
+    "feature_names_path": feature_names_path,
+    "metrics": metrics
+})
 
 logger.info(f"Registered model with version ID: {model_version_id}")
 logger.info("Done! Model and feature names saved.")
@@ -639,12 +639,12 @@ def train_and_save_model():
         "test_size": len(y_test),
     }
     
-    model_version_id = version_tracker.track_model(
-        model_path, 
-        dataset_version_id, 
-        feature_names_path=feature_names_path,
-        metrics=metrics
-    )
+    model_version_id = version_tracker.track_model({
+        "model_path": model_path,
+        "dataset_version_id": dataset_version_id,
+        "feature_names_path": feature_names_path,
+        "metrics": metrics
+    })
     
     logger.info(f"Registered model with version ID: {model_version_id}")
     logger.info("Done! Model and feature names saved.")

@@ -28,6 +28,8 @@ from catboost import CatBoostClassifier
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
+from data.map_nesto_data import map_data_columns
+from query_analyzer import enhanced_query_aware_analysis, QUERY_AWARE_AVAILABLE
 
 # Import query-aware analysis functions - with graceful fallback
 QUERY_AWARE_AVAILABLE = False  # Initialize as module global
@@ -1234,12 +1236,31 @@ data = load_and_preprocess_data()
 if data is None:
     logger.critical("Failed to load data. The application may not function correctly.")
 
-# Load the model
-model_path = os.path.join(os.path.dirname(__name__), '..', 'models', 'best_catboost_model.cbm')
-model = CatBoostClassifier()
-model.load_model(model_path)
-logger.info("Successfully loaded the CatBoost model.")
-feature_names = model.get_feature_names()
+# Load the model and feature names
+try:
+    # Construct paths relative to the current script's location for robustness
+    base_dir = os.path.dirname(__file__)
+    model_path = os.path.join(base_dir, 'models', 'xgboost_model.pkl')
+    features_path = os.path.join(base_dir, 'models', 'feature_names.txt')
+
+    # Load the XGBoost model
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
+    logger.info("Successfully loaded the XGBoost model.")
+
+    # Load feature names
+    with open(features_path, 'r') as f:
+        feature_names = [line.strip() for line in f.readlines()]
+    logger.info("Successfully loaded feature names.")
+
+except FileNotFoundError as e:
+    logger.critical(f"Error loading model or feature names: {e}")
+    model = None
+    feature_names = []
+except Exception as e:
+    logger.critical(f"An unexpected error occurred during model loading: {e}")
+    model = None
+    feature_names = []
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
