@@ -1064,16 +1064,17 @@ def analysis_worker(query):
         # Extract query parameters
         user_query = query.get('query', '')
         analysis_type = query.get('analysis_type', 'unknown')
-        target_field_concept = query.get('target_variable', 'FREQUENCY')
+        target_field = query.get('target_variable', 'FREQUENCY')
         demographic_filters = query.get('demographic_filters', [])
         conversation_context = query.get('conversationContext', '')
         min_applications = query.get('minApplications', 1)
 
-        # Map conceptual field names from the request to actual database column names
-        target_field = FIELD_MAPPINGS.get(target_field_concept.lower(), target_field_concept)
+        # The data is now loaded and columns are renamed.
+        # We can directly use the clean conceptual names from the request.
 
         # Normalize analysis type
         if analysis_type == 'topN':
+            logger.info("Performing SHAP analysis for 'topN' type...")
             analysis_type = 'ranking'
 
         # Load Data
@@ -1083,12 +1084,9 @@ def analysis_worker(query):
         data_to_process = data.copy()
         if demographic_filters:
             for filt in demographic_filters:
-                field_concept = filt.get('field')
+                field = filt.get('field')
                 op = filt.get('op')
                 value = filt.get('value')
-
-                # Map the conceptual field to the actual column name
-                field = FIELD_MAPPINGS.get(field_concept.lower(), field_concept) if field_concept else None
 
                 if analysis_type == 'jointHigh' and field:
                     # (Filtering logic as previously implemented)
@@ -1150,12 +1148,8 @@ def analysis_worker(query):
 
         elif analysis_type == 'jointHigh':
             if len(demographic_filters) >= 2:
-                field1_concept = demographic_filters[0].get('field')
-                field2_concept = demographic_filters[1].get('field')
-
-                # Map conceptual names to actual column names
-                field1 = FIELD_MAPPINGS.get(field1_concept.lower(), field1_concept) if field1_concept else None
-                field2 = FIELD_MAPPINGS.get(field2_concept.lower(), field2_concept) if field2_concept else None
+                field1 = demographic_filters[0].get('field')
+                field2 = demographic_filters[1].get('field')
 
                 if field1 and field2 and field1 in data_to_process.columns and field2 in data_to_process.columns:
                     q1 = data_to_process[field1].quantile(0.75)
