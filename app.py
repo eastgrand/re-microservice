@@ -27,24 +27,15 @@ from typing import List, Dict, Tuple
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
-from query_analyzer import enhanced_query_aware_analysis, QUERY_AWARE_AVAILABLE
 
-# Import query-aware analysis functions - with graceful fallback
-QUERY_AWARE_AVAILABLE = False  # Initialize as module global
-try:
-    from query_aware_analysis import enhanced_query_aware_analysis, analyze_query_intent
-    QUERY_AWARE_AVAILABLE = True
-    print("✅ Query-aware analysis imports successful")
-except ImportError as e:
-    print(f"⚠️ Query-aware analysis not available: {e}")
-    QUERY_AWARE_AVAILABLE = False
-    # Define placeholder functions
-    def enhanced_query_aware_analysis(*args, **kwargs):
-        return {"error": "Query-aware analysis not available"}
-    def analyze_query_intent(query):
-        return {"error": "Query intent analysis not available"}
+# Import the necessary libraries for SHAP analysis
+from shap_analyzer import ShapAnalyzer
 
-print(f"🔧 Module loaded - Query-aware available: {QUERY_AWARE_AVAILABLE}")
+# Import utility for creating dummy models if needed
+from create_dummy_model import create_dummy_model_and_data
+
+# Import custom logging configuration
+from logger_config import setup_logger, get_logger
 
 # Redis connection patch for better stability
 from redis_connection_patch import apply_all_patches
@@ -1123,64 +1114,22 @@ def analysis_worker(query):
         analysis_summary = ""
         confidence = 0.85
 
-        if analysis_type == 'correlation':
-            logger.info("Performing query-aware SHAP analysis for 'correlation' type...")
-            shap_results = enhanced_query_aware_analysis(
-                user_query=user_query,
-                analysis_type=analysis_type,
-                target_field=target_field,
-                demographic_filters=demographic_filters
-            )
+        # Initialize the SHAP analyzer
+        analyzer = ShapAnalyzer(
+            model_path='models/xgboost_model.pkl',
+            feature_names_path='models/feature_names.txt'
+        )
+
+        shap_results = analyzer.get_shap_analysis(user_query, analysis_type)
+
+        if shap_results:
             feature_importance = shap_results.get("feature_importance", [])
-            analysis_summary = shap_results.get("summary", "Correlation analysis complete.")
+            analysis_summary = shap_results.get("summary", "Analysis complete.")
             results = shap_results.get("results", data_to_process.to_dict(orient='records'))
-
-        elif analysis_type == 'ranking':
-            filtered_data = data_to_process.sort_values(target_field, ascending=False).head(10)
-            results = filtered_data.to_dict(orient='records')
-            shap_results = enhanced_query_aware_analysis(
-                user_query=user_query,
-                analysis_type=analysis_type,
-                target_field=target_field,
-                demographic_filters=demographic_filters
-            )
-            feature_importance = shap_results.get("feature_importance", [])
-            analysis_summary = shap_results.get("summary", f"Top 10 areas ranked by {target_field}.")
-
-        elif analysis_type == 'jointHigh':
-            if len(demographic_filters) >= 2:
-                field1 = demographic_filters[0].get('field')
-                field2 = demographic_filters[1].get('field')
-
-                if field1 and field2 and field1 in data_to_process.columns and field2 in data_to_process.columns:
-                    q1 = data_to_process[field1].quantile(0.75)
-                    q2 = data_to_process[field2].quantile(0.75)
-                    data_to_process['joint_score'] = data_to_process[field1] + data_to_process[field2]
-                    
-                    # Call the analysis function with the correct arguments
-                    shap_results = enhanced_query_aware_analysis(
-                        user_query=user_query,
-                        analysis_type=analysis_type,
-                        target_field=target_field,
-                        demographic_filters=demographic_filters
-                    )
-                    
-                    # Add joint_score to results
-                    if 'results' in shap_results and isinstance(shap_results['results'], list):
-                        for res in shap_results['results']:
-                            res['joint_score'] = res.get('joint_score', 0)
-                    results = shap_results.get("results", data_to_process.to_dict(orient='records'))
-                    
-                    analysis_summary = shap_results.get("summary", f"Showing areas with high values for both {field1} and {field2}.")
-                    feature_importance = shap_results.get("feature_importance", [])
-                else:
-                    raise APIError(f"One or both fields for jointHigh not found: {field1}, {field2}")
-            else:
-                raise APIError("Joint-high analysis requires at least two demographic filters.")
-        
-        else: # Handle 'distribution' and other types
+        else:
+            # Fallback if shap_results is empty
             results = data_to_process.to_dict(orient='records')
-            analysis_summary = "Analysis complete."
+            analysis_summary = "Analysis complete, but no SHAP results were generated."
 
 
         return {
