@@ -24,6 +24,7 @@ import xgboost as xgb
 import json
 import math
 from typing import List, Dict, Tuple
+from worker_process_fix import apply_all_worker_patches
 
 # Attempt to import query-aware analysis functions
 try:
