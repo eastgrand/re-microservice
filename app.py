@@ -1070,7 +1070,7 @@ def analysis_worker(query):
         min_applications = query.get('minApplications', 1)
 
         # Map conceptual field names from the request to actual database column names
-        target_field = FIELD_MAPPINGS.get(target_field_concept, target_field_concept)
+        target_field = FIELD_MAPPINGS.get(target_field_concept.lower(), target_field_concept)
 
         # Normalize analysis type
         if analysis_type == 'topN':
@@ -1087,8 +1087,8 @@ def analysis_worker(query):
                 op = filt.get('op')
                 value = filt.get('value')
 
-                # Map the conceptual field to the actual column name without erroneous lower() call
-                field = FIELD_MAPPINGS.get(field_concept, field_concept) if field_concept else None
+                # Map the conceptual field to the actual column name
+                field = FIELD_MAPPINGS.get(field_concept.lower(), field_concept) if field_concept else None
 
                 if analysis_type == 'jointHigh' and field:
                     # (Filtering logic as previously implemented)
@@ -1157,9 +1157,9 @@ def analysis_worker(query):
                 field1_concept = demographic_filters[0].get('field')
                 field2_concept = demographic_filters[1].get('field')
 
-                # Map conceptual names to actual column names without erroneous lower() call
-                field1 = FIELD_MAPPINGS.get(field1_concept, field1_concept) if field1_concept else None
-                field2 = FIELD_MAPPINGS.get(field2_concept, field2_concept) if field2_concept else None
+                # Map conceptual names to actual column names
+                field1 = FIELD_MAPPINGS.get(field1_concept.lower(), field1_concept) if field1_concept else None
+                field2 = FIELD_MAPPINGS.get(field2_concept.lower(), field2_concept) if field2_concept else None
 
                 if field1 and field2 and field1 in data_to_process.columns and field2 in data_to_process.columns:
                     q1 = data_to_process[field1].quantile(0.75)
