@@ -24,7 +24,6 @@ import xgboost as xgb
 import json
 import math
 from typing import List, Dict, Tuple
-from catboost import CatBoostClassifier
 
 # Import field mappings and target variable
 from map_nesto_data import FIELD_MAPPINGS, TARGET_VARIABLE
