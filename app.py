@@ -1106,27 +1106,91 @@ def analysis_worker(query):
                         logger.error(f"Could not apply filter {filt}: {e}")
 
         # --- Analysis Logic ---
-        results = []
-        feature_importance = []
+        results: List[Dict] = []
+        feature_importance: List[Dict] = []
         analysis_summary = ""
         confidence = 0.85
 
-        # Initialize the SHAP analyzer
-        analyzer = ShapAnalyzer(
-            model_path='models/xgboost_model.pkl',
-            feature_names_path='models/feature_names.txt'
-        )
+        # ---------------- JOINT HIGH IMPLEMENTATION ----------------
+        if analysis_type in ("joint_high", "jointHigh"):
+            try:
+                # Collect metric fields: target + matched_fields if provided
+                matched_fields = query.get("matched_fields") or query.get("matchedFields") or []
+                if isinstance(matched_fields, str):
+                    matched_fields = [matched_fields]
 
-        shap_results = analyzer.get_shap_analysis(user_query, analysis_type)
+                metrics: List[str] = [target_field] + [f for f in matched_fields if f and f != target_field]
 
-        if shap_results:
-            feature_importance = shap_results.get("feature_importance", [])
-            analysis_summary = shap_results.get("summary", "Analysis complete.")
-            results = shap_results.get("results", data_to_process.to_dict(orient='records'))
+                # Ensure metrics exist in dataframe
+                metrics = [m for m in metrics if m in data_to_process.columns]
+                if len(metrics) < 2:
+                    logger.warning("[joint_high] Fewer than 2 valid metric fields found – returning empty result")
+                    return {
+                        'success': True,
+                        'results': [],
+                        'summary': 'Not enough data for joint-high analysis',
+                        'feature_importance': [],
+                        'confidence': 0.5,
+                        'visualizationData': []
+                    }
+
+                # Compute 75th percentile threshold for each metric
+                thresholds: Dict[str, float] = {}
+                for m in metrics:
+                    thresholds[m] = data_to_process[m].quantile(0.75)
+
+                logger.info(f"[joint_high] Thresholds: {thresholds}")
+
+                # Filter rows meeting all thresholds
+                mask = np.ones(len(data_to_process), dtype=bool)
+                for m in metrics:
+                    mask &= data_to_process[m] >= thresholds[m]
+
+                high_df = data_to_process.loc[mask].copy()
+
+                if high_df.empty:
+                    logger.info("[joint_high] No rows meet joint-high criteria; relaxing to top 100 by combined score")
+                    # Compute combined score and take top rows
+                    for m in metrics:
+                        norm_col = f"{m}_norm"
+                        high_df[norm_col] = (data_to_process[m] - data_to_process[m].min()) / (data_to_process[m].max() - data_to_process[m].min() + 1e-9)
+                    high_df['combined_score'] = high_df[[f"{m}_norm" for m in metrics]].mean(axis=1)
+                    high_df = high_df.sort_values('combined_score', ascending=False).head(100)
+
+                # Prepare results
+                output_cols = ['ID'] + metrics
+                if 'combined_score' in high_df.columns:
+                    output_cols.append('combined_score')
+                else:
+                    # compute combined score quickly
+                    high_df['combined_score'] = high_df[metrics].mean(axis=1)
+                    output_cols.append('combined_score')
+
+                results = high_df[output_cols].to_dict(orient='records')
+                analysis_summary = f"Found {len(results)} areas with jointly high {', '.join(metrics)}."
+
+            except Exception as je:
+                logger.error(f"[joint_high] Error: {je}")
+                results = []
+                analysis_summary = f"Joint-high analysis failed: {je}"
+
+        # ---------------- OTHER ANALYSIS TYPES (default SHAP) ----------------
         else:
-            # Fallback if shap_results is empty
-            results = data_to_process.to_dict(orient='records')
-            analysis_summary = "Analysis complete, but no SHAP results were generated."
+            analyzer = ShapAnalyzer(
+                model_path='models/xgboost_model.pkl',
+                feature_names_path='models/feature_names.txt'
+            )
+
+            shap_results = analyzer.get_shap_analysis(user_query, analysis_type)
+
+            if shap_results:
+                feature_importance = shap_results.get("feature_importance", [])
+                analysis_summary = shap_results.get("summary", "Analysis complete.")
+                results = shap_results.get("results", data_to_process.to_dict(orient='records'))
+            else:
+                # Fallback if shap_results is empty
+                results = data_to_process.to_dict(orient='records')
+                analysis_summary = "Analysis complete, but no SHAP results were generated."
 
 
         return {
