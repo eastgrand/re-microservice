@@ -43,8 +43,8 @@ services:
     name: nesto-shap-worker
     env: python
     buildCommand: >-
-      echo "Building optimized worker service" &&
-      pip cache purge &&
+      echo "Building optimized worker service (Poetry disabled)" && \
+      pip install --upgrade pip && \
       pip install --no-cache-dir -r requirements.txt &&
       chmod +x ./render_pre_deploy.sh &&
       ./render_pre_deploy.sh &&
@@ -70,5 +70,7 @@ services:
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
       - key: REDIS_HEALTH_CHECK_INTERVAL
         value: "30"
+      - key: POETRY_VERSION
+        value: ""
       - key: API_KEY
         sync: false  # This indicates that the value is secret and should be set in the Render dashboard
