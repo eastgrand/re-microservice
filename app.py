@@ -338,7 +338,7 @@ def calculate_feature_importance_for_applications(data: pd.DataFrame) -> List[Di
         term in col.lower() for term in 
         ['household', 'income', 'population', 'density', 'age', 'education']
     )]
-    
+        
     feature_importance = []
     for col in demographic_cols:
         if col != 'FREQUENCY':
@@ -552,9 +552,23 @@ def load_model():
         if is_render:
             gc.enable()
             
-        # Try to load model
-        if os.path.exists(MODEL_PATH):
+        # Prefer modern JSON/UBJ model if present (version-agnostic)
+        json_model_path = os.path.splitext(MODEL_PATH)[0] + ".json"
+        ubj_model_path  = os.path.splitext(MODEL_PATH)[0] + ".ubj"
+
+        if os.path.exists(json_model_path):
+            model = xgb.Booster()
+            model.load_model(json_model_path)
+        elif os.path.exists(ubj_model_path):
+            model = xgb.Booster()
+            model.load_model(ubj_model_path)
+        elif os.path.exists(MODEL_PATH):
+            # Fallback to legacy pickle (may warn on newer XGBoost)
             model = pickle.load(open(MODEL_PATH, 'rb'))
+        else:
+            raise FileNotFoundError("No model file found (.json, .ubj, or .pkl). Please train or re-export the model.")
+
+        # Load feature names if available
             if os.path.exists(FEATURE_NAMES_PATH):
                 with open(FEATURE_NAMES_PATH, 'r') as f:
                     feature_names = [line.strip() for line in f.readlines()]
@@ -562,8 +576,6 @@ def load_model():
                 feature_names = []
                 
             return model, feature_names  # Return None for dataset as it will be created per query
-        else:
-            raise FileNotFoundError("Model not found, please train the model first.")
     except Exception as e:
         logger.error(f"Error loading model: {str(e)}")
         raise
