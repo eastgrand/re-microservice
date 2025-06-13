@@ -1298,19 +1298,34 @@ def analysis_worker(query):
 
         # ---------------- OTHER ANALYSIS TYPES (default SHAP) ----------------
         else:
-            analyzer = ShapAnalyzer(
-                model_path='models/xgboost_model.pkl',
-                feature_names_path='models/feature_names.txt'
-            )
+            # --- Use the enhanced pre-calculated SHAP analysis pipeline ---
+            try:
+                from enhanced_analysis_worker import enhanced_analysis_worker as _enhanced
+                shap_results = _enhanced(query)
 
-            shap_results = analyzer.get_shap_analysis(user_query, analysis_type)
+                # Validate success flag (the helper returns {'success': bool, …})
+                if shap_results and shap_results.get('success') is not False:
+                    # Ensure required keys exist and normalise identifiers for the join step
+                    raw_results = shap_results.get('results', [])
 
-            if shap_results:
-                feature_importance = shap_results.get("feature_importance", [])
-                analysis_summary = shap_results.get("summary", "Analysis complete.")
-                results = shap_results.get("results", data_to_process.to_dict(orient='records'))
-            else:
-                # Generic statistical fallback
+                    for rec in raw_results:
+                        # Promote common identifier keys to canonical names expected by the frontend join
+                        if 'geo_id' not in rec:
+                            if 'ID' in rec:
+                                rec['geo_id'] = rec['ID']
+                            elif 'zip_code' in rec:
+                                rec['geo_id'] = rec['zip_code']
+                        if 'ID' not in rec and 'geo_id' in rec:
+                            rec['ID'] = rec['geo_id']
+
+                    results = raw_results
+                    feature_importance = shap_results.get('feature_importance', [])
+                    analysis_summary = shap_results.get('summary', 'Analysis complete.')
+                else:
+                    raise ValueError("Enhanced SHAP pipeline returned empty or failed result")
+            except Exception as shap_err:
+                logger.error(f"[SHAP] Fallback to generic analysis due to error: {shap_err}")
+                # Generic statistical fallback (as before)
                 results = data_to_process.to_dict(orient='records')
                 feature_importance = calculate_feature_importance(data_to_process, target_field)
                 analysis_summary = generate_simple_summary(results, target_field, [])
