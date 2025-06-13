@@ -23,7 +23,7 @@ import signal
 import xgboost as xgb
 import json
 import math
-from typing import List, Dict, Tuple
+from typing import List, Dict, Any
 from worker_process_fix import apply_all_worker_patches
 
 # Attempt to import query-aware analysis functions
@@ -93,7 +93,29 @@ JOINED_DATASET_PATH = "data/joined_data.csv"  # Joined dataset for analysis
 # --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
 DEFAULT_ANALYSIS_TYPE = 'correlation'
 
+# --- DATASET SCHEMA (column list) -----------------------------------------
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+try:
+    _schema_path = os.path.join(BASE_DIR, 'data', 'cleaned_data.csv')
+    if not os.path.exists(_schema_path):
+        _schema_path = os.path.join(BASE_DIR, 'data', 'nesto_merge_0.csv')
+
+    _df_schema = pd.read_csv(_schema_path, nrows=1)
+    AVAILABLE_COLUMNS = set(_df_schema.columns)
+    logging.getLogger("schema").info(f"[schema] Loaded {len(AVAILABLE_COLUMNS)} columns from {_schema_path}")
+except Exception as schema_err:
+    AVAILABLE_COLUMNS = set()
+    logging.getLogger("schema").error(f"[schema] Could not load dataset schema: {schema_err}")
+
+# ------------- SCHEMA ENDPOINT -------------
+@cross_origin(origins="*", methods=['GET'])
+@app.route('/schema', methods=['GET'])
+def get_schema():
+    """Return the list of available data columns so the UI can validate queries dynamically."""
+    if not AVAILABLE_COLUMNS:
+        return jsonify({"success": False, "error": "Schema not loaded"}), 500
+    return jsonify({"success": True, "columns": sorted(AVAILABLE_COLUMNS)})
 
 # Logging setup (must be before any use of logger)
 logging.basicConfig(
@@ -331,30 +353,26 @@ def generate_analysis_summary(query: str, target_field: str, results: List[Dict]
     # Handle other query types
     # ... existing code for other analysis types ...
 
-def calculate_feature_importance_for_applications(data: pd.DataFrame) -> List[Dict]:
-    """Calculate feature importance specifically for application count analysis"""
-    # Get relevant demographic columns
-    demographic_cols = [col for col in data.columns if any(
-        term in col.lower() for term in 
-        ['household', 'income', 'population', 'density', 'age', 'education']
-    )]
-        
-    feature_importance = []
-    for col in demographic_cols:
-        if col != 'FREQUENCY':
-            # Calculate correlation with FREQUENCY
-            correlation = data[col].corr(data['FREQUENCY'])
-            if not pd.isna(correlation) and abs(correlation) > 0.1:  # Only include meaningful correlations
-                feature_importance.append({
-                    'feature': col,
-                    'importance': correlation,
-                    'correlation_type': 'positive' if correlation > 0 else 'negative'
-                })
-    
-    # Sort by absolute correlation strength
-    feature_importance.sort(key=lambda x: abs(x['importance']), reverse=True)
-    
-    return feature_importance
+def calculate_feature_importance(data: pd.DataFrame, target: str) -> List[Dict]:
+    """Generic Pearson correlation-based importance for numeric target variables."""
+    if target not in data.columns:
+        return []
+
+    # Consider numeric columns only (exclude the target itself)
+    numeric_cols = [c for c in data.select_dtypes(include=['number']).columns if c != target]
+
+    importances: List[Dict] = []
+    for col in numeric_cols:
+        corr = data[col].corr(data[target])
+        if pd.notna(corr) and abs(corr) > 0.1:
+            importances.append({
+                'feature': col,
+                'importance': corr,
+                'correlation_type': 'positive' if corr > 0 else 'negative'
+            })
+
+    importances.sort(key=lambda x: abs(x['importance']), reverse=True)
+    return importances
 
 def sanitize_for_json(obj):
     """Recursively replace NaN, Infinity, -Infinity with None for JSON serialization."""
@@ -374,6 +392,44 @@ def sanitize_for_json(obj):
         return float(obj)
     else:
         return obj
+
+# ----------------------- REQUEST VALIDATION ---------------------------
+ALLOWED_ANALYSIS_TYPES = {
+    'jointHigh', 'joint_high', 'correlation', 'ranking', 'distribution', 'trends', 'topN'
+}
+
+
+def validate_analysis_request(req_json: Dict[str, Any]):
+    """Raise APIError if the request payload is invalid."""
+    if not isinstance(req_json, dict):
+        raise APIError("Request body must be a JSON object", 400)
+
+    # analysis_type
+    analysis_type = req_json.get('analysis_type') or req_json.get('analysisType')
+    if not analysis_type or analysis_type not in ALLOWED_ANALYSIS_TYPES:
+        raise APIError(f"'analysis_type' must be one of {sorted(ALLOWED_ANALYSIS_TYPES)}", 400)
+
+    # target_variable
+    target_variable = req_json.get('target_variable') or req_json.get('targetVariable')
+    if not target_variable:
+        raise APIError("'target_variable' is required", 400)
+    if target_variable not in AVAILABLE_COLUMNS:
+        raise APIError(f"target_variable '{target_variable}' not found in dataset", 400)
+
+    # matched_fields / metrics
+    matched_fields = req_json.get('matched_fields') or req_json.get('matchedFields') or []
+    if isinstance(matched_fields, str):
+        matched_fields = [matched_fields]
+    bad_fields = [m for m in matched_fields if m not in AVAILABLE_COLUMNS]
+    if bad_fields:
+        raise APIError(f"Unknown metric fields: {', '.join(bad_fields)}", 400)
+
+    # All good – normalized payload can be returned if needed
+    return {
+        'analysis_type': analysis_type,
+        'target_variable': target_variable,
+        'matched_fields': matched_fields,
+    }
 
 # --- ASYNC /analyze ENDPOINT FOR RENDER ---
 @cross_origin(origins="*", methods=['POST', 'OPTIONS'], headers=['Content-Type', 'X-API-KEY'], supports_credentials=True)
@@ -395,6 +451,12 @@ def analyze():
         }), 503
     
     try:
+        # Validate the request early
+        try:
+            validate_analysis_request(query)
+        except APIError as ve:
+            return handle_api_error(ve)
+
         # Ensure 'analysis_worker' is defined later in the file
         job = queue.enqueue(analysis_worker, query, job_timeout=600)
         logger.info(f"Enqueued job {job.id}")
@@ -1065,7 +1127,7 @@ def analysis_worker(query):
         # Extract query parameters
         user_query = query.get('query', '')
         analysis_type = query.get('analysis_type', 'unknown')
-        target_field = query.get('target_variable', 'FREQUENCY')
+        target_field = query['target_variable']
         demographic_filters = query.get('demographic_filters', [])
         conversation_context = query.get('conversationContext', '')
         min_applications = query.get('minApplications', 1)
@@ -1179,7 +1241,7 @@ def analysis_worker(query):
                     output_cols.append('combined_score')
 
                 results = high_df[output_cols].to_dict(orient='records')
-                analysis_summary = f"Found {len(results)} areas with jointly high {', '.join(metrics)}."
+                analysis_summary = generate_simple_summary(results, target_field, metrics[1:])
 
             except Exception as je:
                 logger.error(f"[joint_high] Error: {je}")
@@ -1200,9 +1262,10 @@ def analysis_worker(query):
                 analysis_summary = shap_results.get("summary", "Analysis complete.")
                 results = shap_results.get("results", data_to_process.to_dict(orient='records'))
             else:
-                # Fallback if shap_results is empty
+                # Generic statistical fallback
                 results = data_to_process.to_dict(orient='records')
-                analysis_summary = "Analysis complete, but no SHAP results were generated."
+                feature_importance = calculate_feature_importance(data_to_process, target_field)
+                analysis_summary = generate_simple_summary(results, target_field, [])
 
 
         return {
@@ -1304,6 +1367,43 @@ class ShapAnalyzer:
             "summary": "This is a summary of the analysis.",
             "results": [{"ID": "A1A1A1", "value": 123}]
         }
+
+def generate_simple_summary(results: List[Dict], target: str, metrics: List[str]) -> str:
+    if not results:
+        return "No results found matching the specified criteria."
+
+    top = results[:3]
+    areas = [r.get('ID', r.get('FSA_ID', 'Unknown')) for r in top]
+    summary = f"Top areas by {target.replace('_', ' ')}: " + ", ".join(areas)
+    if metrics:
+        summary += f" (evaluated jointly with {', '.join(metrics)})"
+    summary += "."
+    return summary
+
+# ---------------- REQUEST-ID OBSERVABILITY ----------------
+
+class RequestIDFilter(logging.Filter):
+    """Attach the request_id stored on flask.g (if any) to log records."""
+    def filter(self, record):
+        from flask import g
+        record.request_id = getattr(g, 'request_id', '-')
+        return True
+
+# Add the filter to the root logger
+logging.getLogger().addFilter(RequestIDFilter())
+
+@app.before_request
+def attach_request_id():
+    from flask import g, request
+    rid = request.headers.get('X-Request-ID') or str(uuid.uuid4())
+    g.request_id = rid
+
+@app.after_request
+def propagate_request_id(resp):
+    from flask import g
+    if hasattr(g, 'request_id'):
+        resp.headers['X-Request-ID'] = g.request_id
+    return resp
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

@@ -43,8 +43,8 @@ services:
     name: nesto-shap-worker
     env: python
     buildCommand: >-
-      echo "Building optimized worker service (Poetry disabled)" && \
-      pip install --upgrade pip && \
+      echo "Building optimized worker service (Poetry disabled)" &&
+      pip install --upgrade pip &&
       pip install --no-cache-dir -r requirements.txt &&
       chmod +x ./render_pre_deploy.sh &&
       ./render_pre_deploy.sh &&
