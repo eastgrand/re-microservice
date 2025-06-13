@@ -1420,7 +1420,8 @@ def generate_simple_summary(results: List[Dict], target: str, metrics: List[str]
         return "No results found matching the specified criteria."
 
     top = results[:3]
-    areas = [r.get('ID', r.get('FSA_ID', 'Unknown')) for r in top]
+    # Cast identifiers to string to ensure safe joining
+    areas = [str(r.get('ID', r.get('FSA_ID', 'Unknown'))) for r in top]
     summary = f"Top areas by {target.replace('_', ' ')}: " + ", ".join(areas)
     if metrics:
         summary += f" (evaluated jointly with {', '.join(metrics)})"
