@@ -242,6 +242,23 @@ def map_nesto_data(input_path='data/nesto_merge_0.csv', output_path='data/cleane
         if missing_expected:
             logger.error(f"Critical columns missing after mapping: {missing_expected}")
         
+        # -----------------------------------------------------------------
+        # Ensure a canonical geo_id is present and alias it to legacy column
+        # -----------------------------------------------------------------
+        if 'geo_id' not in mapped_df.columns:
+            if 'province_code' in mapped_df.columns:
+                mapped_df['geo_id'] = mapped_df['province_code']
+            elif 'ID' in mapped_df.columns:
+                mapped_df['geo_id'] = mapped_df['ID']
+            elif 'OBJECTID' in df.columns:
+                mapped_df['geo_id'] = df['OBJECTID'].astype(str)
+            else:
+                logger.warning("No obvious identifier column found – synthesising geo_id from index")
+                mapped_df['geo_id'] = mapped_df.index.astype(str)
+
+        # Legacy compatibility: keep an 'ID' column as duplicate of geo_id
+        mapped_df['ID'] = mapped_df['geo_id']
+
         # Save the mapped data
         mapped_df.to_csv(output_path, index=False)
         logger.info(f"Saved mapped data to {output_path} with {len(mapped_df)} records and {len(mapped_df.columns)} columns")

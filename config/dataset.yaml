@@ -1,0 +1,9 @@
+raw_csv: data/nesto_merge_0.csv
+identifier_column: ID
+column_mappings:
+  ID: geo_id
+  OBJECTID: object_id
+  province_code: geo_id  # legacy
+  CONVERSION_RATE: conversion_rate
+  2024 Visible Minority Total Population (%): total_minority_population_pct
+  # ... (keep other mappings in map_nesto_data.py) 

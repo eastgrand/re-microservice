@@ -1246,7 +1246,11 @@ def analysis_worker(query):
 
                 # Dynamically choose an identifier column
                 id_col = None
-                if 'ID' in high_df.columns:
+                if 'geo_id' in high_df.columns:
+                    id_col = 'geo_id'
+                elif 'province_code' in high_df.columns:
+                    id_col = 'province_code'
+                elif 'ID' in high_df.columns:
                     id_col = 'ID'
                 elif 'OBJECTID' in high_df.columns:
                     id_col = 'OBJECTID'
@@ -1260,8 +1264,13 @@ def analysis_worker(query):
                 if id_col != 'ID':
                     high_df['ID'] = high_df[id_col]
 
-                # Always include canonical 'ID' first for frontend join
-                output_cols = ['ID'] + [m for m in metrics if m != 'ID']
+                # Always include canonical 'geo_id' and legacy 'ID'
+                if 'geo_id' not in high_df.columns and id_col != 'geo_id':
+                    high_df['geo_id'] = high_df[id_col]
+                if 'ID' not in high_df.columns:
+                    high_df['ID'] = high_df['geo_id']
+
+                output_cols = ['geo_id', 'ID'] + [m for m in metrics if m not in ('geo_id', 'ID')]
 
                 if 'combined_score' in high_df.columns:
                     output_cols.append('combined_score')
@@ -1326,23 +1335,39 @@ def load_and_preprocess_data():
             alt_raw = '/opt/render/project/src/data/nesto_merge_0.csv'
             raw_path = alt_raw if os.path.exists(alt_raw) else raw_path
 
-        # If the cleaned (mapped) file is missing, attempt to generate it
+        def regenerate_mapped():
+            logger.info("Generating cleaned_data.csv from the latest nesto_merge_0.csv …")
+            from map_nesto_data import map_nesto_data as _map
+            _map(raw_path, mapped_path)
+
+        # Determine if we need to (re)generate the mapped file
+        need_regen = False
         if not os.path.exists(mapped_path):
+            logger.info("cleaned_data.csv is missing – will generate a fresh one.")
+            need_regen = True
+        elif os.path.getmtime(mapped_path) < os.path.getmtime(raw_path):
+            logger.info("cleaned_data.csv is older than nesto_merge_0.csv – will regenerate.")
+            need_regen = True
+
+        if need_regen:
             if not os.path.exists(raw_path):
                 raise FileNotFoundError(
-                    f"Neither mapped dataset ({mapped_path}) nor raw dataset ({raw_path}) found."
+                    f"Raw dataset not found at {raw_path}; cannot generate cleaned_data.csv"
                 )
-
-            logger.info("cleaned_data.csv not found – running map_nesto_data to generate it …")
             try:
-                from map_nesto_data import map_nesto_data as _map
-                _map(raw_path, mapped_path)
+                regenerate_mapped()
             except Exception as map_err:
                 logger.error(f"Failed to map raw data: {map_err}")
                 raise
 
         # Load the cleaned (schema-standardised) dataset
         processed_df = pd.read_csv(mapped_path, low_memory=False)
+
+        # Quick sanity-check: ensure canonical identifier exists
+        if not ({'ID', 'province_code'} & set(processed_df.columns)):
+            logger.warning("cleaned_data.csv missing 'ID'/'province_code' – forcing regeneration once.")
+            regenerate_mapped()
+            processed_df = pd.read_csv(mapped_path, low_memory=False)
 
         # Log the columns after mapping to confirm correctness
         logger.info(
@@ -1421,7 +1446,7 @@ def generate_simple_summary(results: List[Dict], target: str, metrics: List[str]
 
     top = results[:3]
     # Cast identifiers to string to ensure safe joining
-    areas = [str(r.get('ID', r.get('FSA_ID', 'Unknown'))) for r in top]
+    areas = [str(r.get('geo_id', r.get('ID', r.get('FSA_ID', 'Unknown')))) for r in top]
     summary = f"Top areas by {target.replace('_', ' ')}: " + ", ".join(areas)
     if metrics:
         summary += f" (evaluated jointly with {', '.join(metrics)})"
