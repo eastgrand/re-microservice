@@ -42,14 +42,15 @@ services:
   - type: worker
     name: nesto-shap-worker
     env: python
-    buildCommand: >-
-      echo "Building optimized worker service (Poetry disabled)" &&
-      pip install --upgrade pip &&
-      pip install --no-cache-dir -r requirements.txt &&
-      chmod +x ./render_pre_deploy.sh &&
-      ./render_pre_deploy.sh &&
-      chmod +x ./deploy_to_render.sh &&
-      export SKIP_MODEL_TRAINING=true &&
+    buildCommand: |-
+      set -e
+      echo "Building optimized worker service (Poetry disabled)"
+      pip install --upgrade pip
+      pip install --no-cache-dir -r requirements.txt
+      chmod +x ./render_pre_deploy.sh
+      ./render_pre_deploy.sh
+      chmod +x ./deploy_to_render.sh
+      export SKIP_MODEL_TRAINING=true
       ./deploy_to_render.sh
     startCommand: >-
       echo "Starting memory-optimized SHAP worker" &&
