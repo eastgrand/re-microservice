@@ -1208,28 +1208,25 @@ def analysis_worker(query):
                         'visualizationData': []
                     }
 
-                # Compute 75th percentile threshold for each metric
-                thresholds: Dict[str, float] = {}
+                # --- 2025-06-13: Percentile mask disabled to allow larger result set ---
+                # thresholds: Dict[str, float] = {}
+                # for m in metrics:
+                #     thresholds[m] = data_to_process[m].quantile(0.75)
+                # logger.info(f"[joint_high] Thresholds: {thresholds}")
+                # mask = np.ones(len(data_to_process), dtype=bool)
+                # for m in metrics:
+                #     mask &= data_to_process[m] >= thresholds[m]
+                # high_df = data_to_process.loc[mask].copy()
+
+                # For now, evaluate combined score over the **entire** dataset
+                high_df = data_to_process.copy()
+
+                # Compute combined score and take top 100 rows
                 for m in metrics:
-                    thresholds[m] = data_to_process[m].quantile(0.75)
-
-                logger.info(f"[joint_high] Thresholds: {thresholds}")
-
-                # Filter rows meeting all thresholds
-                mask = np.ones(len(data_to_process), dtype=bool)
-                for m in metrics:
-                    mask &= data_to_process[m] >= thresholds[m]
-
-                high_df = data_to_process.loc[mask].copy()
-
-                if high_df.empty:
-                    logger.info("[joint_high] No rows meet joint-high criteria; relaxing to top 100 by combined score")
-                    # Compute combined score and take top rows
-                    for m in metrics:
-                        norm_col = f"{m}_norm"
-                        high_df[norm_col] = (data_to_process[m] - data_to_process[m].min()) / (data_to_process[m].max() - data_to_process[m].min() + 1e-9)
-                    high_df['combined_score'] = high_df[[f"{m}_norm" for m in metrics]].mean(axis=1)
-                    high_df = high_df.sort_values('combined_score', ascending=False).head(100)
+                    norm_col = f"{m}_norm"
+                    high_df[norm_col] = (high_df[m] - high_df[m].min()) / (high_df[m].max() - high_df[m].min() + 1e-9)
+                high_df['combined_score'] = high_df[[f"{m}_norm" for m in metrics]].mean(axis=1)
+                high_df = high_df.sort_values('combined_score', ascending=False).head(100)
 
                 # Prepare results
                 output_cols = ['ID'] + metrics
