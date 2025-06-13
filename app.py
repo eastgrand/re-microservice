@@ -1289,7 +1289,15 @@ def analysis_worker(query):
                 output_cols = high_df.columns.tolist()
 
                 results = high_df[output_cols].to_dict(orient='records')
+
+                # --------------------- FEATURE IMPORTANCE ---------------------
+                feature_importance = calculate_feature_importance(high_df, target_field)
+
+                # --------------------- SUMMARY CONSTRUCTION ------------------
                 analysis_summary = generate_simple_summary(results, target_field, metrics[1:])
+                if feature_importance:
+                    top_feats = ', '.join([fi['feature'].replace('_', ' ') for fi in feature_importance[:3]])
+                    analysis_summary += f" Key factors influencing {target_field.replace('_', ' ')} include {top_feats}."
 
             except Exception as je:
                 logger.error(f"[joint_high] Error: {je}")
