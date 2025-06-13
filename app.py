@@ -23,7 +23,7 @@ import signal
 import xgboost as xgb
 import json
 import math
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from worker_process_fix import apply_all_worker_patches
 
 # Attempt to import query-aware analysis functions
@@ -87,8 +87,9 @@ from rq import Queue, get_current_job
 # --- PATHS FOR MODEL, FEATURE NAMES, AND DATASET ---
 MODEL_PATH = "models/xgboost_model.pkl"  # Update if your model file is named differently
 FEATURE_NAMES_PATH = "models/feature_names.txt"  # Update if your feature names file is named differently
-TRAINING_DATASET_PATH = "data/nesto_merge_0.csv"  # Training dataset
+TRAINING_DATASET_PATH = "data/nesto_merge_0.csv"  # Canonical training dataset
 JOINED_DATASET_PATH = "data/joined_data.csv"  # Joined dataset for analysis
+PRIMARY_DATASET_PATH = TRAINING_DATASET_PATH  # Alias for clarity
 
 # --- DEFAULTS FOR ANALYSIS TYPE AND TARGET VARIABLE ---
 DEFAULT_ANALYSIS_TYPE = 'correlation'
@@ -97,9 +98,10 @@ DEFAULT_ANALYSIS_TYPE = 'correlation'
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 try:
-    _schema_path = os.path.join(BASE_DIR, 'data', 'cleaned_data.csv')
+    # Always use the canonical dataset for schema detection
+    _schema_path = os.path.join(BASE_DIR, PRIMARY_DATASET_PATH)
     if not os.path.exists(_schema_path):
-        _schema_path = os.path.join(BASE_DIR, 'data', 'nesto_merge_0.csv')
+        raise FileNotFoundError(f"Primary dataset not found at {_schema_path}. Ensure data/nesto_merge_0.csv is present.")
 
     _df_schema = pd.read_csv(_schema_path, nrows=1)
     AVAILABLE_COLUMNS = set(_df_schema.columns)
@@ -484,11 +486,21 @@ def job_status(job_id):
         job = queue.fetch_job(job_id)
         if job is None:
             return jsonify({"success": False, "error": "Job not found"}), 404
+
+        # Normalize job status for frontend compatibility
         if job.is_finished:
             result = job.result
             if result is None:
                 return jsonify({"success": False, "error": "Job finished but no result found."}), 500
-            return jsonify({"success": True, "status": "finished", "result": result})
+
+            # The frontend expects the string 'completed' to indicate success.
+            # Preserve backwards-compatibility by also including the legacy 'finished'.
+            return jsonify({
+                "success": True,
+                "status": "completed",
+                "legacy_status": "finished",
+                "result": result
+            })
         elif job.is_failed:
             return jsonify({"success": False, "status": "failed", "error": str(job.exc_info)})
         else:
@@ -734,19 +746,18 @@ def health_check():
         # Try to load dataset info (optional)
         dataset_info = None
         try:
-            dataset_path = 'data/nesto_merge_0.csv'
+            dataset_path = PRIMARY_DATASET_PATH
             if not os.path.exists(dataset_path):
-                dataset_path = 'data/cleaned_data.csv'
+                raise FileNotFoundError(f"Primary dataset not found at {dataset_path}")
             
-            if os.path.exists(dataset_path):
-                # Just get basic info without loading full dataset
-                import pandas as pd
-                sample_data = pd.read_csv(dataset_path, nrows=1)  # Read just one row to get columns
-                dataset_info = {
-                    "columns": list(sample_data.columns),
-                    "column_count": len(sample_data.columns),
-                    "path": dataset_path
-                }
+            # Just get basic info without loading full dataset
+            import pandas as pd
+            sample_data = pd.read_csv(dataset_path, nrows=1)  # Read just one row to get columns
+            dataset_info = {
+                "columns": list(sample_data.columns),
+                "column_count": len(sample_data.columns),
+                "path": dataset_path
+            }
         except Exception as e:
             logger.warning(f"Could not load dataset info: {str(e)}")
             dataset_info = None
@@ -797,9 +808,9 @@ def get_metadata():
         
         # Load dataset for metadata
         try:
-            dataset_path = 'data/nesto_merge_0.csv'
+            dataset_path = PRIMARY_DATASET_PATH
             if not os.path.exists(dataset_path):
-                dataset_path = 'data/cleaned_data.csv'
+                raise FileNotFoundError(f"Primary dataset not found at {dataset_path}")
             
             if not os.path.exists(dataset_path):
                 raise APIError("Dataset file not found", 500)
@@ -1228,12 +1239,28 @@ def analysis_worker(query):
                 high_df['combined_score'] = high_df[[f"{m}_norm" for m in metrics]].mean(axis=1)
                 high_df = high_df.sort_values('combined_score', ascending=False).head(100)
 
-                # Prepare results
-                output_cols = ['ID'] + metrics
+                # Dynamically choose an identifier column
+                id_col = None
+                if 'ID' in high_df.columns:
+                    id_col = 'ID'
+                elif 'OBJECTID' in high_df.columns:
+                    id_col = 'OBJECTID'
+
+                # Fall back to using the dataframe index when no ID column is present
+                if id_col is None:
+                    high_df = high_df.reset_index().rename(columns={'index': 'row_index'})
+                    id_col = 'row_index'
+
+                # Guarantee a canonical 'ID' column for downstream joins
+                if id_col != 'ID':
+                    high_df['ID'] = high_df[id_col]
+
+                output_cols = [id_col] + metrics
+
                 if 'combined_score' in high_df.columns:
                     output_cols.append('combined_score')
                 else:
-                    # compute combined score quickly
+                    # compute combined score quickly if missing
                     high_df['combined_score'] = high_df[metrics].mean(axis=1)
                     output_cols.append('combined_score')
 
