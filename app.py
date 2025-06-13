@@ -1242,7 +1242,22 @@ def analysis_worker(query):
                     norm_col = f"{m}_norm"
                     high_df[norm_col] = (high_df[m] - high_df[m].min()) / (high_df[m].max() - high_df[m].min() + 1e-9)
                 high_df['combined_score'] = high_df[[f"{m}_norm" for m in metrics]].mean(axis=1)
-                high_df = high_df.sort_values('combined_score', ascending=False).head(100)
+
+                # honour optional top_n parameter – if omitted, return **all rows**
+                top_n = query.get('top_n')
+                if top_n is None:
+                    top_n = query.get('limit')
+                if top_n is None:
+                    top_n = -1  # Default: no limit
+
+                try:
+                    top_n = int(top_n)
+                except (TypeError, ValueError):
+                    top_n = -1
+
+                high_df = high_df.sort_values('combined_score', ascending=False)
+                if top_n > 0:
+                    high_df = high_df.head(top_n)
 
                 # Dynamically choose an identifier column
                 id_col = None
@@ -1270,14 +1285,8 @@ def analysis_worker(query):
                 if 'ID' not in high_df.columns:
                     high_df['ID'] = high_df['geo_id']
 
-                output_cols = ['geo_id', 'ID'] + [m for m in metrics if m not in ('geo_id', 'ID')]
-
-                if 'combined_score' in high_df.columns:
-                    output_cols.append('combined_score')
-                else:
-                    # compute combined score quickly if missing
-                    high_df['combined_score'] = high_df[metrics].mean(axis=1)
-                    output_cols.append('combined_score')
+                # Return **all** available columns (features) for each matched area
+                output_cols = high_df.columns.tolist()
 
                 results = high_df[output_cols].to_dict(orient='records')
                 analysis_summary = generate_simple_summary(results, target_field, metrics[1:])
