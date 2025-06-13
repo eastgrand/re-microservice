@@ -1260,7 +1260,8 @@ def analysis_worker(query):
                 if id_col != 'ID':
                     high_df['ID'] = high_df[id_col]
 
-                output_cols = [id_col] + metrics
+                # Always include canonical 'ID' first for frontend join
+                output_cols = ['ID'] + [m for m in metrics if m != 'ID']
 
                 if 'combined_score' in high_df.columns:
                     output_cols.append('combined_score')
