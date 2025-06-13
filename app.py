@@ -1294,10 +1294,10 @@ def analysis_worker(query):
                 feature_importance = calculate_feature_importance(high_df, target_field)
 
                 # --------------------- SUMMARY CONSTRUCTION ------------------
-                analysis_summary = generate_simple_summary(results, target_field, metrics[1:])
+                analysis_summary = _build_joint_high_summary(high_df, metrics, id_col)
                 if feature_importance:
                     top_feats = ', '.join([fi['feature'].replace('_', ' ') for fi in feature_importance[:3]])
-                    analysis_summary += f" Key factors influencing {target_field.replace('_', ' ')} include {top_feats}."
+                    analysis_summary += f"\nDominant driving factors: {top_feats}."
 
             except Exception as je:
                 logger.error(f"[joint_high] Error: {je}")
@@ -1509,6 +1509,63 @@ def propagate_request_id(resp):
     if hasattr(g, 'request_id'):
         resp.headers['X-Request-ID'] = g.request_id
     return resp
+
+# ----------- ADVANCED SUMMARY HELPERS -------------
+
+def _build_joint_high_summary(df: pd.DataFrame, metrics: List[str], id_field: str = 'geo_id', max_clusters: int = 5) -> str:
+    """Return a richer textual summary for joint-high analysis.
+
+    Builds cluster-style insights similar to the front-end Claude prompts:
+    – Ranks clusters defined by the first 3 characters of geo_id.
+    – Lists top areas in each cluster.
+    – Highlights which metric drives the score most (via variance contribution).
+    """
+    if df.empty or 'combined_score' not in df.columns:
+        return "No results available to summarise."
+
+    # Derive region key (FSA prefix or leading part of identifier)
+    def _region(val: str) -> str:
+        if isinstance(val, str):
+            return val[:3].upper()
+        return 'UNK'
+
+    df = df.copy()
+    df['region'] = df[id_field].astype(str).apply(_region)
+
+    # Compute per-region stats
+    region_stats = (
+        df.groupby('region')['combined_score']
+        .agg(['mean', 'count'])
+        .reset_index()
+        .sort_values('mean', ascending=False)
+    )
+
+    top_regions = region_stats.head(max_clusters)
+
+    lines = [
+        f"Top {len(top_regions)} clusters by average combined score (joint ranking of {', '.join(metrics)})"
+    ]
+
+    for rank, row in enumerate(top_regions.itertuples(index=False), 1):
+        region_key = row.region
+        subset = df[df['region'] == region_key].sort_values('combined_score', ascending=False)
+        top_ids = subset[id_field].astype(str).head(5).tolist()
+        mean_score = row.mean
+        lines.append(
+            f"#{rank}: Region {region_key}xx — avg score {mean_score:.2f} across {row.count} areas. "
+            f"Top FSAs: {', '.join(top_ids)}"
+        )
+
+    # Identify which metric contributes most to score variance
+    var_contrib = {}
+    for m in metrics:
+        if m + '_norm' in df.columns:
+            var_contrib[m] = df[m + '_norm'].var()
+    if var_contrib:
+        dominant = max(var_contrib.items(), key=lambda x: x[1])[0]
+        lines.append(f"Across all clusters, '{dominant}' shows the greatest variability and therefore drives most of the combined score differences.")
+
+    return "\n".join(lines)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
