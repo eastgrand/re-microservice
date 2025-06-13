@@ -87,7 +87,7 @@ from rq import Queue, get_current_job
 # --- PATHS FOR MODEL, FEATURE NAMES, AND DATASET ---
 MODEL_PATH = "models/xgboost_model.pkl"  # Update if your model file is named differently
 FEATURE_NAMES_PATH = "models/feature_names.txt"  # Update if your feature names file is named differently
-TRAINING_DATASET_PATH = "data/nesto_merge_0.csv"  # Canonical training dataset
+TRAINING_DATASET_PATH = "data/cleaned_data.csv"  # Canonical training dataset (mapped columns)
 JOINED_DATASET_PATH = "data/joined_data.csv"  # Joined dataset for analysis
 PRIMARY_DATASET_PATH = TRAINING_DATASET_PATH  # Alias for clarity
 
@@ -101,7 +101,7 @@ try:
     # Always use the canonical dataset for schema detection
     _schema_path = os.path.join(BASE_DIR, PRIMARY_DATASET_PATH)
     if not os.path.exists(_schema_path):
-        raise FileNotFoundError(f"Primary dataset not found at {_schema_path}. Ensure data/nesto_merge_0.csv is present.")
+        raise FileNotFoundError(f"Primary dataset not found at {_schema_path}. Ensure data/cleaned_data.csv is present.")
 
     _df_schema = pd.read_csv(_schema_path, nrows=1)
     AVAILABLE_COLUMNS = set(_df_schema.columns)
@@ -1143,6 +1143,14 @@ def analysis_worker(query):
         conversation_context = query.get('conversationContext', '')
         min_applications = query.get('minApplications', 1)
 
+        # Use the preprocessed global dataframe; reload if it failed earlier
+        global data
+        if data is None or data.empty:
+            logger.warning("Global dataframe 'data' is empty – reloading via load_and_preprocess_data()")
+            data = load_and_preprocess_data()
+            if data is None or data.empty:
+                raise APIError("Failed to load analysis dataset.", 500)
+
         # The data is now loaded and columns are renamed.
         # We can directly use the clean conceptual names from the request.
 
@@ -1150,9 +1158,6 @@ def analysis_worker(query):
         if analysis_type == 'topN':
             logger.info("Performing SHAP analysis for 'topN' type...")
             analysis_type = 'ranking'
-
-        # Load Data
-        data = pd.read_csv(TRAINING_DATASET_PATH)
 
         # --- General Purpose Filtering ---
         data_to_process = data.copy()
@@ -1311,21 +1316,38 @@ def load_and_preprocess_data():
     This function now uses the correct data mapping script.
     """
     try:
-        # Corrected file path
-        file_path = os.path.join(os.path.dirname(__name__), 'data', 'nesto_merge_0.csv')
-        
-        if not os.path.exists(file_path):
-            logger.error(f"Data file not found at {file_path}")
-            # Fallback to a known location for Render deployment
-            file_path = '/opt/render/project/src/data/nesto_merge_0.csv'
-            if not os.path.exists(file_path):
-                 raise FileNotFoundError(f"Data file not found at {file_path} or fallback location.")
+        base_dir = os.path.dirname(__file__)
+        raw_path = os.path.join(base_dir, 'data', 'nesto_merge_0.csv')
+        mapped_path = os.path.join(base_dir, 'data', 'cleaned_data.csv')
 
-        # Apply the standardized mapping
-        processed_df = pd.read_csv(file_path) # Data is already mapped during build
-        
+        # Honour Render's container path layout as a secondary lookup
+        if not os.path.exists(raw_path):
+            alt_raw = '/opt/render/project/src/data/nesto_merge_0.csv'
+            raw_path = alt_raw if os.path.exists(alt_raw) else raw_path
+
+        # If the cleaned (mapped) file is missing, attempt to generate it
+        if not os.path.exists(mapped_path):
+            if not os.path.exists(raw_path):
+                raise FileNotFoundError(
+                    f"Neither mapped dataset ({mapped_path}) nor raw dataset ({raw_path}) found."
+                )
+
+            logger.info("cleaned_data.csv not found – running map_nesto_data to generate it …")
+            try:
+                from map_nesto_data import map_nesto_data as _map
+                _map(raw_path, mapped_path)
+            except Exception as map_err:
+                logger.error(f"Failed to map raw data: {map_err}")
+                raise
+
+        # Load the cleaned (schema-standardised) dataset
+        processed_df = pd.read_csv(mapped_path, low_memory=False)
+
         # Log the columns after mapping to confirm correctness
-        logger.info(f"Columns after loading pre-mapped data: {processed_df.columns.tolist()}")
+        logger.info(
+            "Loaded %d records with %d columns from cleaned_data.csv. Sample columns: %s",
+            len(processed_df), len(processed_df.columns), processed_df.columns[:10].tolist()
+        )
 
         return processed_df
     except FileNotFoundError as e:
