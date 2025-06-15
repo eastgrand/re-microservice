@@ -106,7 +106,8 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
     logging.info("Renamed columns based on master schema.")
     
     # Ensure all columns required by the schema exist, otherwise log a warning
-    final_columns = list(FIELD_MAPPINGS.values())
+    # The final columns should be the canonical names from the master schema.
+    final_columns = [details['canonical_name'] for _, details in MASTER_SCHEMA.items()]
     for col in final_columns:
         if col not in df.columns:
             logging.warning(f"Column '{col}' not found in DataFrame after renaming. It will be missing from the output.")
