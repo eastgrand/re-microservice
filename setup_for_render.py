@@ -64,8 +64,9 @@ def setup_environment():
     # Step 3: Run the data mapping script
     try:
         logger.info("Mapping data fields...")
-        from map_nesto_data import map_nesto_data
-        mapped_data = map_nesto_data(nesto_data_path, 'data/cleaned_data.csv')
+        from map_nesto_data import load_and_preprocess_data
+        # The function now reads its config internally, so no args are needed.
+        load_and_preprocess_data()
         logger.info("Data mapping completed successfully")
 
         # --- AUTOMATION: Rename CONVERSION_RATE to CONVERSIONRATE in cleaned_data.csv ---
