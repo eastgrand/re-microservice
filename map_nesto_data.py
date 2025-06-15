@@ -94,9 +94,8 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
     # Define paths relative to the script's location
     base_path = script_dir
     raw_data_path = os.path.join(base_path, config['raw_csv'])
-    raw_filename = os.path.basename(config['raw_csv'])
-    cleaned_filename = f"cleaned_{raw_filename}"
-    cleaned_data_path = os.path.join(base_path, 'data', cleaned_filename)
+    # Ensure the cleaned data path is always 'data/cleaned_data.csv'
+    cleaned_data_path = os.path.join(base_path, 'data', 'cleaned_data.csv')
 
     logging.info(f"Loading raw data from: {raw_data_path}")
     df = pd.read_csv(raw_data_path)
