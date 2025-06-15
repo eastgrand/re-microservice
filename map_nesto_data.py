@@ -100,20 +100,25 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
 
     logging.info(f"Loading raw data from: {raw_data_path}")
     df = pd.read_csv(raw_data_path)
+    logging.info(f"Initial columns from raw CSV: {df.columns.tolist()}")
     
     # Rename columns based on the dynamic FIELD_MAPPINGS
     df.rename(columns=FIELD_MAPPINGS, inplace=True)
     logging.info("Renamed columns based on master schema.")
+    logging.info(f"Columns after renaming: {df.columns.tolist()}")
     
     # Ensure all columns required by the schema exist, otherwise log a warning
     # The final columns should be the canonical names from the master schema.
     final_columns = [details['canonical_name'] for _, details in MASTER_SCHEMA.items()]
+    logging.info(f"Canonical columns to keep: {final_columns}")
+
     for col in final_columns:
         if col not in df.columns:
             logging.warning(f"Column '{col}' not found in DataFrame after renaming. It will be missing from the output.")
     
     # Select only the columns defined in our canonical schema
     df = df[[col for col in final_columns if col in df.columns]]
+    logging.info(f"Final columns being saved to cleaned_data.csv: {df.columns.tolist()}")
 
     # Convert specified columns to numeric, coercing errors
     logging.info(f"Converting numeric columns: {NUMERIC_COLS}")
