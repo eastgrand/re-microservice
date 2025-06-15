@@ -210,3 +210,69 @@ def internal_server_error(error):
 if __name__ == '__main__':
     # Note: Running in debug mode is not recommended for production
     app.run(debug=True, port=5001)
+
+""" 
+# ---------------------------------------------------------------------------
+# (Optional) ASYNC ANALYSIS ENDPOINTS – Disabled by default
+# ---------------------------------------------------------------------------
+# The following Flask routes implement the original asynchronous pattern using
+# Redis + RQ.  They are **commented out** to keep the current deployment
+# simple and synchronous, but can be re-enabled easily if long-running jobs or
+# high request concurrency make it necessary again.
+#
+# Requirements:
+#   pip install rq redis
+#   export REDIS_URL=redis://:password@hostname:port/0
+#
+# How to enable:
+#   1. Uncomment the code below.
+#   2. Start an RQ worker:  rq worker shap-queue --url $REDIS_URL
+#   3. Point the frontend to POST /submit_analysis instead of /analyze.
+# ---------------------------------------------------------------------------
+
+"""
+
+# from rq import Queue
+# from uuid import uuid4
+#
+# # --- Redis connection & queue ---
+# redis_url = os.getenv('REDIS_URL')
+# if redis_url:
+#     redis_conn = redis.from_url(redis_url)
+#     job_queue = Queue('shap-queue', connection=redis_conn)
+#     logger.info('Redis queue initialised for async analysis.')
+# else:
+#     redis_conn = None
+#     job_queue = None
+#     logger.warning('REDIS_URL not set – async analysis endpoints will refuse requests.')
+#
+# @app.route('/submit_analysis', methods=['POST'])
+# def submit_analysis():
+#     """Enqueue a long-running SHAP analysis job and return a job_id."""
+#     if job_queue is None:
+#         abort(503, description='Async analysis service not configured (REDIS_URL missing).')
+#
+#     data = request.json or {}
+#     job_id = str(uuid4())
+#     job = job_queue.enqueue(analysis_worker, data, job_id=job_id)
+#     logger.info(f'Enqueued analysis job {job_id}')
+#     return jsonify({'job_id': job_id, 'status': job.get_status()}), 202
+#
+# @app.route('/job_status/<job_id>', methods=['GET'])
+# def job_status(job_id):
+#     """Check the status or retrieve the result of a queued analysis job."""
+#     if job_queue is None:
+#         abort(503, description='Async analysis service not configured.')
+#
+#     job = job_queue.fetch_job(job_id)
+#     if job is None:
+#         abort(404, description='Job ID not found')
+#
+#     if job.is_finished:
+#         return jsonify({'status': 'completed', 'result': job.result})
+#     if job.is_failed:
+#         return jsonify({'status': 'failed', 'error': str(job.exc_info)}), 500
+#
+#     return jsonify({'status': job.get_status()}), 202
+
+# ---------------------------------------------------------------------------

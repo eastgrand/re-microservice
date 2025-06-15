@@ -114,7 +114,7 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
     for col in final_columns:
         if col not in df.columns:
             logging.warning(f"Column '{col}' not found in DataFrame after renaming. It will be missing from the output.")
-    
+        
     # Select only the columns defined in our canonical schema
     df = df[[col for col in final_columns if col in df.columns]]
     logging.info(f"Final columns being saved to cleaned_data.csv: {df.columns.tolist()}")
@@ -126,7 +126,7 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
             df[col] = pd.to_numeric(df[col], errors='coerce')
         else:
             logging.warning(f"Numeric column '{col}' not found for type conversion.")
-            
+        
     # Fill NaN values with the median of the column
     df.fillna(df.median(numeric_only=True), inplace=True)
     logging.info("Filled NaN values with column medians.")
@@ -135,9 +135,9 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
     os.makedirs(os.path.dirname(cleaned_data_path), exist_ok=True)
     df.to_csv(cleaned_data_path, index=False)
     logging.info(f"Cleaned data saved to: {cleaned_data_path}")
-
+        
     return df
-
+        
 if __name__ == '__main__':
     # This allows the script to be run directly to regenerate the cleaned data
     load_and_preprocess_data()
