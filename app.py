@@ -32,11 +32,6 @@ FEATURE_NAMES_PATH = "models/feature_names.txt"
 model = None
 feature_names = None
 
-
-# --- Redis/RQ Setup ---
-# Use the REDIS_URL from environment variables, which is standard for Render deployments
-
-
 # --- Data and Model Loading ---
 df = None
 AVAILABLE_COLUMNS = set()
@@ -111,7 +106,6 @@ def analysis_worker(analysis_request):
             'message': 'An error occurred during SHAP analysis.',
             'error_details': str(e)
         }
-
 
 # === API Endpoints ===
 

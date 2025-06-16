@@ -5,73 +5,18 @@ import os
 import logging
 from typing import List, Dict
 
+# Import the query classifier
+from query_classifier import QueryClassifier, process_query
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
 def select_model_for_analysis(query):
     """Select the best pre-calculated model based on the analysis request"""
     
-    analysis_type = query.get('analysis_type', 'correlation')
-    target_variable = query.get('target_variable', 'CONVERSION_RATE')
-    focus_area = query.get('focus_area', None)
-    user_query = query.get('query', '').lower()
-    conversation_context = query.get('conversationContext', '').lower()
-    
-    # Load available models metadata
-    metadata_path = 'precalculated/models/metadata.json'
-    if not os.path.exists(metadata_path):
-        return 'conversion'  # Fallback to default
-    
-    with open(metadata_path, 'r') as f:
-        available_models = json.load(f)
-    
-    # Check for specific concepts in query and context
-    specific_concepts = set()
-    
-    # Check query for specific concepts
-    if 'diversity' in user_query or 'population' in user_query:
-        specific_concepts.add('demographic')
-    if 'income' in user_query or 'financial' in user_query:
-        specific_concepts.add('financial')
-    if 'housing' in user_query or 'structure' in user_query:
-        specific_concepts.add('geographic')
-    
-    # Check conversation context for additional concepts
-    if conversation_context:
-        if 'diversity' in conversation_context or 'population' in conversation_context:
-            specific_concepts.add('demographic')
-        if 'income' in conversation_context or 'financial' in conversation_context:
-            specific_concepts.add('financial')
-        if 'housing' in conversation_context or 'structure' in conversation_context:
-            specific_concepts.add('geographic')
-    
-    # Model selection logic based on specific concepts
-    if target_variable == 'CONVERSION_RATE':
-        if 'demographic' in specific_concepts and 'financial' not in specific_concepts:
-            return 'demographic_analysis'
-        elif 'geographic' in specific_concepts and 'financial' not in specific_concepts:
-            return 'geographic_analysis'
-        elif 'financial' in specific_concepts:
-            return 'financial_analysis'
-        else:
-            return 'conversion'  # General conversion model
-    elif target_variable == 'SUM_FUNDED':
-        if 'demographic' in specific_concepts:
-            return 'demographic_volume'
-        elif 'geographic' in specific_concepts:
-            return 'geographic_volume'
-        else:
-            return 'volume'
-    elif target_variable == 'FREQUENCY':
-        if 'demographic' in specific_concepts:
-            return 'demographic_frequency'
-        elif 'geographic' in specific_concepts:
-            return 'geographic_frequency'
-        else:
-            return 'frequency'
-    else:
-        # Default to conversion model
-        return 'conversion'
+    # For now, we only have one model available, but we'll use query classification
+    # to determine how to analyze the data differently
+    return 'conversion'
 
 def load_precalculated_model_data(model_name):
     """Load pre-calculated SHAP data for specified model"""
@@ -93,10 +38,24 @@ def load_precalculated_model_data(model_name):
     return precalc_df, model_info
 
 def enhanced_analysis_worker(query):
-    """Enhanced analysis worker with multiple model support"""
+    """Enhanced analysis worker with query-aware analysis"""
     
     try:
-        # Select appropriate model
+        # Extract the actual user query from the request
+        user_query = query.get('query', '')
+        analysis_type = query.get('analysis_type', 'correlation')
+        conversation_context = query.get('conversationContext', '')
+        
+        logger.info(f"Processing query: {user_query}")
+        logger.info(f"Analysis type: {analysis_type}")
+        
+        # Use query classifier to understand the query intent
+        classifier = QueryClassifier()
+        query_classification = process_query(user_query)
+        
+        logger.info(f"Query classification: {query_classification}")
+        
+        # Select appropriate model (for now, always 'conversion')
         selected_model = select_model_for_analysis(query)
         logger.info(f"Selected model: {selected_model} for analysis")
         
@@ -111,92 +70,233 @@ def enhanced_analysis_worker(query):
         logger.info(f"Features: {len(features)}")
         logger.info(f"Model R² score: {model_info['r2_score']:.4f}")
         
-        # Apply filters to data (same as before)
+        # Apply query-aware filtering and analysis
+        filtered_data, query_specific_features = apply_query_aware_analysis(
+            precalc_df, query_classification, user_query, conversation_context
+        )
+        
+        # Apply additional filters from request
         filters = query.get('demographic_filters', [])
-        filtered_ids = apply_filters_to_get_ids(precalc_df, filters, target_variable)
+        if filters:
+            filtered_ids = apply_filters_to_get_ids(filtered_data, filters, target_variable)
+            filtered_data = filtered_data[filtered_data['ID'].isin(filtered_ids)]
         
-        # Get top areas based on target variable
-        top_data = precalc_df[precalc_df['ID'].isin(filtered_ids)]
-        top_data = top_data.nlargest(25, target_variable)
+        # Get top areas based on query-specific ranking
+        top_data = get_query_aware_top_areas(
+            filtered_data, query_classification, target_variable, user_query
+        )
         
-        # Extract SHAP values for this model's features
-        shap_columns = [f'shap_{feature}' for feature in features if f'shap_{feature}' in precalc_df.columns]
-        shap_values_data = top_data[shap_columns].values
+        # Calculate query-aware feature importance
+        feature_importance = calculate_query_aware_feature_importance(
+            top_data, query_specific_features, query_classification
+        )
         
-        # Calculate feature importance
-        feature_importance = []
-        for i, feature in enumerate(features):
-            if f'shap_{feature}' in precalc_df.columns:
-                shap_col_idx = [j for j, col in enumerate(shap_columns) if col == f'shap_{feature}'][0]
-                importance = abs(shap_values_data[:, shap_col_idx]).mean()
-                feature_importance.append({'feature': feature, 'importance': float(importance)})
+        # Build results with query-specific fields
+        results = build_query_aware_results(top_data, target_variable, query_classification)
         
-        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
-        
-        # Build results
-        results = []
-        for _, row in top_data.iterrows():
-            result = {
-                'geo_id': str(row['ID']),
-                'FSA_ID': str(row['ID']),  # Add FSA_ID for geographic joining
-                'ID': str(row['ID']),      # Add ID for geographic joining
-                target_variable.lower(): float(row[target_variable])
-            }
-            
-            # Add key demographic/geographic fields with expected field names
-            # Always include conversion rate if available
-            if 'CONVERSION_RATE' in row:
-                result['conversion_rate'] = float(row['CONVERSION_RATE'])
-            
-            # Add demographic fields with expected names (using correct field names with 'value_' prefix)
-            if 'value_2024 Visible Minority Total Population (%)' in row:
-                result['visible_minority_population_pct'] = float(row['value_2024 Visible Minority Total Population (%)'])
-            
-            # Add other common fields that might be expected
-            if 'value_2024 Total Population' in row:
-                result['total_population'] = float(row['value_2024 Total Population'])
-            
-            if 'value_2024 Household Average Income (Current Year $)' in row:
-                result['household_average_income'] = float(row['value_2024 Household Average Income (Current Year $)'])
-            
-            # Add geographic fields
-            if 'value_2024 Structure Type Single-Detached House (%)' in row:
-                result['single_detached_house_pct'] = float(row['value_2024 Structure Type Single-Detached House (%)'])
-            
-            if 'value_2024 Condominium Status - In Condo (%)' in row:
-                result['condominium_pct'] = float(row['value_2024 Condominium Status - In Condo (%)'])
-            
-            results.append(result)
-        
-        # No summary generation - this is handled by Claude in the narrative pass
-        # The microservice only provides statistical data and feature importance
-        summary = None  # Let Claude handle all narrative explanations
-        
-        # Build SHAP values dict
+        # Build SHAP values dict for relevant features
         shap_values_dict = {}
-        for i, feature in enumerate(features):
-            if f'shap_{feature}' in precalc_df.columns:
-                shap_col_idx = [j for j, col in enumerate(shap_columns) if col == f'shap_{feature}'][0]
-                shap_values_dict[feature] = shap_values_data[:, shap_col_idx].tolist()[:10]
+        for feature in query_specific_features[:10]:  # Top 10 most relevant features
+            shap_col = f'shap_{feature}'
+            if shap_col in top_data.columns:
+                shap_values_dict[feature] = top_data[shap_col].tolist()[:10]
         
         return {
             "success": True,
             "results": results,
-            "summary": summary,
+            "summary": None,  # Let Claude handle all narrative explanations
             "feature_importance": feature_importance,
             "shap_values": shap_values_dict,
             "model_info": {
                 "model_name": selected_model,
-                "model_description": model_info['description'],
+                "model_description": f"{model_info['description']} - Query-aware analysis for: {query_classification.get('query_type', 'general')}",
                 "target_variable": target_variable,
-                "feature_count": len(features),
-                "r2_score": model_info['r2_score']
+                "feature_count": len(query_specific_features),
+                "r2_score": model_info['r2_score'],
+                "query_classification": query_classification
             }
         }
         
     except Exception as e:
         logger.error(f"Enhanced analysis error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
+
+def apply_query_aware_analysis(df, query_classification, user_query, conversation_context):
+    """Apply query-specific filtering and feature selection"""
+    
+    query_type = query_classification.get('query_type', 'unknown')
+    target_variable = query_classification.get('target_variable', 'CONVERSION_RATE')
+    
+    logger.info(f"Applying query-aware analysis for type: {query_type}")
+    
+    # Start with all data
+    filtered_data = df.copy()
+    
+    # Define query-specific feature priorities
+    query_specific_features = []
+    
+    if 'diversity' in user_query.lower() or 'population' in user_query.lower():
+        # Prioritize demographic features
+        demographic_features = [f for f in df.columns if 'Visible Minority' in f or 'Population' in f]
+        query_specific_features.extend(demographic_features)
+        logger.info(f"Diversity query detected - prioritizing {len(demographic_features)} demographic features")
+        
+    if 'income' in user_query.lower() or 'financial' in user_query.lower():
+        # Prioritize financial features
+        financial_features = [f for f in df.columns if 'Income' in f or 'Financial' in f or 'Mortgage' in f]
+        query_specific_features.extend(financial_features)
+        logger.info(f"Income query detected - prioritizing {len(financial_features)} financial features")
+        
+    if 'housing' in user_query.lower() or 'condo' in user_query.lower() or 'structure' in user_query.lower():
+        # Prioritize housing features
+        housing_features = [f for f in df.columns if 'Structure' in f or 'Housing' in f or 'Condominium' in f or 'Tenure' in f]
+        query_specific_features.extend(housing_features)
+        logger.info(f"Housing query detected - prioritizing {len(housing_features)} housing features")
+    
+    # If no specific features identified, use top features by SHAP importance
+    if not query_specific_features:
+        # Get all SHAP columns and find the most important ones
+        shap_columns = [col for col in df.columns if col.startswith('shap_')]
+        if shap_columns:
+            # Calculate average absolute SHAP values for each feature
+            feature_importance_scores = {}
+            for shap_col in shap_columns:
+                feature_name = shap_col.replace('shap_', '')
+                if feature_name in df.columns:
+                    avg_importance = abs(df[shap_col]).mean()
+                    feature_importance_scores[feature_name] = avg_importance
+            
+            # Sort by importance and take top features
+            sorted_features = sorted(feature_importance_scores.items(), key=lambda x: x[1], reverse=True)
+            query_specific_features = [f[0] for f in sorted_features[:20]]
+            logger.info(f"Using top {len(query_specific_features)} features by SHAP importance")
+    
+    return filtered_data, query_specific_features
+
+def get_query_aware_top_areas(df, query_classification, target_variable, user_query):
+    """Get top areas using query-aware ranking"""
+    
+    query_type = query_classification.get('query_type', 'unknown')
+    
+    # For diversity queries, we might want to weight areas with higher diversity
+    if 'diversity' in user_query.lower():
+        # Create a diversity score
+        diversity_cols = [col for col in df.columns if 'Visible Minority' in col and col != 'value_2024 Visible Minority Total Population (%)']
+        if diversity_cols and 'value_2024 Visible Minority Total Population (%)' in df.columns:
+            # Calculate diversity index (higher when multiple groups are present)
+            df_copy = df.copy()
+            df_copy['diversity_score'] = df_copy['value_2024 Visible Minority Total Population (%)']
+            
+            # Combine with conversion rate for ranking
+            df_copy['combined_score'] = (
+                df_copy[target_variable] * 0.7 + 
+                df_copy['diversity_score'] * 0.3
+            )
+            
+            top_data = df_copy.nlargest(25, 'combined_score')
+            logger.info("Applied diversity-aware ranking")
+            return top_data
+    
+    # For income queries, weight by income levels
+    elif 'income' in user_query.lower():
+        income_col = 'value_2024 Household Average Income (Current Year $)'
+        if income_col in df.columns:
+            df_copy = df.copy()
+            # Normalize income for scoring
+            income_normalized = (df_copy[income_col] - df_copy[income_col].min()) / (df_copy[income_col].max() - df_copy[income_col].min())
+            
+            df_copy['combined_score'] = (
+                df_copy[target_variable] * 0.7 + 
+                income_normalized * 0.3
+            )
+            
+            top_data = df_copy.nlargest(25, 'combined_score')
+            logger.info("Applied income-aware ranking")
+            return top_data
+    
+    # For housing queries, weight by housing characteristics
+    elif 'condo' in user_query.lower():
+        condo_col = 'value_2024 Condominium Status - In Condo (%)'
+        if condo_col in df.columns:
+            df_copy = df.copy()
+            df_copy['combined_score'] = (
+                df_copy[target_variable] * 0.7 + 
+                df_copy[condo_col] * 0.3
+            )
+            
+            top_data = df_copy.nlargest(25, 'combined_score')
+            logger.info("Applied condo-aware ranking")
+            return top_data
+    
+    # Default ranking by target variable only
+    top_data = df.nlargest(25, target_variable)
+    logger.info("Applied default ranking by target variable")
+    return top_data
+
+def calculate_query_aware_feature_importance(df, query_specific_features, query_classification):
+    """Calculate feature importance with query-specific weighting"""
+    
+    feature_importance = []
+    
+    for feature in query_specific_features:
+        shap_col = f'shap_{feature}'
+        if shap_col in df.columns:
+            importance = abs(df[shap_col]).mean()
+            feature_importance.append({
+                'feature': feature,
+                'importance': float(importance)
+            })
+    
+    # Sort by importance
+    feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+    
+    # Limit to top 15 features for clarity
+    return feature_importance[:15]
+
+def build_query_aware_results(df, target_variable, query_classification):
+    """Build results with query-specific field selection"""
+    
+    results = []
+    for _, row in df.iterrows():
+        result = {
+            'geo_id': str(row['ID']),
+            'FSA_ID': str(row['ID']),
+            'ID': str(row['ID']),
+            target_variable.lower(): float(row[target_variable])
+        }
+        
+        # Always include conversion rate
+        if 'CONVERSION_RATE' in row:
+            result['conversion_rate'] = float(row['CONVERSION_RATE'])
+        
+        # Add query-specific fields
+        # Demographic fields
+        if 'value_2024 Visible Minority Total Population (%)' in row:
+            result['visible_minority_population_pct'] = float(row['value_2024 Visible Minority Total Population (%)'])
+        
+        if 'value_2024 Total Population' in row:
+            result['total_population'] = float(row['value_2024 Total Population'])
+        
+        # Financial fields
+        if 'value_2024 Household Average Income (Current Year $)' in row:
+            result['household_average_income'] = float(row['value_2024 Household Average Income (Current Year $)'])
+        
+        # Housing fields
+        if 'value_2024 Structure Type Single-Detached House (%)' in row:
+            result['single_detached_house_pct'] = float(row['value_2024 Structure Type Single-Detached House (%)'])
+        
+        if 'value_2024 Condominium Status - In Condo (%)' in row:
+            result['condominium_pct'] = float(row['value_2024 Condominium Status - In Condo (%)'])
+        
+        # Add combined score if it was calculated
+        if 'combined_score' in row:
+            result['combined_score'] = float(row['combined_score'])
+        
+        results.append(result)
+    
+    return results
 
 def apply_filters_to_get_ids(df, filters, target_col):
     """Apply filters and return matching IDs"""
