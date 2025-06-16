@@ -23,6 +23,26 @@ python3 setup_for_render.py
 python3 fix_categorical_types.py
 python3 fix_categorical_data.py
 
+# Ensure data is properly processed with full schema
+echo "Regenerating cleaned data with full schema..."
+python3 map_nesto_data.py
+echo "Data regeneration complete - verifying field count..."
+python3 -c "
+import pandas as pd
+import os
+if os.path.exists('data/cleaned_data.csv'):
+    df = pd.read_csv('data/cleaned_data.csv')
+    print(f'✅ Cleaned data has {len(df.columns)} columns')
+    print(f'✅ Sample fields: {list(df.columns[:10])}')
+    if len(df.columns) < 100:
+        print('⚠️  WARNING: Field count is low - may indicate schema filtering issue')
+    else:
+        print('✅ Field count looks good for full schema')
+else:
+    print('❌ ERROR: cleaned_data.csv not found after regeneration')
+    exit(1)
+"
+
 # Use both direct flag check and environment variable for flexibility
 SKIP_TRAINING=false
 

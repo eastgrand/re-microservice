@@ -184,8 +184,15 @@ Thumbs.db
 # Local data files
 data/raw/
 data/processed/
-*.csv
-*.json
+# Allow essential data files for deployment
+!data/cleaned_data.csv
+!data/nesto_merge_0.csv
+!data/NESTO_FIELD_MAPPING.md
+!data/versions.json
+# Exclude other CSV files
+temp_*.csv
+test_*.csv
+backup_*.csv
 *.parquet
 
 # Logs
