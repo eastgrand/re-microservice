@@ -148,23 +148,23 @@ def enhanced_analysis_worker(query):
             if 'CONVERSION_RATE' in row:
                 result['conversion_rate'] = float(row['CONVERSION_RATE'])
             
-            # Add demographic fields with expected names
-            if '2024 Visible Minority Total Population (%)' in row:
-                result['visible_minority_population_pct'] = float(row['2024 Visible Minority Total Population (%)'])
+            # Add demographic fields with expected names (using correct field names with 'value_' prefix)
+            if 'value_2024 Visible Minority Total Population (%)' in row:
+                result['visible_minority_population_pct'] = float(row['value_2024 Visible Minority Total Population (%)'])
             
             # Add other common fields that might be expected
-            if '2024 Total Population' in row:
-                result['total_population'] = float(row['2024 Total Population'])
+            if 'value_2024 Total Population' in row:
+                result['total_population'] = float(row['value_2024 Total Population'])
             
-            if '2024 Household Average Income (Current Year $)' in row:
-                result['household_average_income'] = float(row['2024 Household Average Income (Current Year $)'])
+            if 'value_2024 Household Average Income (Current Year $)' in row:
+                result['household_average_income'] = float(row['value_2024 Household Average Income (Current Year $)'])
             
             # Add geographic fields
-            if '2024 Structure Type Single-Detached House (%)' in row:
-                result['single_detached_house_pct'] = float(row['2024 Structure Type Single-Detached House (%)'])
+            if 'value_2024 Structure Type Single-Detached House (%)' in row:
+                result['single_detached_house_pct'] = float(row['value_2024 Structure Type Single-Detached House (%)'])
             
-            if '2024 Condominium Status - In Condo (%)' in row:
-                result['condominium_pct'] = float(row['2024 Condominium Status - In Condo (%)'])
+            if 'value_2024 Condominium Status - In Condo (%)' in row:
+                result['condominium_pct'] = float(row['value_2024 Condominium Status - In Condo (%)'])
             
             results.append(result)
         
@@ -288,7 +288,7 @@ ANALYSIS_EXAMPLES = {
         "target_variable": "CONVERSION_RATE",
         "focus_area": "demographic",
         "demographic_filters": [
-            {"field": "2024 Visible Minority Total Population (%)", "operator": "greaterThan", "value": 10}
+            {"field": "value_2024 Visible Minority Total Population (%)", "operator": "greaterThan", "value": 10}
         ],
         "analysis_type": "correlation",
         "query": "How do demographic factors affect conversion rates in diverse areas?"
@@ -298,7 +298,7 @@ ANALYSIS_EXAMPLES = {
         "target_variable": "SUM_FUNDED", 
         "focus_area": "financial",
         "demographic_filters": [
-            {"field": "2024 Household Average Income (Current Year $)", "operator": "greaterThan", "value": 80000}
+            {"field": "value_2024 Household Average Income (Current Year $)", "operator": "greaterThan", "value": 80000}
         ],
         "analysis_type": "ranking",
         "query": "Which high-income areas generate the most loan volume?"
@@ -308,7 +308,7 @@ ANALYSIS_EXAMPLES = {
         "target_variable": "CONVERSION_RATE",
         "focus_area": "geographic", 
         "demographic_filters": [
-            {"field": "2024 Structure Type Single-Detached House (%)", "operator": "greaterThan", "value": 50}
+            {"field": "value_2024 Structure Type Single-Detached House (%)", "operator": "greaterThan", "value": 50}
         ],
         "analysis_type": "correlation",
         "query": "How do housing types affect conversion rates?"
@@ -317,7 +317,7 @@ ANALYSIS_EXAMPLES = {
     "frequency_analysis": {
         "target_variable": "FREQUENCY",
         "demographic_filters": [
-            {"field": "2024 Total Population", "operator": "greaterThan", "value": 5000}
+            {"field": "value_2024 Total Population", "operator": "greaterThan", "value": 5000}
         ],
         "analysis_type": "ranking", 
         "query": "Which populated areas have the highest application frequency?"
