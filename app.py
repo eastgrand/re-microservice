@@ -182,6 +182,24 @@ def analyze():
             logger.info(f"Field '{field_name}' found directly in available columns")
             return field_name
         
+        # Handle common field aliases that the frontend might use
+        common_aliases = {
+            'household_average_income': 'median_income',
+            'household_income': 'median_income',
+            'average_income': 'median_income',
+            'income': 'median_income',
+            'household_median_income': 'median_income',
+            'disposable_household_income': 'disposable_income',
+            'mortgage_approval': 'mortgage_approvals',
+            'mortgage_approval_rate': 'mortgage_approvals',
+            'approval_rate': 'mortgage_approvals',
+        }
+        
+        if field_name.lower() in common_aliases:
+            resolved_field = common_aliases[field_name.lower()]
+            logger.info(f"Resolved common alias: '{field_name}' -> '{resolved_field}'")
+            return resolved_field
+        
         # Dynamic field resolution for all fields
         field_lower = field_name.lower()
         logger.info(f"Searching for field with lowercase: '{field_lower}'")
