@@ -168,18 +168,9 @@ def enhanced_analysis_worker(query):
             
             results.append(result)
         
-        # Generate model-specific summary
-        if len(feature_importance) > 0:
-            top_factor = feature_importance[0]['feature']
-            model_desc = model_info['description']
-            summary = f"{model_desc}. The top factor influencing {target_variable} is {top_factor}."
-        else:
-            summary = f"Analysis complete using {selected_model} model."
-        
-        # Add top 3 factors if available
-        if len(feature_importance) >= 3:
-            summary += f" The top 3 factors are {feature_importance[0]['feature']}, "
-            summary += f"{feature_importance[1]['feature']}, and {feature_importance[2]['feature']}."
+        # No summary generation - this is handled by Claude in the narrative pass
+        # The microservice only provides statistical data and feature importance
+        summary = None  # Let Claude handle all narrative explanations
         
         # Build SHAP values dict
         shap_values_dict = {}
@@ -236,50 +227,34 @@ def apply_filters_to_get_ids(df, filters, target_col):
     return filtered_data['ID'].tolist()
 
 def analyze_query_intent(query: str, target_field: str, results: List[Dict], feature_importance: List[Dict], conversation_context: str = '') -> Dict[str, any]:
-    """Analyze the user's query to understand their analytical intent"""
+    """Analyze the user's query to understand their analytical intent
+    
+    Note: This function no longer generates summaries - that's handled by Claude in the narrative pass.
+    It only provides query type classification and feature importance filtering.
+    """
     
     query_lower = query.lower()
     
-    # Special handling for application count queries
+    # Determine query type based on keywords and patterns
     if target_field.lower() == 'frequency' and ('application' in query_lower or 'applications' in query_lower):
-        if not results or len(results) == 0:
-            return {
-                'summary': 'No areas found with mortgage applications matching your criteria.',
-                'feature_importance': [],
-                'query_type': 'topN'
-            }
-        
-        # Get top areas by application count
-        top_areas = [result.get('FSA_ID', result.get('ID', 'Unknown Area')) for result in results[:5]]
-        top_counts = [int(result.get('FREQUENCY', 0)) for result in results[:5]]
-        
-        # Generate summary focusing only on application counts
-        summary = f"The areas with the most mortgage applications are {top_areas[0]} ({top_counts[0]} applications)"
-        if len(top_areas) > 1:
-            summary += f", followed by {top_areas[1]} ({top_counts[1]} applications)"
-        if len(top_areas) > 2:
-            summary += f", and {top_areas[2]} ({top_counts[2]} applications)"
-        summary += "."
-        
-        # Only include relevant demographic factors if they significantly correlate with application counts
+        query_type = 'topN'
+        # Filter to most relevant demographic factors for application analysis
         relevant_features = [f for f in feature_importance if 
             any(term in f['feature'].lower() for term in ['household', 'income', 'population', 'density']) and
-            abs(f.get('importance', 0)) > 0.3]  # Only include if correlation is significant
-        
-        if relevant_features:
-            summary += f" These areas tend to have higher {relevant_features[0]['feature'].lower().replace('_', ' ')}"
-            if len(relevant_features) > 1:
-                summary += f" and {relevant_features[1]['feature'].lower().replace('_', ' ')}"
-            summary += "."
+            abs(f.get('importance', 0)) > 0.3]
         
         return {
-            'summary': summary,
+            'summary': None,  # No summary - Claude handles this
             'feature_importance': relevant_features,
-            'query_type': 'topN'
+            'query_type': query_type
         }
     
-    # Handle other query types
-    # ... existing code for other analysis types ...
+    # Default case - return all feature importance for Claude to analyze
+    return {
+        'summary': None,  # No summary - Claude handles this
+        'feature_importance': feature_importance,
+        'query_type': 'analysis'
+    }
 
 # Example usage patterns for different analysis types:
 
