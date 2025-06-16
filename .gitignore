@@ -189,6 +189,11 @@ data/processed/
 !data/nesto_merge_0.csv
 !data/NESTO_FIELD_MAPPING.md
 !data/versions.json
+# Allow precalculated model files for deployment
+!precalculated/models/metadata.json
+!precalculated/metadata.pkl
+!precalculated/shap_values.pkl.gz
+!precalculated/shap_values_sample.csv
 # Exclude other CSV files
 temp_*.csv
 test_*.csv
