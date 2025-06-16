@@ -101,31 +101,31 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
     df = pd.read_csv(raw_data_path)
     logging.info(f"Initial columns from raw CSV: {df.columns.tolist()}")
     
-    # Rename columns based on the dynamic FIELD_MAPPINGS
+    # Rename columns based on the dynamic FIELD_MAPPINGS (only for fields that have mappings)
     df.rename(columns=FIELD_MAPPINGS, inplace=True)
     logging.info("Renamed columns based on master schema.")
     logging.info(f"Columns after renaming: {df.columns.tolist()}")
     
-    # Ensure all columns required by the schema exist, otherwise log a warning
-    # The final columns should be the canonical names from the master schema.
-    final_columns = [details['canonical_name'] for _, details in MASTER_SCHEMA.items()]
-    logging.info(f"Canonical columns to keep: {final_columns}")
-
-    for col in final_columns:
-        if col not in df.columns:
-            logging.warning(f"Column '{col}' not found in DataFrame after renaming. It will be missing from the output.")
+    # Keep ALL columns, not just the ones in MASTER_SCHEMA
+    # This preserves all 137 fields while applying canonical mappings where they exist
+    logging.info(f"Preserving all {len(df.columns)} columns from the dataset")
+    
+    # Convert all numeric-looking columns to numeric, not just the ones in MASTER_SCHEMA
+    numeric_converted = 0
+    for col in df.columns:
+        # Skip obvious non-numeric columns
+        if col.upper() in ['OBJECTID', 'ID', 'FORWARD SORTATION AREA', 'PROVINCE_CODE']:
+            continue
+            
+        # Try to convert to numeric
+        original_dtype = df[col].dtype
+        df[col] = pd.to_numeric(df[col], errors='coerce')
         
-    # Select only the columns defined in our canonical schema
-    df = df[[col for col in final_columns if col in df.columns]]
-    logging.info(f"Final columns being saved to cleaned_data.csv: {df.columns.tolist()}")
-
-    # Convert specified columns to numeric, coercing errors
-    logging.info(f"Converting numeric columns: {NUMERIC_COLS}")
-    for col in NUMERIC_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        else:
-            logging.warning(f"Numeric column '{col}' not found for type conversion.")
+        # Check if conversion was successful (dtype changed)
+        if df[col].dtype != original_dtype:
+            numeric_converted += 1
+    
+    logging.info(f"Converted {numeric_converted} columns to numeric type")
         
     # Fill NaN values with the median of the column
     df.fillna(df.median(numeric_only=True), inplace=True)

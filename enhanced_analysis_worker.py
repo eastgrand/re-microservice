@@ -2,7 +2,11 @@ import pandas as pd
 import numpy as np
 import json
 import os
+import logging
 from typing import List, Dict
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 def select_model_for_analysis(query):
     """Select the best pre-calculated model based on the analysis request"""
@@ -133,21 +137,34 @@ def enhanced_analysis_worker(query):
         results = []
         for _, row in top_data.iterrows():
             result = {
-                'zip_code': str(row['ID']),
+                'geo_id': str(row['ID']),
+                'FSA_ID': str(row['ID']),  # Add FSA_ID for geographic joining
+                'ID': str(row['ID']),      # Add ID for geographic joining
                 target_variable.lower(): float(row[target_variable])
             }
             
-            # Add key demographic/geographic fields based on model type
-            if 'demographic' in selected_model:
-                demo_fields = ['2024 Total Population', '2024 Visible Minority Total Population (%)']
-                for field in demo_fields:
-                    if field in row:
-                        result[field.lower().replace(' ', '_').replace('(%)', '_pct')] = float(row[field])
-            elif 'geographic' in selected_model:
-                geo_fields = ['2024 Structure Type Single-Detached House (%)', '2024 Condominium Status - In Condo (%)']
-                for field in geo_fields:
-                    if field in row:
-                        result[field.lower().replace(' ', '_').replace('(%)', '_pct')] = float(row[field])
+            # Add key demographic/geographic fields with expected field names
+            # Always include conversion rate if available
+            if 'CONVERSION_RATE' in row:
+                result['conversion_rate'] = float(row['CONVERSION_RATE'])
+            
+            # Add demographic fields with expected names
+            if '2024 Visible Minority Total Population (%)' in row:
+                result['visible_minority_population_pct'] = float(row['2024 Visible Minority Total Population (%)'])
+            
+            # Add other common fields that might be expected
+            if '2024 Total Population' in row:
+                result['total_population'] = float(row['2024 Total Population'])
+            
+            if '2024 Household Average Income (Current Year $)' in row:
+                result['household_average_income'] = float(row['2024 Household Average Income (Current Year $)'])
+            
+            # Add geographic fields
+            if '2024 Structure Type Single-Detached House (%)' in row:
+                result['single_detached_house_pct'] = float(row['2024 Structure Type Single-Detached House (%)'])
+            
+            if '2024 Condominium Status - In Condo (%)' in row:
+                result['condominium_pct'] = float(row['2024 Condominium Status - In Condo (%)'])
             
             results.append(result)
         

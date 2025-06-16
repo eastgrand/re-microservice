@@ -12,7 +12,7 @@ import xgboost as xgb
 # Import the master schema and data processing function
 from map_nesto_data import MASTER_SCHEMA, TARGET_VARIABLE, load_and_preprocess_data
 # Import the real analysis function
-from query_aware_analysis import enhanced_query_aware_analysis
+from enhanced_analysis_worker import enhanced_analysis_worker
 
 # --- Redis/RQ Imports for Async Jobs ---
 import redis
@@ -97,19 +97,8 @@ def analysis_worker(analysis_request):
         if df is None or model is None or feature_names is None:
             raise ValueError("Worker is missing essential resources (data, model, or features). Cannot proceed.")
 
-        # Use the query-aware analysis function from the original implementation
-        result = enhanced_query_aware_analysis(
-            df=df,
-            model=model,
-            feature_names=feature_names,
-            analysis_type=analysis_request.get('analysis_type', 'correlation'),
-            target_variable=analysis_request.get('target_variable'),
-            demographic_filters=analysis_request.get('demographic_filters', {}),
-            matched_fields=analysis_request.get('matched_fields', []),
-            min_applications=analysis_request.get('min_applications', 1),
-            query=analysis_request.get('query', ''),
-            top_n=analysis_request.get('top_n', 0)
-        )
+        # Use the enhanced analysis worker function
+        result = enhanced_analysis_worker(analysis_request)
         
         logger.info("Worker completed real analysis successfully.")
         return result
@@ -129,25 +118,51 @@ def analysis_worker(analysis_request):
 @app.route('/api/v1/schema', methods=['GET'])
 def get_schema():
     """
-    Exposes the master data schema to the frontend.
-    This is the single source of truth for all field names, aliases, and descriptions.
+    Exposes the complete data schema to the frontend.
+    This includes all available fields from the dataset, not just the predefined ones.
     """
-    if not MASTER_SCHEMA:
-        return jsonify({"error": "Schema is not available or failed to load"}), 500
+    if df is None:
+        return jsonify({"error": "Dataset not loaded. Schema unavailable."}), 500
 
-    # Prepare a list of all canonical names for convenience
-    known_fields = [details['canonical_name'] for _, details in MASTER_SCHEMA.items()]
-
+    # Generate dynamic schema from actual data columns
+    dynamic_schema = {}
+    known_fields = []
+    
+    for col in df.columns:
+        # Check if this field has a predefined mapping in MASTER_SCHEMA
+        predefined = None
+        for key, details in MASTER_SCHEMA.items():
+            if details['canonical_name'] == col:
+                predefined = details
+                break
+        
+        if predefined:
+            # Use predefined schema info
+            dynamic_schema[col] = predefined
+        else:
+            # Generate schema info for unmapped fields
+            dynamic_schema[col] = {
+                'canonical_name': col,
+                'raw_mapping': col,  # No mapping needed
+                'aliases': [col.lower(), col.replace(' ', '_').lower()],
+                'description': f'Data field: {col}',
+                'type': 'numeric' if df[col].dtype in ['int64', 'float64'] else 'string'
+            }
+        
+        known_fields.append(col)
+    
+    logger.info(f"Generated schema for {len(known_fields)} fields")
+    
     return jsonify({
-        "fields": MASTER_SCHEMA,
-        "known_fields": known_fields
+        "fields": dynamic_schema,
+        "known_fields": sorted(known_fields)
     })
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """
     Main analysis endpoint. It validates the request against available data columns
-    and returns a mock analysis result.
+    and performs real SHAP analysis using the analysis worker.
     """
     if df is None:
         abort(500, description="Dataset not loaded. Cannot perform analysis.")
@@ -165,31 +180,33 @@ def analyze():
     unknown_fields = [field for field in all_requested_fields if field and field not in AVAILABLE_COLUMNS]
 
     if unknown_fields:
-        error_msg = f"Unknown metric fields requested: {', '.join(unknown_fields)}. Please use fields available in the schema."
+        available_sample = sorted(list(AVAILABLE_COLUMNS))[:20]  # Show first 20 available fields
+        error_msg = f"Unknown metric fields requested: {', '.join(unknown_fields)}. Available fields include: {', '.join(available_sample)}... (total: {len(AVAILABLE_COLUMNS)} fields)"
         abort(400, description=error_msg)
 
     logger.info(f"Received analysis request with target '{target_variable}' and fields {matched_fields}")
 
-    # --- Mock Analysis ---
-    # In a real scenario, this is where the SHAP analysis would run.
-    # We will return a structured mock response.
-    analysis_results = {
-        'success': True,
-        'message': 'Analysis complete',
-        'target_variable': target_variable,
-        'matched_fields': matched_fields,
-        'summary': {
-            'base_value': 0.5,
-            'feature_impacts': {field: np.random.rand() * 0.1 for field in matched_fields}
-        },
-        'results': [
-            {'geo_id': 'A0A', 'shap_values': {field: np.random.rand() for field in matched_fields}, 'prediction': np.random.rand()}
-            for i in range(10) # Return top 10 mock results
-        ]
-    }
-    
-    # Return the analysis results
-    return jsonify(analysis_results)
+    # --- Real Analysis ---
+    # Call the real analysis worker function
+    try:
+        analysis_results = analysis_worker(data)
+        
+        # Ensure results have proper geographic identifiers for data joining
+        if analysis_results.get('success') and 'results' in analysis_results:
+            # Add FSA_ID field to each result for proper geographic joining
+            for result in analysis_results['results']:
+                if 'geo_id' in result and 'FSA_ID' not in result:
+                    result['FSA_ID'] = result['geo_id']
+                if 'ID' not in result and 'geo_id' in result:
+                    result['ID'] = result['geo_id']
+        
+        logger.info(f"Analysis completed successfully. Returning {len(analysis_results.get('results', []))} results.")
+        return jsonify(analysis_results)
+        
+    except Exception as e:
+        logger.error(f"Analysis failed: {e}")
+        logger.error(traceback.format_exc())
+        abort(500, description=f"Analysis failed: {str(e)}")
 
 # === Error Handlers ===
 
