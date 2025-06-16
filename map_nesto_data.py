@@ -10,72 +10,139 @@ import pandas as pd
 import yaml
 import os
 import logging
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
-# --- MASTER SCHEMA DEFINITION ---
-# This is the single source of truth for all data fields, their mappings, and aliases.
-# The schema endpoint will expose this to the frontend.
-MASTER_SCHEMA = {
-    'FREQUENCY': {
-        'canonical_name': 'FREQUENCY',
-        'raw_mapping': 'FREQUENCY',
-        'aliases': ['frequency', 'applications', 'application', 'numberOfApplications', 'number_of_applications', 'mortgage_applications'],
-        'description': 'Total number of mortgage applications.'
-    },
-    'mortgage_approvals': {
-        'canonical_name': 'mortgage_approvals',
-        'raw_mapping': 'SUM_FUNDED',
-        'aliases': ['approvals', 'approval', 'funded_applications', 'funded', 'SUM_FUNDED'],
-        'description': 'Total number of funded mortgage applications.'
-    },
-    'conversion_rate': {
-        'canonical_name': 'conversion_rate',
-        'raw_mapping': 'CONVERSION_RATE',
-        'aliases': ['conversion rate', 'conversionrate'],
-        'description': 'The ratio of funded applications to total applications.'
-    },
-    'median_income': {
-        'canonical_name': 'median_income',
-        'raw_mapping': '2024 Household Average Income (Current Year $)',
-        'aliases': ['income', 'average income', 'household income'],
-        'description': 'The median household income in the area.'
-    },
-    'disposable_income': {
-        'canonical_name': 'disposable_income',
-        'raw_mapping': '2024 Household Discretionary Aggregate Income',
-        'aliases': ['discretionary income', 'householdDiscretionaryIncome', 'household_discretionary_income', 'householddiscretionaryincome'],
-        'description': 'The aggregate discretionary income for households.'
-    },
-    'condo_ownership_pct': {
-        'canonical_name': 'condo_ownership_pct',
-        'raw_mapping': '2024 Condominium Status - In Condo (%)',
-        'aliases': ['condo ownership', 'condominium', 'condo_ownership'],
-        'description': 'Percentage of households that are condominiums.'
-    },
-    'visible_minority_population_pct': {
-        'canonical_name': 'visible_minority_population_pct',
-        'raw_mapping': '2024 Visible Minority Total Population (%)',
-        'aliases': ['visible minority', 'visibleMinorityPopulationPct', 'visible_minority_population'],
-        'description': 'Percentage of the population identified as a visible minority.'
-    }
+# --- CORE FIELD MAPPINGS ---
+# These are the key fields that have specific canonical names for the model
+CORE_FIELD_MAPPINGS = {
+    'FREQUENCY': 'FREQUENCY',
+    'SUM_FUNDED': 'mortgage_approvals', 
+    'CONVERSION_RATE': 'conversion_rate',
+    '2024 Household Average Income (Current Year $)': 'median_income',
+    '2024 Household Discretionary Aggregate Income': 'disposable_income',
+    '2024 Condominium Status - In Condo (%)': 'condo_ownership_pct',
+    '2024 Visible Minority Total Population (%)': 'visible_minority_population_pct'
 }
-
-# --- Dynamically Generated Mappings (from MASTER_SCHEMA) ---
-
-# FIELD_MAPPINGS: Connects raw CSV headers to the canonical names used in the service.
-FIELD_MAPPINGS = {
-    details['raw_mapping']: details['canonical_name']
-    for _, details in MASTER_SCHEMA.items()
-    if 'raw_mapping' in details
-}
-
-# NUMERIC_COLS: A list of all canonical names that should be treated as numeric.
-NUMERIC_COLS = [details['canonical_name'] for _, details in MASTER_SCHEMA.items()]
 
 # The target variable for the model
 TARGET_VARIABLE = 'conversion_rate'
+
+def generate_field_alias(field_name):
+    """Generate common aliases for a field name"""
+    aliases = [field_name.lower()]
+    
+    # Convert to snake_case
+    snake_case = re.sub(r'[^\w\s]', '', field_name.lower())
+    snake_case = re.sub(r'\s+', '_', snake_case.strip())
+    aliases.append(snake_case)
+    
+    # Add variations without common words
+    clean_name = re.sub(r'\b(2024|2023|2022|2021|census|current|year|\$|%)\b', '', field_name.lower())
+    clean_name = re.sub(r'[^\w\s]', '', clean_name)
+    clean_name = re.sub(r'\s+', '_', clean_name.strip())
+    if clean_name and clean_name != snake_case:
+        aliases.append(clean_name)
+    
+    # Add percentage field aliases first
+    if '(%)' in field_name:
+        base_name = field_name.replace('(%)', '').strip()
+        base_snake = re.sub(r'[^\w\s]', '', base_name.lower())
+        base_snake = re.sub(r'\s+', '_', base_snake.strip())
+        aliases.append(base_snake + '_pct')
+        
+        # Remove year prefixes for cleaner aliases
+        clean_base = re.sub(r'\b(2024|2023|2022|2021)\b', '', base_name).strip()
+        if clean_base:
+            clean_snake = re.sub(r'[^\w\s]', '', clean_base.lower())
+            clean_snake = re.sub(r'\s+', '_', clean_snake.strip())
+            aliases.append(clean_snake + '_pct')
+    
+    # Add specific aliases for common patterns
+    if 'single-detached house' in field_name.lower():
+        aliases.extend(['single_detached_house', 'detached_house', 'single_family_house', 'single_detached_house_pct'])
+    elif 'semi-detached house' in field_name.lower():
+        aliases.extend(['semi_detached_house', 'semi_detached_house_pct'])
+    elif 'apartment' in field_name.lower():
+        aliases.extend(['apartment', 'apartments'])
+    elif 'condominium' in field_name.lower():
+        aliases.extend(['condo', 'condominium'])
+    elif 'visible minority' in field_name.lower():
+        aliases.extend(['visible_minority', 'minority', 'diversity'])
+    elif 'income' in field_name.lower():
+        aliases.extend(['income', 'household_income'])
+    
+    # Special case for the specific field we need
+    if field_name == '2024 Structure Type Single-Detached House (%)':
+        aliases.extend(['single_detached_house_pct', 'detached_house_pct', 'single_family_house_pct'])
+    
+    return list(set(aliases))  # Remove duplicates
+
+def generate_dynamic_schema(df):
+    """Generate schema for all fields in the dataset"""
+    schema = {}
+    
+    for col in df.columns:
+        # Check if this field has a core mapping
+        canonical_name = CORE_FIELD_MAPPINGS.get(col, col)
+        
+        # Generate description
+        if col in CORE_FIELD_MAPPINGS:
+            # Use predefined descriptions for core fields
+            descriptions = {
+                'FREQUENCY': 'Total number of mortgage applications.',
+                'mortgage_approvals': 'Total number of funded mortgage applications.',
+                'conversion_rate': 'The ratio of funded applications to total applications.',
+                'median_income': 'The median household income in the area.',
+                'disposable_income': 'The aggregate discretionary income for households.',
+                'condo_ownership_pct': 'Percentage of households that are condominiums.',
+                'visible_minority_population_pct': 'Percentage of the population identified as a visible minority.'
+            }
+            description = descriptions.get(canonical_name, f'Data field: {col}')
+        else:
+            description = f'Data field: {col}'
+        
+        # Determine data type
+        data_type = 'numeric' if df[col].dtype in ['int64', 'float64'] else 'string'
+        
+        schema[canonical_name] = {
+            'canonical_name': canonical_name,
+            'raw_mapping': col,
+            'aliases': generate_field_alias(col),
+            'description': description,
+            'type': data_type
+        }
+    
+    return schema
+
+# Global variables that will be set when data is loaded
+MASTER_SCHEMA = {}
+FIELD_MAPPINGS = {}
+NUMERIC_COLS = []
+
+def initialize_schema(df):
+    """Initialize the global schema variables from the loaded dataframe"""
+    global MASTER_SCHEMA, FIELD_MAPPINGS, NUMERIC_COLS
+    
+    MASTER_SCHEMA = generate_dynamic_schema(df)
+    
+    # Generate field mappings (raw name -> canonical name)
+    FIELD_MAPPINGS = {
+        details['raw_mapping']: details['canonical_name']
+        for _, details in MASTER_SCHEMA.items()
+        if 'raw_mapping' in details
+    }
+    
+    # All numeric columns
+    NUMERIC_COLS = [
+        details['canonical_name'] 
+        for _, details in MASTER_SCHEMA.items() 
+        if details.get('type') == 'numeric'
+    ]
+    
+    logging.info(f"Initialized dynamic schema with {len(MASTER_SCHEMA)} fields")
 
 def load_and_preprocess_data(config_path='config/dataset.yaml'):
     """
@@ -101,9 +168,9 @@ def load_and_preprocess_data(config_path='config/dataset.yaml'):
     df = pd.read_csv(raw_data_path)
     logging.info(f"Initial columns from raw CSV: {df.columns.tolist()}")
     
-    # Rename columns based on the dynamic FIELD_MAPPINGS (only for fields that have mappings)
-    df.rename(columns=FIELD_MAPPINGS, inplace=True)
-    logging.info("Renamed columns based on master schema.")
+    # Apply core field mappings only
+    df.rename(columns=CORE_FIELD_MAPPINGS, inplace=True)
+    logging.info("Applied core field mappings.")
     logging.info(f"Columns after renaming: {df.columns.tolist()}")
     
     # Keep ALL columns, not just the ones in MASTER_SCHEMA
