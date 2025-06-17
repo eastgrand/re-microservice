@@ -66,12 +66,37 @@ def enhanced_analysis_worker(query):
         target_variable = query_classification.get('target_variable', model_info['target'])
         
         # Handle condominium target variable - map to the actual column name in data
-        if target_variable == "2024 Condominium Status - In Condo (%)":
-            # Check if the value_ prefixed version exists in the data
-            if f"value_{target_variable}" in precalc_df.columns:
-                target_variable = f"value_{target_variable}"
+        if target_variable == "condo_ownership_pct":
+            # Map to the actual column name in the precalculated data
+            if "value_2024 Condominium Status - In Condo (%)" in precalc_df.columns:
+                target_variable = "value_2024 Condominium Status - In Condo (%)"
+                logger.info(f"Mapped condo_ownership_pct to actual column: {target_variable}")
             else:
                 logger.warning(f"Condominium target variable not found in data, using default: {model_info['target']}")
+                target_variable = model_info['target']
+        elif target_variable == "median_income":
+            # Map to the actual column name in the precalculated data
+            if "value_2024 Household Average Income (Current Year $)" in precalc_df.columns:
+                target_variable = "value_2024 Household Average Income (Current Year $)"
+                logger.info(f"Mapped median_income to actual column: {target_variable}")
+            else:
+                logger.warning(f"Income target variable not found in data, using default: {model_info['target']}")
+                target_variable = model_info['target']
+        elif target_variable == "visible_minority_population_pct":
+            # Map to the actual column name in the precalculated data
+            if "value_2024 Visible Minority Total Population (%)" in precalc_df.columns:
+                target_variable = "value_2024 Visible Minority Total Population (%)"
+                logger.info(f"Mapped visible_minority_population_pct to actual column: {target_variable}")
+            else:
+                logger.warning(f"Visible minority target variable not found in data, using default: {model_info['target']}")
+                target_variable = model_info['target']
+        elif target_variable == "conversion_rate":
+            # Map to the actual column name in the precalculated data
+            if "CONVERSION_RATE" in precalc_df.columns:
+                target_variable = "CONVERSION_RATE"
+                logger.info(f"Mapped conversion_rate to actual column: {target_variable}")
+            else:
+                logger.warning(f"Conversion rate target variable not found in data, using default: {model_info['target']}")
                 target_variable = model_info['target']
         
         features = model_info['features']
@@ -211,7 +236,7 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
         
         # Check if we're ranking by a specific target variable (like condominium ownership)
         # If so, rank directly by that variable instead of creating combined scores
-        if target_variable.startswith('value_2024 Condominium Status - In Condo'):
+        if target_variable == "value_2024 Condominium Status - In Condo (%)":
             # For condominium ownership queries, rank directly by the condo percentage
             top_data = df.nlargest(limit, target_variable)
             logger.info(f"Applied direct ranking by {target_variable} with limit {limit}")
@@ -306,8 +331,17 @@ def build_query_aware_results(df, target_variable, query_classification):
         }
         
         # Add the target variable with a clean field name
-        if target_variable.startswith('value_2024 Condominium Status - In Condo'):
-            result['condominium_ownership_pct'] = safe_float(row[target_variable])
+        if target_variable == "value_2024 Condominium Status - In Condo (%)":
+            result['condo_ownership_pct'] = safe_float(row[target_variable])
+            result['target_value'] = safe_float(row[target_variable])
+        elif target_variable == "value_2024 Household Average Income (Current Year $)":
+            result['median_income'] = safe_float(row[target_variable])
+            result['target_value'] = safe_float(row[target_variable])
+        elif target_variable == "value_2024 Visible Minority Total Population (%)":
+            result['visible_minority_population_pct'] = safe_float(row[target_variable])
+            result['target_value'] = safe_float(row[target_variable])
+        elif target_variable == "CONVERSION_RATE":
+            result['conversion_rate'] = safe_float(row[target_variable])
             result['target_value'] = safe_float(row[target_variable])
         else:
             result[target_variable.lower()] = safe_float(row[target_variable])
