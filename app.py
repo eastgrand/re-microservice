@@ -199,29 +199,41 @@ def analyze():
     
     # Resolve field names from aliases
     def resolve_field_name(field_name):
-        """Map field names from frontend to actual column names in the dataset."""
-        if not field_name:
+        logger.info(f"Attempting to resolve field: '{field_name}'")
+        
+        if field_name in AVAILABLE_COLUMNS:
+            logger.info(f"Field '{field_name}' found directly in available columns")
             return field_name
-            
-        # Direct field mappings for common cases
-        field_mappings = {
-            'condo_ownership_pct': '2024 Condominium Status - In Condo (%)',
-            'condominium_pct': '2024 Condominium Status - In Condo (%)',
-            'single_detached_house_pct': '2024 Structure Type Single-Detached House (%)',
-            'visible_minority_population_pct': '2024 Visible Minority Total Population (%)',
-            'median_income': '2024 Household Average Income (Current Year $)',
-            'disposable_income': '2024 Household Discretionary Aggregate Income',
-            'mortgage_approvals': 'SUM_FUNDED',
-            'conversion_rate': 'CONVERSION_RATE'
+        
+        # Handle common field aliases that the frontend might use
+        common_aliases = {
+            'household_average_income': 'median_income',
+            'household_income': 'median_income',
+            'average_income': 'median_income',
+            'income': 'median_income',
+            'household_median_income': 'median_income',
+            'disposable_household_income': 'disposable_income',
+            'mortgage_approval': 'mortgage_approvals',
+            'mortgage_approval_rate': 'mortgage_approvals',
+            'approval_rate': 'mortgage_approvals',
         }
         
-        if field_name in field_mappings:
-            logger.info(f"Direct mapping found: '{field_name}' -> '{field_mappings[field_name]}'")
-            return field_mappings[field_name]
+        if field_name.lower() in common_aliases:
+            resolved_field = common_aliases[field_name.lower()]
+            logger.info(f"Resolved common alias: '{field_name}' -> '{resolved_field}'")
+            return resolved_field
         
-        # If no direct mapping, try the existing logic
+        # Dynamic field resolution for all fields
         field_lower = field_name.lower()
+        logger.info(f"Searching for field with lowercase: '{field_lower}'")
         
+        # First, try exact match in MASTER_SCHEMA aliases
+        for canonical_name, details in MASTER_SCHEMA.items():
+            if field_lower in [alias.lower() for alias in details.get('aliases', [])]:
+                logger.info(f"Found field '{field_name}' in MASTER_SCHEMA aliases, mapping to '{details['raw_mapping']}'")
+                return details['raw_mapping']
+        
+        # If not found in aliases, try pattern matching for all fields
         for col in AVAILABLE_COLUMNS:
             col_lower = col.lower()
             
