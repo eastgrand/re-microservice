@@ -102,49 +102,49 @@ class QueryClassifier:
         # Comprehensive target variables mapping for all available fields in the dataset
         # This enables "top N" queries for any metric in the data
         self.target_variables = {
-            # === CORE MORTGAGE METRICS ===
-            "conversion rate": "CONVERSION_RATE",
-            "mortgage approvals": "Mortgage_Approvals", 
-            "mortgage applications": "Mortgage_Applications",
-            "funded applications": "Mortgage_Approvals",
-            "approval rate": "CONVERSION_RATE",
-            "approval rates": "CONVERSION_RATE",
-            "approvals": "Mortgage_Approvals",
-            "approved": "Mortgage_Approvals",
+            # === CORE METRICS ===
+            "conversion": "conversion_rate",
+            "conversion rate": "conversion_rate", 
+            "approval": "conversion_rate",
+            "approval rate": "conversion_rate",
+            "approval rates": "conversion_rate",
+            "mortgage approval": "conversion_rate",
+            "mortgage approvals": "conversion_rate",
+            "success rate": "conversion_rate",
             
             # === POPULATION & DEMOGRAPHICS ===
             "population": "2024 Total Population",
             "total population": "2024 Total Population",
-            "residents": "2024 Total Population",
             "people": "2024 Total Population",
-            "inhabitants": "2024 Total Population",
-            "demographic": "2024 Total Population",
+            "residents": "2024 Total Population",
             
-            # Gender demographics
+            "female": "2024 Female Household Population (%)",
             "female population": "2024 Female Household Population (%)",
             "female percentage": "2024 Female Household Population (%)",
+            "women": "2024 Female Household Population (%)",
+            
+            "male": "2024 Male Household Population (%)",
             "male population": "2024 Male Household Population (%)",
             "male percentage": "2024 Male Household Population (%)",
+            "men": "2024 Male Household Population (%)",
             
-            # === AGE DEMOGRAPHICS ===
             "age": "2024 Maintainers - Median Age",
             "median age": "2024 Maintainers - Median Age",
+            "average age": "2024 Maintainers - Median Age",
             "young adults": "2024 Maintainers - 25 to 34 (%)",
-            "young adult percentage": "2024 Maintainers - 25 to 34 (%)",
-            "middle age": "2024 Maintainers - 35 to 44 (%)",
             "middle aged": "2024 Maintainers - 35 to 44 (%)",
             "mature adults": "2024 Maintainers - 45 to 54 (%)",
             "seniors": "2024 Maintainers - 55 to 64 (%)",
             "senior percentage": "2024 Maintainers - 55 to 64 (%)",
             
             # === INCOME & ECONOMIC INDICATORS ===
-            "income": "2024 Household Average Income (Current Year $)",
-            "average income": "2024 Household Average Income (Current Year $)",
-            "household income": "2024 Household Average Income (Current Year $)",
-            "median income": "2024 Household Median Income (Current Year $)",
-            "earnings": "2024 Household Average Income (Current Year $)",
-            "salary": "2024 Household Average Income (Current Year $)",
-            "disposable income": "2024 Household Disposable Aggregate Income",
+            "income": "median_income",
+            "average income": "median_income",
+            "household income": "median_income",
+            "median income": "median_income",
+            "earnings": "median_income",
+            "salary": "median_income",
+            "disposable income": "disposable_income",
             "discretionary income": "2024 Household Discretionary Aggregate Income",
             "total income": "2024 Household Aggregate Income (Current Year $)",
             
@@ -180,16 +180,16 @@ class QueryClassifier:
             "total households": "2024 Tenure: Total Households",
             
             # === HOUSING STRUCTURE TYPES ===
-            # Condominiums
-            "condominium ownership": "2024 Condominium Status - In Condo (%)",
-            "condominium ownership percentage": "2024 Condominium Status - In Condo (%)",
-            "condo ownership": "2024 Condominium Status - In Condo (%)",
-            "condo ownership percentage": "2024 Condominium Status - In Condo (%)",
-            "condominium percentage": "2024 Condominium Status - In Condo (%)",
-            "condo percentage": "2024 Condominium Status - In Condo (%)",
-            "condominium": "2024 Condominium Status - In Condo (%)",
-            "condo": "2024 Condominium Status - In Condo (%)",
-            "condos": "2024 Condominium Status - In Condo (%)",
+            # Condominiums - FIXED TO USE RENAMED FIELD
+            "condominium ownership": "condo_ownership_pct",
+            "condominium ownership percentage": "condo_ownership_pct",
+            "condo ownership": "condo_ownership_pct",
+            "condo ownership percentage": "condo_ownership_pct",
+            "condominium percentage": "condo_ownership_pct",
+            "condo percentage": "condo_ownership_pct",
+            "condominium": "condo_ownership_pct",
+            "condo": "condo_ownership_pct",
+            "condos": "condo_ownership_pct",
             
             # House types
             "single detached": "2024 Structure Type Single-Detached House (%)",
@@ -228,11 +228,11 @@ class QueryClassifier:
             "recent construction": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
             
             # === VISIBLE MINORITY DEMOGRAPHICS ===
-            "diversity": "2024 Visible Minority Total Population (%)",
-            "visible minority": "2024 Visible Minority Total Population (%)",
-            "minority population": "2024 Visible Minority Total Population (%)",
-            "ethnic diversity": "2024 Visible Minority Total Population (%)",
-            "multicultural": "2024 Visible Minority Total Population (%)",
+            "diversity": "visible_minority_population_pct",
+            "visible minority": "visible_minority_population_pct",
+            "minority population": "visible_minority_population_pct",
+            "ethnic diversity": "visible_minority_population_pct",
+            "multicultural": "visible_minority_population_pct",
             
             # Specific ethnic groups
             "chinese": "2024 Visible Minority Chinese (%)",
@@ -317,6 +317,7 @@ class QueryClassifier:
             "market weight": "Sum_Weight",
             "market significance": "Sum_Weight",
             "business weight": "Sum_Weight",
+            "mortgage approvals": "mortgage_approvals",
             
             # Legacy mappings for backward compatibility
             "jobs": "2024 Labour Force - Labour Employment Rate"
@@ -449,8 +450,8 @@ class QueryClassifier:
             if term in query:
                 return variable
         
-        # Default to Mortgage_Approvals if no target variable found
-        return "Mortgage_Approvals"
+        # Default to conversion_rate if no target variable found
+        return "conversion_rate"
     
     def _extract_filters(self, query: str) -> List[str]:
         """Extract demographic filters from the query"""
@@ -844,7 +845,7 @@ def process_query(query_text: str) -> Dict[str, Any]:
     
     # Set default target if none extracted
     if "target_variable" not in result:
-        result["target_variable"] = "Mortgage_Approvals"
+        result["target_variable"] = "conversion_rate"
     
     return result
 
