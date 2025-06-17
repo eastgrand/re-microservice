@@ -16,7 +16,7 @@ def select_model_for_analysis(query):
     
     # For now, we only have one model available, but we'll use query classification
     # to determine how to analyze the data differently
-        return 'conversion'
+    return 'conversion'
 
 def load_precalculated_model_data(model_name):
     """Load pre-calculated SHAP data for specified model"""
