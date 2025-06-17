@@ -657,8 +657,10 @@ class QueryClassifier:
     
     def _extract_target_variable(self, query: str) -> Optional[str]:
         """Extract the target variable from the query"""
-        # Expanded lookup in target_variables dictionary
-        for term, variable in self.target_variables.items():
+        # Sort terms by length (longest first) to match more specific terms first
+        sorted_terms = sorted(self.target_variables.items(), key=lambda x: len(x[0]), reverse=True)
+        
+        for term, variable in sorted_terms:
             if term in query:
                 return variable
         

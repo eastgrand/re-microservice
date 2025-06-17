@@ -174,7 +174,8 @@ def enhanced_analysis_worker(query):
 def apply_query_aware_analysis(df, query_classification, user_query, conversation_context):
     """Apply query-specific filtering and feature selection"""
     
-    query_type = query_classification.get('query_type', 'unknown')
+    # Check both 'query_type' and 'analysis_type' keys for compatibility
+    query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
     target_variable = query_classification.get('target_variable', 'CONVERSION_RATE')
     
     logger.info(f"Applying query-aware analysis for type: {query_type}")
@@ -226,7 +227,8 @@ def apply_query_aware_analysis(df, query_classification, user_query, conversatio
 def get_query_aware_top_areas(df, query_classification, target_variable, user_query):
     """Get top areas using query-aware ranking"""
     
-    query_type = query_classification.get('query_type', 'unknown')
+    # Check both 'query_type' and 'analysis_type' keys for compatibility
+    query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
     
     # Only apply ranking/limiting for ranking queries
     if query_type == 'ranking':
