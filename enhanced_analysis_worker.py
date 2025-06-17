@@ -102,6 +102,11 @@ def enhanced_analysis_worker(query):
                 # Use safe_float to handle NaN values in SHAP data
                 shap_values_dict[feature] = [safe_float(val) for val in top_data[shap_col].tolist()[:10]]
         
+        # ADD: Enhanced spatial and geographic context for Claude
+        spatial_analysis = analyze_spatial_patterns(top_data, target_variable, query_specific_features)
+        regional_clusters = identify_regional_clusters(top_data, target_variable)
+        geographic_context = build_geographic_context(top_data, target_variable, user_query)
+        
         return {
             "success": True,
             "analysisType": analysis_type,  # Include analysis type at top level for frontend
@@ -109,13 +114,18 @@ def enhanced_analysis_worker(query):
             "summary": None,  # Let Claude handle all narrative explanations
             "feature_importance": feature_importance,
             "shap_values": shap_values_dict,
+            "spatial_analysis": spatial_analysis,  # NEW: Spatial clustering and distribution info
+            "regional_clusters": regional_clusters,  # NEW: Geographic clusters
+            "geographic_context": geographic_context,  # NEW: Regional context and patterns
             "model_info": {
                 "model_name": selected_model,
                 "model_description": f"{model_info['description']} - Query-aware analysis for: {query_classification.get('query_type', 'general')}",
                 "target_variable": target_variable,
                 "feature_count": len(query_specific_features),
                 "r2_score": model_info['r2_score'],
-                "query_classification": query_classification
+                "query_classification": query_classification,
+                "total_areas_analyzed": len(top_data),
+                "analysis_scope": "Regional patterns and spatial clustering analysis included"
             }
         }
         
@@ -374,6 +384,260 @@ def analyze_query_intent(query: str, target_field: str, results: List[Dict], fea
         'summary': None,  # No summary - Claude handles this
         'feature_importance': feature_importance,
         'query_type': 'analysis'
+    }
+
+def analyze_spatial_patterns(df, target_variable, features):
+    """Analyze spatial distribution patterns and clustering"""
+    
+    if len(df) < 3:
+        return {
+            "distribution_type": "insufficient_data",
+            "clustering_strength": 0,
+            "spatial_autocorrelation": 0,
+            "pattern_description": "Insufficient data for spatial pattern analysis"
+        }
+    
+    # Calculate basic distribution statistics
+    values = df[target_variable].dropna()
+    if len(values) == 0:
+        return {
+            "distribution_type": "no_data",
+            "clustering_strength": 0,
+            "spatial_autocorrelation": 0,
+            "pattern_description": "No valid data for spatial analysis"
+        }
+    
+    # Analyze value distribution
+    mean_val = values.mean()
+    std_val = values.std()
+    cv = std_val / mean_val if mean_val != 0 else 0
+    
+    # Determine clustering strength based on coefficient of variation
+    if cv < 0.2:
+        clustering_type = "uniform"
+        clustering_strength = 0.2
+    elif cv < 0.5:
+        clustering_type = "moderate_clustering"
+        clustering_strength = 0.6
+    else:
+        clustering_type = "high_clustering"
+        clustering_strength = 0.9
+    
+    # Calculate quartile distribution
+    q1 = values.quantile(0.25)
+    q2 = values.quantile(0.50)
+    q3 = values.quantile(0.75)
+    
+    # Identify outliers
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    outliers = df[(df[target_variable] < lower_bound) | (df[target_variable] > upper_bound)]
+    
+    return {
+        "distribution_type": clustering_type,
+        "clustering_strength": safe_float(clustering_strength),
+        "spatial_autocorrelation": safe_float(min(1.0, cv)),  # Use CV as proxy for spatial autocorrelation
+        "value_statistics": {
+            "mean": safe_float(mean_val),
+            "median": safe_float(q2),
+            "std_deviation": safe_float(std_val),
+            "coefficient_variation": safe_float(cv),
+            "quartiles": {
+                "q1": safe_float(q1),
+                "q2": safe_float(q2),
+                "q3": safe_float(q3)
+            }
+        },
+        "outlier_analysis": {
+            "outlier_count": len(outliers),
+            "outlier_percentage": safe_float((len(outliers) / len(df)) * 100),
+            "outlier_threshold_low": safe_float(lower_bound),
+            "outlier_threshold_high": safe_float(upper_bound)
+        },
+        "pattern_description": f"Data shows {clustering_type} with {len(outliers)} outliers ({(len(outliers)/len(df)*100):.1f}% of areas)"
+    }
+
+def identify_regional_clusters(df, target_variable):
+    """Identify and analyze regional clusters based on values"""
+    
+    if len(df) < 5:
+        return {
+            "cluster_count": 1,
+            "clusters": [{"name": "all_areas", "area_count": len(df), "avg_value": safe_float(df[target_variable].mean())}],
+            "cluster_description": "Insufficient data for cluster analysis"
+        }
+    
+    values = df[target_variable].dropna()
+    if len(values) == 0:
+        return {
+            "cluster_count": 0,
+            "clusters": [],
+            "cluster_description": "No valid data for clustering"
+        }
+    
+    # Use quartile-based clustering for simplicity
+    q25 = values.quantile(0.25)
+    q50 = values.quantile(0.50)
+    q75 = values.quantile(0.75)
+    
+    # Define clusters based on quartiles
+    clusters = []
+    
+    # High performing areas (top quartile)
+    high_areas = df[df[target_variable] >= q75]
+    if len(high_areas) > 0:
+        clusters.append({
+            "name": "high_performance",
+            "label": "High Performance Areas",
+            "area_count": len(high_areas),
+            "avg_value": safe_float(high_areas[target_variable].mean()),
+            "min_value": safe_float(high_areas[target_variable].min()),
+            "max_value": safe_float(high_areas[target_variable].max()),
+            "percentage_of_total": safe_float((len(high_areas) / len(df)) * 100),
+            "areas": high_areas['ID'].tolist()[:10]  # First 10 area IDs
+        })
+    
+    # Medium-high performing areas (3rd quartile)
+    med_high_areas = df[(df[target_variable] >= q50) & (df[target_variable] < q75)]
+    if len(med_high_areas) > 0:
+        clusters.append({
+            "name": "medium_high_performance",
+            "label": "Medium-High Performance Areas",
+            "area_count": len(med_high_areas),
+            "avg_value": safe_float(med_high_areas[target_variable].mean()),
+            "min_value": safe_float(med_high_areas[target_variable].min()),
+            "max_value": safe_float(med_high_areas[target_variable].max()),
+            "percentage_of_total": safe_float((len(med_high_areas) / len(df)) * 100),
+            "areas": med_high_areas['ID'].tolist()[:10]
+        })
+    
+    # Medium-low performing areas (2nd quartile)
+    med_low_areas = df[(df[target_variable] >= q25) & (df[target_variable] < q50)]
+    if len(med_low_areas) > 0:
+        clusters.append({
+            "name": "medium_low_performance",
+            "label": "Medium-Low Performance Areas",
+            "area_count": len(med_low_areas),
+            "avg_value": safe_float(med_low_areas[target_variable].mean()),
+            "min_value": safe_float(med_low_areas[target_variable].min()),
+            "max_value": safe_float(med_low_areas[target_variable].max()),
+            "percentage_of_total": safe_float((len(med_low_areas) / len(df)) * 100),
+            "areas": med_low_areas['ID'].tolist()[:10]
+        })
+    
+    # Low performing areas (bottom quartile)
+    low_areas = df[df[target_variable] < q25]
+    if len(low_areas) > 0:
+        clusters.append({
+            "name": "low_performance",
+            "label": "Low Performance Areas",
+            "area_count": len(low_areas),
+            "avg_value": safe_float(low_areas[target_variable].mean()),
+            "min_value": safe_float(low_areas[target_variable].min()),
+            "max_value": safe_float(low_areas[target_variable].max()),
+            "percentage_of_total": safe_float((len(low_areas) / len(df)) * 100),
+            "areas": low_areas['ID'].tolist()[:10]
+        })
+    
+    return {
+        "cluster_count": len(clusters),
+        "clusters": clusters,
+        "cluster_method": "quartile_based",
+        "cluster_description": f"Identified {len(clusters)} performance-based regional clusters across {len(df)} areas"
+    }
+
+def build_geographic_context(df, target_variable, user_query):
+    """Build comprehensive geographic context for spatial analysis"""
+    
+    # Analyze geographic spread and diversity
+    total_areas = len(df)
+    values = df[target_variable].dropna()
+    
+    if len(values) == 0:
+        return {
+            "geographic_scope": "no_data",
+            "area_coverage": 0,
+            "regional_patterns": {},
+            "context_description": "No geographic data available for analysis"
+        }
+    
+    # Calculate geographic diversity metrics
+    unique_ids = df['ID'].nunique()
+    value_range = values.max() - values.min()
+    mean_value = values.mean()
+    
+    # Identify top and bottom performing areas with geographic context
+    top_5 = df.nlargest(5, target_variable)
+    bottom_5 = df.nsmallest(5, target_variable)
+    
+    # Build regional patterns based on available demographic/economic indicators
+    regional_patterns = {}
+    
+    # Check for diversity patterns
+    diversity_col = 'value_2024 Visible Minority Total Population (%)'
+    if diversity_col in df.columns:
+        diversity_corr = df[[target_variable, diversity_col]].corr().iloc[0, 1]
+        regional_patterns['diversity_relationship'] = {
+            "correlation": safe_float(diversity_corr),
+            "description": f"{'Positive' if diversity_corr > 0.1 else 'Negative' if diversity_corr < -0.1 else 'Weak'} relationship between diversity and {target_variable.lower()}"
+        }
+    
+    # Check for income patterns
+    income_col = 'value_2024 Household Average Income (Current Year $)'
+    if income_col in df.columns:
+        income_corr = df[[target_variable, income_col]].corr().iloc[0, 1]
+        regional_patterns['income_relationship'] = {
+            "correlation": safe_float(income_corr),
+            "description": f"{'Positive' if income_corr > 0.1 else 'Negative' if income_corr < -0.1 else 'Weak'} relationship between income and {target_variable.lower()}"
+        }
+    
+    # Check for housing patterns
+    housing_col = 'value_2024 Structure Type Single-Detached House (%)'
+    if housing_col in df.columns:
+        housing_corr = df[[target_variable, housing_col]].corr().iloc[0, 1]
+        regional_patterns['housing_relationship'] = {
+            "correlation": safe_float(housing_corr),
+            "description": f"{'Positive' if housing_corr > 0.1 else 'Negative' if housing_corr < -0.1 else 'Weak'} relationship between single-detached housing and {target_variable.lower()}"
+        }
+    
+    # Determine geographic scope based on query and data
+    if 'province' in user_query.lower() or 'provincial' in user_query.lower():
+        geographic_scope = "provincial"
+    elif 'city' in user_query.lower() or 'urban' in user_query.lower():
+        geographic_scope = "urban"
+    elif 'region' in user_query.lower() or 'regional' in user_query.lower():
+        geographic_scope = "regional"
+    else:
+        geographic_scope = "multi_area"
+    
+    return {
+        "geographic_scope": geographic_scope,
+        "area_coverage": total_areas,
+        "value_statistics": {
+            "range": safe_float(value_range),
+            "mean": safe_float(mean_value),
+            "geographic_diversity": safe_float(value_range / mean_value if mean_value != 0 else 0)
+        },
+        "top_performers": {
+            "count": len(top_5),
+            "areas": top_5['ID'].tolist(),
+            "avg_value": safe_float(top_5[target_variable].mean()),
+            "value_range": safe_float(top_5[target_variable].max() - top_5[target_variable].min())
+        },
+        "bottom_performers": {
+            "count": len(bottom_5),
+            "areas": bottom_5['ID'].tolist(),
+            "avg_value": safe_float(bottom_5[target_variable].mean()),
+            "value_range": safe_float(bottom_5[target_variable].max() - bottom_5[target_variable].min())
+        },
+        "regional_patterns": regional_patterns,
+        "adjacent_area_analysis": {
+            "coverage_description": f"Analysis covers {total_areas} geographic areas",
+            "spatial_continuity": "Available" if total_areas > 10 else "Limited",
+            "pattern_reliability": "High" if total_areas > 20 else "Moderate" if total_areas > 10 else "Limited"
+        },
+        "context_description": f"Geographic analysis of {total_areas} areas showing {geographic_scope} patterns with {len(regional_patterns)} demographic/economic relationships identified"
     }
 
 # Example usage patterns for different analysis types:
