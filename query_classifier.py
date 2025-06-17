@@ -145,7 +145,7 @@ class QueryClassifier:
             "earnings": "median_income",
             "salary": "median_income",
             "disposable income": "disposable_income",
-            "discretionary income": "2024 Household Discretionary Aggregate Income",
+            "discretionary income": "2024 Household Disposable Aggregate Income",
             "total income": "2024 Household Aggregate Income (Current Year $)",
             
             # Employment metrics
@@ -314,10 +314,222 @@ class QueryClassifier:
             "projected income growth": "2024-2025 Current$ Household Average Income % Change",
             
             # === BUSINESS/MARKET METRICS ===
-            "market weight": "Sum_Weight",
-            "market significance": "Sum_Weight",
-            "business weight": "Sum_Weight",
             "mortgage approvals": "mortgage_approvals",
+            
+            # === CONSTRUCTION PERIOD & HOUSING AGE ===
+            # Historical housing periods - both counts and percentages
+            "housing built before 1960": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            "old housing": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            "vintage housing": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            "older homes": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            "pre-1960 housing": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            
+            "housing 1961 to 1980": "2021 Period of Construction - 1961 to 1980 (Census) (%)",
+            "1960s housing": "2021 Period of Construction - 1961 to 1980 (Census) (%)",
+            "1970s housing": "2021 Period of Construction - 1961 to 1980 (Census) (%)",
+            
+            "housing 1981 to 1990": "2021 Period of Construction - 1981 to 1990 (Census) (%)",
+            "1980s housing": "2021 Period of Construction - 1981 to 1990 (Census) (%)",
+            
+            "housing 1991 to 2000": "2021 Period of Construction - 1991 to 2000 (Census) (%)",
+            "1990s housing": "2021 Period of Construction - 1991 to 2000 (Census) (%)",
+            
+            "housing 2001 to 2005": "2021 Period of Construction - 2001 to 2005 (Census) (%)",
+            "early 2000s housing": "2021 Period of Construction - 2001 to 2005 (Census) (%)",
+            
+            "housing 2006 to 2010": "2021 Period of Construction - 2006 to 2010 (Census) (%)",
+            "mid 2000s housing": "2021 Period of Construction - 2006 to 2010 (Census) (%)",
+            
+            "housing 2011 to 2016": "2021 Period of Construction - 2011 to 2016 (Census) (%)",
+            "2010s housing": "2021 Period of Construction - 2011 to 2016 (Census) (%)",
+            
+            "new housing": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            "new homes": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            "recent construction": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            "newest housing": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            
+            # Raw count versions for construction periods
+            "housing units built before 1960": "2021 Period of Construction - 1960 or Before (Census)",
+            "housing units 1961 to 1980": "2021 Period of Construction - 1961 to 1980 (Census)",
+            "housing units 1981 to 1990": "2021 Period of Construction - 1981 to 1990 (Census)",
+            "housing units 1991 to 2000": "2021 Period of Construction - 1991 to 2000 (Census)",
+            "housing units 2001 to 2005": "2021 Period of Construction - 2001 to 2005 (Census)",
+            "housing units 2006 to 2010": "2021 Period of Construction - 2006 to 2010 (Census)",
+            "housing units 2011 to 2016": "2021 Period of Construction - 2011 to 2016 (Census)",
+            "housing units 2016 to 2021": "2021 Period of Construction - 2016 to 2021 (Census)",
+            
+            # === HOUSING COSTS & FINANCIAL (EXPANDED) ===
+            # Raw cost amounts (not averages)
+            "total property taxes": "2024 Property Taxes (Shelter)",
+            "total condo fees": "2024 Condominium Charges (Shelter)",
+            "total mortgage payments": "2024 Regular Mortgage Payments (Shelter)",
+            "total financial services": "2024 Financial Services",
+            "total bank charges": "2024 Service Charges for Banks, Other Financial Institutions",
+            
+            # Average versions (already mapped above, but adding aliases)
+            "average condo fees": "2024 Condominium Charges (Shelter) (Avg)",
+            "average financial services": "2024 Financial Services (Avg)",
+            "average bank charges": "2024 Service Charges for Banks, Other Financial Institutions (Avg)",
+            
+            # === RAW POPULATION & DEMOGRAPHIC COUNTS ===
+            # Female/Male population counts (not percentages)
+            "female population count": "2024 Female Household Population",
+            "male population count": "2024 Male Household Population",
+            "women count": "2024 Female Household Population",
+            "men count": "2024 Male Household Population",
+            
+            # Age group raw counts
+            "young adults count": "2024 Maintainers - 25 to 34",
+            "35-44 age group": "2024 Maintainers - 35 to 44",
+            "35-44 count": "2024 Maintainers - 35 to 44",
+            "middle aged count": "2024 Maintainers - 35 to 44",
+            "45-54 age group": "2024 Maintainers - 45 to 54",
+            "45-54 count": "2024 Maintainers - 45 to 54",
+            "mature adults count": "2024 Maintainers - 45 to 54",
+            "55-64 age group": "2024 Maintainers - 55 to 64",
+            "55-64 count": "2024 Maintainers - 55 to 64",
+            "seniors count": "2024 Maintainers - 55 to 64",
+            
+            # === HOUSING STATUS & CONDOMINIUM (EXPANDED) ===
+            # Raw counts for housing status
+            "households in condos": "2024 Condominium Status - In Condo",
+            "condo households": "2024 Condominium Status - In Condo",
+            "condominium households": "2024 Condominium Status - In Condo",
+            
+            "households not in condos": "2024 Condominium Status - Not In Condo",
+            "non-condo households": "2024 Condominium Status - Not In Condo",
+            "households not in condos percentage": "2024 Condominium Status - Not In Condo (%)",
+            
+            "total condominium households": "2024 Condominium Status - Total Households",
+            "total condo households": "2024 Condominium Status - Total Households",
+            
+            # === MARITAL STATUS (RAW COUNTS) ===
+            "married population count": "2024 Pop 15+: Married (And Not Separated)",
+            "single population count": "2024 Pop 15+: Single (Never Legally Married)",
+            "divorced population count": "2024 Pop 15+: Divorced",
+            "separated population count": "2024 Pop 15+: Separated",
+            "widowed population count": "2024 Pop 15+: Widowed",
+            "common law population count": "2024 Pop 15+: Living Common Law",
+            
+            # Combined marital categories
+            "married or common law": "2024 Pop 15+: Married or Living Common-Law (%)",
+            "partnered population": "2024 Pop 15+: Married or Living Common-Law (%)",
+            "partnered": "2024 Pop 15+: Married or Living Common-Law (%)",
+            "not married": "2024 Pop 15+: Not Married or Common-Law (%)",
+            "unpartnered": "2024 Pop 15+: Not Married or Common-Law (%)",
+            "single status": "2024 Pop 15+: Not Married or Common-Law (%)",
+            
+            # Raw counts for combined categories
+            "married or common law count": "2024 Pop 15+: Married or Living Common-Law",
+            "partnered population count": "2024 Pop 15+: Married or Living Common-Law",
+            "not married count": "2024 Pop 15+: Not Married or Common-Law",
+            "unpartnered count": "2024 Pop 15+: Not Married or Common-Law",
+            
+            # === HOUSING STRUCTURE TYPES (RAW COUNTS) ===
+            "duplex count": "2021 Housing: Apartment or Flat in Duplex (Census)",
+            "duplex units": "2021 Housing: Apartment or Flat in Duplex (Census)",
+            
+            "single detached count": "2024 Structure Type Single-Detached House",
+            "semi detached count": "2024 Structure Type Semi-Detached House",
+            "row houses count": "2024 Structure Type Row House",
+            "townhouses count": "2024 Structure Type Row House",
+            "apartments count": "2024 Structure Type Apartment, Building Five or More Story",
+            "high rise count": "2024 Structure Type Apartment, Building Five or More Story",
+            "small apartments count": "2024 Structure Type Apartment, Building Fewer Than Five Story",
+            "low rise count": "2024 Structure Type Apartment, Building Fewer Than Five Story",
+            "movable dwellings count": "2024 Structure Type Movable Dwelling",
+            "mobile homes count": "2024 Structure Type Movable Dwelling",
+            "other attached houses": "2024 Structure Type Other Single-Attached House (%)",
+            "other attached count": "2024 Structure Type Other Single-Attached House",
+            
+            # === HOUSING TENURE (RAW COUNTS) ===
+            "owned homes count": "2024 Tenure: Owned",
+            "homeowners count": "2024 Tenure: Owned",
+            "owned units": "2024 Tenure: Owned",
+            
+            "rental units count": "2024 Tenure: Rented",
+            "rented units": "2024 Tenure: Rented",
+            "rental count": "2024 Tenure: Rented",
+            
+            "band housing count": "2024 Tenure: Band Housing",
+            "band housing units": "2024 Tenure: Band Housing",
+            
+            # === HOUSEHOLD TYPES ===
+            "household types": "2024 Household Type - Total Households",
+            "total household types": "2024 Household Type - Total Households",
+            
+            # === VISIBLE MINORITY (RAW COUNTS) ===
+            "chinese population count": "2024 Visible Minority Chinese",
+            "south asian population count": "2024 Visible Minority South Asian",
+            "black population count": "2024 Visible Minority Black",
+            "filipino population count": "2024 Visible Minority Filipino",
+            "latin american population count": "2024 Visible Minority Latin American",
+            "arab population count": "2024 Visible Minority Arab",
+            "southeast asian population count": "2024 Visible Minority Southeast Asian",
+            "west asian population count": "2024 Visible Minority West Asian",
+            "japanese population count": "2024 Visible Minority Japanese",
+            "korean population count": "2024 Visible Minority Korean",
+            "total visible minority count": "2024 Visible Minority Total Population",
+            
+            # === INCOME TYPES (EXPANDED) ===
+            "aggregate income": "2024 Household Aggregate Income (Current Year $)",
+            "total household income": "2024 Household Aggregate Income (Current Year $)",
+            "community income": "2024 Household Aggregate Income (Current Year $)",
+            
+            "disposable aggregate income": "2024 Household Disposable Aggregate Income",
+            "total disposable income": "2024 Household Disposable Aggregate Income",
+            "community disposable income": "2024 Household Disposable Aggregate Income",
+            
+            "raw aggregate income": "2024 Household Aggregate Income",
+            "household median income": "2024 Household Median Income (Current Year $)",
+            
+            # === ALL YEAR-OVER-YEAR CHANGE INDICATORS ===
+            # Historical changes
+            "2021-2022 population change": "2021-2022 Total Population % Change",
+            "population change 2021-2022": "2021-2022 Total Population % Change",
+            
+            "2022-2023 population change": "2022-2023 Total Population % Change",
+            "population change 2022-2023": "2022-2023 Total Population % Change",
+            
+            "2022-2023 income change": "2022-2023 Current$ Household Average Income % Change",
+            "income change 2022-2023": "2022-2023 Current$ Household Average Income % Change",
+            
+            # Current/recent changes (already mapped above but adding aliases)
+            "current population change": "2023-2024 Total Population % Change",
+            "latest population change": "2023-2024 Total Population % Change",
+            "current income change": "2023-2024 Current$ Household Average Income % Change",
+            "latest income change": "2023-2024 Current$ Household Average Income % Change",
+            
+            # Future projections
+            "2024-2025 population change": "2024-2025 Total Population % Change",
+            "population change 2024-2025": "2024-2025 Total Population % Change",
+            "next year population change": "2024-2025 Total Population % Change",
+            
+            "2024-2025 income change": "2024-2025 Current$ Household Average Income % Change",
+            "income change 2024-2025": "2024-2025 Current$ Household Average Income % Change",
+            "next year income change": "2024-2025 Current$ Household Average Income % Change",
+            
+            "2025-2026 population change": "2025-2026 Total Population % Change",
+            "population change 2025-2026": "2025-2026 Total Population % Change",
+            
+            "2025-2026 income change": "2025-2026 Current$ Household Average Income % Change",
+            "income change 2025-2026": "2025-2026 Current$ Household Average Income % Change",
+            
+            "2026-2027 population change": "2026-2027 Total Population % Change",
+            "population change 2026-2027": "2026-2027 Total Population % Change",
+            "long term population change": "2026-2027 Total Population % Change",
+            
+            "2026-2027 income change": "2026-2027 Current$ Household Average Income % Change",
+            "income change 2026-2027": "2026-2027 Current$ Household Average Income % Change",
+            "long term income change": "2026-2027 Current$ Household Average Income % Change",
+            
+            # === ALIASES FOR CONSISTENCY ===
+            # Alternative ways to ask about existing mapped fields
+            "condo ownership rate": "condo_ownership_pct",
+            "condominium rate": "condo_ownership_pct",
+            "conversion": "conversion_rate",
+            "approval": "conversion_rate",
+            "success": "conversion_rate",
             
             # Legacy mappings for backward compatibility
             "jobs": "2024 Labour Force - Labour Employment Rate"
