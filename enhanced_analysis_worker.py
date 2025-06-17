@@ -99,7 +99,8 @@ def enhanced_analysis_worker(query):
         for feature in query_specific_features[:10]:  # Top 10 most relevant features
             shap_col = f'shap_{feature}'
             if shap_col in top_data.columns:
-                shap_values_dict[feature] = top_data[shap_col].tolist()[:10]
+                # Use safe_float to handle NaN values in SHAP data
+                shap_values_dict[feature] = [safe_float(val) for val in top_data[shap_col].tolist()[:10]]
         
         return {
             "success": True,
@@ -251,16 +252,28 @@ def calculate_query_aware_feature_importance(df, query_specific_features, query_
         shap_col = f'shap_{feature}'
         if shap_col in df.columns:
             importance = abs(df[shap_col]).mean()
-            feature_importance.append({
-                'feature': feature,
-                'importance': float(importance)
-            })
+            # Handle NaN values - convert to None which becomes null in JSON
+            importance_value = float(importance) if pd.notna(importance) else None
+            if importance_value is not None:  # Only add non-null values
+                feature_importance.append({
+                    'feature': feature,
+                    'importance': importance_value
+                })
     
     # Sort by importance
     feature_importance.sort(key=lambda x: x['importance'], reverse=True)
     
     # Limit to top 15 features for clarity
     return feature_importance[:15]
+
+def safe_float(value):
+    """Safely convert value to float, replacing NaN with None for JSON compatibility"""
+    try:
+        if pd.isna(value):
+            return None
+        return float(value)
+    except (ValueError, TypeError):
+        return None
 
 def build_query_aware_results(df, target_variable, query_classification):
     """Build results with query-specific field selection"""
@@ -271,35 +284,35 @@ def build_query_aware_results(df, target_variable, query_classification):
             'geo_id': str(row['ID']),
             'FSA_ID': str(row['ID']),
             'ID': str(row['ID']),
-            target_variable.lower(): float(row[target_variable])
+            target_variable.lower(): safe_float(row[target_variable])
         }
         
         # Always include conversion rate
         if 'CONVERSION_RATE' in row:
-            result['conversion_rate'] = float(row['CONVERSION_RATE'])
+            result['conversion_rate'] = safe_float(row['CONVERSION_RATE'])
         
         # Add query-specific fields
         # Demographic fields
         if 'value_2024 Visible Minority Total Population (%)' in row:
-            result['visible_minority_population_pct'] = float(row['value_2024 Visible Minority Total Population (%)'])
+            result['visible_minority_population_pct'] = safe_float(row['value_2024 Visible Minority Total Population (%)'])
         
         if 'value_2024 Total Population' in row:
-            result['total_population'] = float(row['value_2024 Total Population'])
+            result['total_population'] = safe_float(row['value_2024 Total Population'])
         
         # Financial fields
         if 'value_2024 Household Average Income (Current Year $)' in row:
-            result['household_average_income'] = float(row['value_2024 Household Average Income (Current Year $)'])
+            result['household_average_income'] = safe_float(row['value_2024 Household Average Income (Current Year $)'])
         
         # Housing fields
         if 'value_2024 Structure Type Single-Detached House (%)' in row:
-            result['single_detached_house_pct'] = float(row['value_2024 Structure Type Single-Detached House (%)'])
+            result['single_detached_house_pct'] = safe_float(row['value_2024 Structure Type Single-Detached House (%)'])
         
         if 'value_2024 Condominium Status - In Condo (%)' in row:
-            result['condominium_pct'] = float(row['value_2024 Condominium Status - In Condo (%)'])
+            result['condominium_pct'] = safe_float(row['value_2024 Condominium Status - In Condo (%)'])
         
         # Add combined score if it was calculated
         if 'combined_score' in row:
-            result['combined_score'] = float(row['combined_score'])
+            result['combined_score'] = safe_float(row['combined_score'])
         
         results.append(result)
     

@@ -9,6 +9,7 @@ import pickle
 import shap
 import xgboost as xgb
 import re
+import json
 
 # Import the master schema and data processing function
 from map_nesto_data import MASTER_SCHEMA, TARGET_VARIABLE, load_and_preprocess_data, initialize_schema
@@ -17,6 +18,28 @@ from enhanced_analysis_worker import enhanced_analysis_worker
 
 # --- Redis/RQ Imports for Async Jobs ---
 import redis
+
+# --- Custom NaN-Safe JSON Handler ---
+def safe_jsonify(data, status_code=200):
+    """Safe jsonify that handles NaN values by converting them to None"""
+    def convert_nan(obj):
+        if isinstance(obj, dict):
+            return {key: convert_nan(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_nan(item) for item in obj]
+        elif isinstance(obj, float):
+            if pd.isna(obj) or np.isnan(obj) or np.isinf(obj):
+                return None
+            return obj
+        elif pd.isna(obj):  # For pandas NA values
+            return None
+        return obj
+    
+    # Convert NaN values to None throughout the data structure
+    safe_data = convert_nan(data)
+    response = jsonify(safe_data)
+    response.status_code = status_code
+    return response
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -121,7 +144,7 @@ def get_schema():
     This includes all available fields from the dataset, not just the predefined ones.
     """
     if df is None:
-        return jsonify({"error": "Dataset not loaded. Schema unavailable."}), 500
+        return safe_jsonify({"error": "Dataset not loaded. Schema unavailable."}, 500)
 
     # Generate dynamic schema from actual data columns
     dynamic_schema = {}
@@ -152,7 +175,7 @@ def get_schema():
     
     logger.info(f"Generated schema for {len(known_fields)} fields")
     
-    return jsonify({
+    return safe_jsonify({
         "fields": dynamic_schema,
         "known_fields": sorted(known_fields)
     })
@@ -330,7 +353,7 @@ def analyze():
                     result['ID'] = result['geo_id']
         
         logger.info(f"Analysis completed successfully. Returning {len(analysis_results.get('results', []))} results.")
-        return jsonify(analysis_results)
+        return safe_jsonify(analysis_results)
         
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
@@ -342,15 +365,13 @@ def analyze():
 @app.errorhandler(400)
 def bad_request(error):
     logger.error(f"Bad Request: {error.description}")
-    response = jsonify({'error': 'Bad Request', 'message': error.description})
-    response.status_code = 400
+    response = safe_jsonify({'error': 'Bad Request', 'message': error.description}, 400)
     return response
 
 @app.errorhandler(500)
 def internal_server_error(error):
     logger.error(f"Internal Server Error: {traceback.format_exc()}")
-    response = jsonify({'error': 'Internal Server Error', 'message': 'An unexpected error occurred.'})
-    response.status_code = 500
+    response = safe_jsonify({'error': 'Internal Server Error', 'message': 'An unexpected error occurred.'}, 500)
     return response
 
 if __name__ == '__main__':
