@@ -48,16 +48,14 @@ class QueryClassifier:
                 r"how does.*affect.*"
             ],
             QueryType.RANKING: [
-                r"(?:highest|lowest|top|bottom|best|worst|most|least).*(?:[0-9]+|few|many).*",
+                # Only match explicit numerical rankings
+                r"(?:top|bottom|first|last|best|worst)\s+(\d+).*",
+                r"(?:highest|lowest)\s+(\d+).*",
+                r"show me.*(?:top|bottom)\s+(\d+).*",
+                r"list.*(?:top|bottom)\s+(\d+).*",
+                # Only match ranking/sorting when explicitly about ordering
                 r"(?:rank|ranking|order|sort).*(?:by|of|in terms of).*",
-                r"(?:which|what).*(?:area|region|zone|location|place).*(?:highest|lowest|top|most|least).*",
                 r"(?:list|show|display).*(?:order|sorted|ranked).*",
-                r"(?:which|what).*(?:is|are).*(?:highest|lowest|top|best|worst|largest|smallest).*",
-                r"show me.*(?:highest|lowest|top|best|worst).*",
-                r"where.*(?:highest|lowest|greatest|least).*(?:rate|level|value|percentage).*",
-                r".*rank(?:ing|ed)?.*(?:from|by|in).*",
-                r".*(?:highest|lowest).*(?:rate|level|value|percentage).*",
-                r".*(?:outperform|underperform).*"
             ],
             QueryType.COMPARISON: [
                 r"(?:compare|comparison|contrast|difference|versus|vs|vs\.|differences between|similarities between).*",

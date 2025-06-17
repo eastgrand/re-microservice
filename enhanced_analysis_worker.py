@@ -181,60 +181,66 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
     
     query_type = query_classification.get('query_type', 'unknown')
     
-    # For diversity queries, we might want to weight areas with higher diversity
-    if 'diversity' in user_query.lower():
-        # Create a diversity score
-        diversity_cols = [col for col in df.columns if 'Visible Minority' in col and col != 'value_2024 Visible Minority Total Population (%)']
-        if diversity_cols and 'value_2024 Visible Minority Total Population (%)' in df.columns:
-            # Calculate diversity index (higher when multiple groups are present)
-            df_copy = df.copy()
-            df_copy['diversity_score'] = df_copy['value_2024 Visible Minority Total Population (%)']
-            
-            # Combine with conversion rate for ranking
-            df_copy['combined_score'] = (
-                df_copy[target_variable] * 0.7 + 
-                df_copy['diversity_score'] * 0.3
-            )
-            
-            top_data = df_copy.nlargest(25, 'combined_score')
-            logger.info("Applied diversity-aware ranking")
-            return top_data
+    # Only apply ranking/limiting for ranking queries
+    if query_type == 'ranking':
+        # For diversity queries, we might want to weight areas with higher diversity
+        if 'diversity' in user_query.lower():
+            # Create a diversity score
+            diversity_cols = [col for col in df.columns if 'Visible Minority' in col and col != 'value_2024 Visible Minority Total Population (%)']
+            if diversity_cols and 'value_2024 Visible Minority Total Population (%)' in df.columns:
+                # Calculate diversity index (higher when multiple groups are present)
+                df_copy = df.copy()
+                df_copy['diversity_score'] = df_copy['value_2024 Visible Minority Total Population (%)']
+                
+                # Combine with conversion rate for ranking
+                df_copy['combined_score'] = (
+                    df_copy[target_variable] * 0.7 + 
+                    df_copy['diversity_score'] * 0.3
+                )
+                
+                top_data = df_copy.nlargest(25, 'combined_score')
+                logger.info("Applied diversity-aware ranking")
+                return top_data
+        
+        # For income queries, weight by income levels
+        elif 'income' in user_query.lower():
+            income_col = 'value_2024 Household Average Income (Current Year $)'
+            if income_col in df.columns:
+                df_copy = df.copy()
+                # Normalize income for scoring
+                income_normalized = (df_copy[income_col] - df_copy[income_col].min()) / (df_copy[income_col].max() - df_copy[income_col].min())
+                
+                df_copy['combined_score'] = (
+                    df_copy[target_variable] * 0.7 + 
+                    income_normalized * 0.3
+                )
+                
+                top_data = df_copy.nlargest(25, 'combined_score')
+                logger.info("Applied income-aware ranking")
+                return top_data
+        
+        # For housing queries, weight by housing characteristics
+        elif 'condo' in user_query.lower():
+            condo_col = 'value_2024 Condominium Status - In Condo (%)'
+            if condo_col in df.columns:
+                df_copy = df.copy()
+                df_copy['combined_score'] = (
+                    df_copy[target_variable] * 0.7 + 
+                    df_copy[condo_col] * 0.3
+                )
+                
+                top_data = df_copy.nlargest(25, 'combined_score')
+                logger.info("Applied condo-aware ranking")
+                return top_data
+        
+        # Default ranking by target variable only for ranking queries
+        top_data = df.nlargest(25, target_variable)
+        logger.info("Applied default ranking by target variable")
+        return top_data
     
-    # For income queries, weight by income levels
-    elif 'income' in user_query.lower():
-        income_col = 'value_2024 Household Average Income (Current Year $)'
-        if income_col in df.columns:
-            df_copy = df.copy()
-            # Normalize income for scoring
-            income_normalized = (df_copy[income_col] - df_copy[income_col].min()) / (df_copy[income_col].max() - df_copy[income_col].min())
-            
-            df_copy['combined_score'] = (
-                df_copy[target_variable] * 0.7 + 
-                income_normalized * 0.3
-            )
-            
-            top_data = df_copy.nlargest(25, 'combined_score')
-            logger.info("Applied income-aware ranking")
-            return top_data
-    
-    # For housing queries, weight by housing characteristics
-    elif 'condo' in user_query.lower():
-        condo_col = 'value_2024 Condominium Status - In Condo (%)'
-        if condo_col in df.columns:
-            df_copy = df.copy()
-            df_copy['combined_score'] = (
-                df_copy[target_variable] * 0.7 + 
-                df_copy[condo_col] * 0.3
-            )
-            
-            top_data = df_copy.nlargest(25, 'combined_score')
-            logger.info("Applied condo-aware ranking")
-            return top_data
-    
-    # Default ranking by target variable only
-    top_data = df.nlargest(25, target_variable)
-    logger.info("Applied default ranking by target variable")
-    return top_data
+    # For non-ranking queries (correlation, etc.), return all data
+    logger.info(f"Returning all data for {query_type} query type")
+    return df
 
 def calculate_query_aware_feature_importance(df, query_specific_features, query_classification):
     """Calculate feature importance with query-specific weighting"""
