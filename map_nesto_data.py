@@ -129,12 +129,12 @@ def initialize_schema(df):
     MASTER_SCHEMA = generate_dynamic_schema(df)
     
     # Generate field mappings (raw name -> canonical name)
-    FIELD_MAPPINGS = {
-        details['raw_mapping']: details['canonical_name']
-        for _, details in MASTER_SCHEMA.items()
-        if 'raw_mapping' in details
-    }
-    
+FIELD_MAPPINGS = {
+    details['raw_mapping']: details['canonical_name']
+    for _, details in MASTER_SCHEMA.items()
+    if 'raw_mapping' in details
+}
+
     # All numeric columns
     NUMERIC_COLS = [
         details['canonical_name'] 

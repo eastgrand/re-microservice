@@ -99,41 +99,227 @@ class QueryClassifier:
             ]
         }
         
-        # Common target variables in mortgage analysis for easier extraction
+        # Comprehensive target variables mapping for all available fields in the dataset
+        # This enables "top N" queries for any metric in the data
         self.target_variables = {
-            "mortgage approvals": "Mortgage_Approvals",
-            "mortgage approval": "Mortgage_Approvals",
+            # === CORE MORTGAGE METRICS ===
+            "conversion rate": "CONVERSION_RATE",
+            "mortgage approvals": "Mortgage_Approvals", 
+            "mortgage applications": "Mortgage_Applications",
+            "funded applications": "Mortgage_Approvals",
+            "approval rate": "CONVERSION_RATE",
+            "approval rates": "CONVERSION_RATE",
             "approvals": "Mortgage_Approvals",
-            "approval rate": "Mortgage_Approvals",
-            "approval rates": "Mortgage_Approvals",
             "approved": "Mortgage_Approvals",
-            "income": "Median_Income",
-            "median income": "Median_Income",
-            "household income": "Median_Income",
-            "earnings": "Median_Income",
-            "salary": "Median_Income",
-            "population": "Population",
-            "residents": "Population",
-            "people": "Population",
-            "inhabitants": "Population",
-            "demographic": "Population",
-            "homeownership": "Homeownership",
-            "home ownership": "Homeownership",
-            "owning homes": "Homeownership",
-            "own their home": "Homeownership",
-            "rental": "Rental_Units",
-            "rent": "Rental_Units",
-            "rentals": "Rental_Units",
-            "tenants": "Rental_Units",
-            "renters": "Rental_Units",
-            "unemployment": "Unemployment_Rate",
-            "unemployment rate": "Unemployment_Rate",
-            "jobless": "Unemployment_Rate",
-            "joblessness": "Unemployment_Rate",
-            "employment": "Employment_Rate",
-            "employment rate": "Employment_Rate",
-            "employed": "Employment_Rate",
-            "jobs": "Employment_Rate"
+            
+            # === POPULATION & DEMOGRAPHICS ===
+            "population": "2024 Total Population",
+            "total population": "2024 Total Population",
+            "residents": "2024 Total Population",
+            "people": "2024 Total Population",
+            "inhabitants": "2024 Total Population",
+            "demographic": "2024 Total Population",
+            
+            # Gender demographics
+            "female population": "2024 Female Household Population (%)",
+            "female percentage": "2024 Female Household Population (%)",
+            "male population": "2024 Male Household Population (%)",
+            "male percentage": "2024 Male Household Population (%)",
+            
+            # === AGE DEMOGRAPHICS ===
+            "age": "2024 Maintainers - Median Age",
+            "median age": "2024 Maintainers - Median Age",
+            "young adults": "2024 Maintainers - 25 to 34 (%)",
+            "young adult percentage": "2024 Maintainers - 25 to 34 (%)",
+            "middle age": "2024 Maintainers - 35 to 44 (%)",
+            "middle aged": "2024 Maintainers - 35 to 44 (%)",
+            "mature adults": "2024 Maintainers - 45 to 54 (%)",
+            "seniors": "2024 Maintainers - 55 to 64 (%)",
+            "senior percentage": "2024 Maintainers - 55 to 64 (%)",
+            
+            # === INCOME & ECONOMIC INDICATORS ===
+            "income": "2024 Household Average Income (Current Year $)",
+            "average income": "2024 Household Average Income (Current Year $)",
+            "household income": "2024 Household Average Income (Current Year $)",
+            "median income": "2024 Household Median Income (Current Year $)",
+            "earnings": "2024 Household Average Income (Current Year $)",
+            "salary": "2024 Household Average Income (Current Year $)",
+            "disposable income": "2024 Household Disposable Aggregate Income",
+            "discretionary income": "2024 Household Discretionary Aggregate Income",
+            "total income": "2024 Household Aggregate Income (Current Year $)",
+            
+            # Employment metrics
+            "employment": "2024 Labour Force - Labour Employment Rate",
+            "employment rate": "2024 Labour Force - Labour Employment Rate",
+            "employed": "2024 Labour Force - Labour Employment Rate",
+            "unemployment": "2024 Labour Force - Labour Unemployment Rate",
+            "unemployment rate": "2024 Labour Force - Labour Unemployment Rate",
+            "jobless": "2024 Labour Force - Labour Unemployment Rate",
+            "labor participation": "2024 Labour Force - Labour Participation Rate",
+            "labour participation": "2024 Labour Force - Labour Participation Rate",
+            
+            # === HOUSING TENURE ===
+            "homeownership": "2024 Tenure: Owned (%)",
+            "home ownership": "2024 Tenure: Owned (%)",
+            "ownership": "2024 Tenure: Owned (%)",
+            "owned homes": "2024 Tenure: Owned (%)",
+            "owner occupied": "2024 Tenure: Owned (%)",
+            
+            "rental": "2024 Tenure: Rented (%)",
+            "rental rate": "2024 Tenure: Rented (%)",
+            "rental percentage": "2024 Tenure: Rented (%)",
+            "rent": "2024 Tenure: Rented (%)",
+            "rentals": "2024 Tenure: Rented (%)",
+            "renters": "2024 Tenure: Rented (%)",
+            "rented": "2024 Tenure: Rented (%)",
+            "tenant": "2024 Tenure: Rented (%)",
+            "tenants": "2024 Tenure: Rented (%)",
+            
+            "band housing": "2024 Tenure: Band Housing (%)",
+            "households": "2024 Tenure: Total Households",
+            "total households": "2024 Tenure: Total Households",
+            
+            # === HOUSING STRUCTURE TYPES ===
+            # Condominiums
+            "condominium ownership": "2024 Condominium Status - In Condo (%)",
+            "condominium ownership percentage": "2024 Condominium Status - In Condo (%)",
+            "condo ownership": "2024 Condominium Status - In Condo (%)",
+            "condo ownership percentage": "2024 Condominium Status - In Condo (%)",
+            "condominium percentage": "2024 Condominium Status - In Condo (%)",
+            "condo percentage": "2024 Condominium Status - In Condo (%)",
+            "condominium": "2024 Condominium Status - In Condo (%)",
+            "condo": "2024 Condominium Status - In Condo (%)",
+            "condos": "2024 Condominium Status - In Condo (%)",
+            
+            # House types
+            "single detached": "2024 Structure Type Single-Detached House (%)",
+            "single detached houses": "2024 Structure Type Single-Detached House (%)",
+            "detached houses": "2024 Structure Type Single-Detached House (%)",
+            "detached homes": "2024 Structure Type Single-Detached House (%)",
+            
+            "semi detached": "2024 Structure Type Semi-Detached House (%)",
+            "semi detached houses": "2024 Structure Type Semi-Detached House (%)",
+            
+            "row houses": "2024 Structure Type Row House (%)",
+            "townhouses": "2024 Structure Type Row House (%)",
+            "row homes": "2024 Structure Type Row House (%)",
+            
+            "apartments": "2024 Structure Type Apartment, Building Five or More Story (%)",
+            "large apartments": "2024 Structure Type Apartment, Building Five or More Story (%)",
+            "high rise": "2024 Structure Type Apartment, Building Five or More Story (%)",
+            "high rise apartments": "2024 Structure Type Apartment, Building Five or More Story (%)",
+            
+            "small apartments": "2024 Structure Type Apartment, Building Fewer Than Five Story (%)",
+            "low rise apartments": "2024 Structure Type Apartment, Building Fewer Than Five Story (%)",
+            
+            "movable dwellings": "2024 Structure Type Movable Dwelling (%)",
+            "mobile homes": "2024 Structure Type Movable Dwelling (%)",
+            
+            "duplex": "2021 Housing: Apartment or Flat in Duplex (Census) (%)",
+            "duplex apartments": "2021 Housing: Apartment or Flat in Duplex (Census) (%)",
+            
+            # === HOUSING AGE/CONSTRUCTION PERIODS ===
+            "old housing": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            "older homes": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            "vintage housing": "2021 Period of Construction - 1960 or Before (Census) (%)",
+            
+            "new housing": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            "new homes": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            "recent construction": "2021 Period of Construction - 2016 to 2021 (Census) (%)",
+            
+            # === VISIBLE MINORITY DEMOGRAPHICS ===
+            "diversity": "2024 Visible Minority Total Population (%)",
+            "visible minority": "2024 Visible Minority Total Population (%)",
+            "minority population": "2024 Visible Minority Total Population (%)",
+            "ethnic diversity": "2024 Visible Minority Total Population (%)",
+            "multicultural": "2024 Visible Minority Total Population (%)",
+            
+            # Specific ethnic groups
+            "chinese": "2024 Visible Minority Chinese (%)",
+            "chinese population": "2024 Visible Minority Chinese (%)",
+            "asian": "2024 Visible Minority Chinese (%)",
+            
+            "south asian": "2024 Visible Minority South Asian (%)",
+            "indian": "2024 Visible Minority South Asian (%)",
+            
+            "black": "2024 Visible Minority Black (%)",
+            "african": "2024 Visible Minority Black (%)",
+            "black population": "2024 Visible Minority Black (%)",
+            
+            "filipino": "2024 Visible Minority Filipino (%)",
+            "filipino population": "2024 Visible Minority Filipino (%)",
+            
+            "latin american": "2024 Visible Minority Latin American (%)",
+            "hispanic": "2024 Visible Minority Latin American (%)",
+            "latino": "2024 Visible Minority Latin American (%)",
+            
+            "arab": "2024 Visible Minority Arab (%)",
+            "arab population": "2024 Visible Minority Arab (%)",
+            "middle eastern": "2024 Visible Minority Arab (%)",
+            
+            "southeast asian": "2024 Visible Minority Southeast Asian (%)",
+            "vietnamese": "2024 Visible Minority Southeast Asian (%)",
+            
+            "japanese": "2024 Visible Minority Japanese (%)",
+            "korean": "2024 Visible Minority Korean (%)",
+            "west asian": "2024 Visible Minority West Asian (%)",
+            
+            # === MARITAL STATUS ===
+            "married": "2024 Pop 15+: Married (And Not Separated) (%)",
+            "married population": "2024 Pop 15+: Married (And Not Separated) (%)",
+            "marriage rate": "2024 Pop 15+: Married (And Not Separated) (%)",
+            
+            "single": "2024 Pop 15+: Single (Never Legally Married) (%)",
+            "single population": "2024 Pop 15+: Single (Never Legally Married) (%)",
+            "never married": "2024 Pop 15+: Single (Never Legally Married) (%)",
+            
+            "divorced": "2024 Pop 15+: Divorced (%)",
+            "divorced population": "2024 Pop 15+: Divorced (%)",
+            "divorce rate": "2024 Pop 15+: Divorced (%)",
+            
+            "separated": "2024 Pop 15+: Separated (%)",
+            "widowed": "2024 Pop 15+: Widowed (%)",
+            
+            "common law": "2024 Pop 15+: Living Common Law (%)",
+            "common law population": "2024 Pop 15+: Living Common Law (%)",
+            "cohabiting": "2024 Pop 15+: Living Common Law (%)",
+            
+            # === HOUSING COSTS & FINANCIAL ===
+            "property taxes": "2024 Property Taxes (Shelter) (Avg)",
+            "property tax": "2024 Property Taxes (Shelter) (Avg)",
+            "average property tax": "2024 Property Taxes (Shelter) (Avg)",
+            
+            "mortgage payments": "2024 Regular Mortgage Payments (Shelter) (Avg)",
+            "mortgage payment": "2024 Regular Mortgage Payments (Shelter) (Avg)",
+            "average mortgage payment": "2024 Regular Mortgage Payments (Shelter) (Avg)",
+            
+            "condo fees": "2024 Condominium Charges (Shelter) (Avg)",
+            "condominium fees": "2024 Condominium Charges (Shelter) (Avg)",
+            "maintenance fees": "2024 Condominium Charges (Shelter) (Avg)",
+            
+            "financial services": "2024 Financial Services (Avg)",
+            "bank charges": "2024 Service Charges for Banks, Other Financial Institutions (Avg)",
+            "banking fees": "2024 Service Charges for Banks, Other Financial Institutions (Avg)",
+            
+            # === ECONOMIC CHANGE INDICATORS ===
+            "population growth": "2023-2024 Total Population % Change",
+            "population change": "2023-2024 Total Population % Change",
+            "recent population growth": "2023-2024 Total Population % Change",
+            
+            "income growth": "2023-2024 Current$ Household Average Income % Change",
+            "income change": "2023-2024 Current$ Household Average Income % Change",
+            "recent income growth": "2023-2024 Current$ Household Average Income % Change",
+            
+            "projected population growth": "2024-2025 Total Population % Change",
+            "projected income growth": "2024-2025 Current$ Household Average Income % Change",
+            
+            # === BUSINESS/MARKET METRICS ===
+            "market weight": "Sum_Weight",
+            "market significance": "Sum_Weight",
+            "business weight": "Sum_Weight",
+            
+            # Legacy mappings for backward compatibility
+            "jobs": "2024 Labour Force - Labour Employment Rate"
         }
     
     def classify(self, query_text: str) -> Tuple[QueryType, float]:

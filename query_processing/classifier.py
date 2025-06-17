@@ -66,6 +66,9 @@ class QueryClassifier:
                 r"(?:highest|lowest)\s+(\d+).*",
                 r"show me.*(?:top|bottom)\s+(\d+).*",
                 r"list.*(?:top|bottom)\s+(\d+).*",
+                # Match ranking terms without numbers (limit extraction will handle defaults)
+                r"(?:show|list|find|get).*(?:top|bottom|best|worst|highest|lowest).*(?:areas|regions|places|locations).*",
+                r"(?:top|bottom|best|worst|highest|lowest).*(?:areas|regions|places|locations).*",
                 # Only match ranking/sorting when explicitly about ordering
                 r"(?:rank|ranking|order|sort).*(?:by|of|in terms of).*",
                 r"(?:list|show|display).*(?:order|sorted|ranked).*",

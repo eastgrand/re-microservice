@@ -16,7 +16,7 @@ def select_model_for_analysis(query):
     
     # For now, we only have one model available, but we'll use query classification
     # to determine how to analyze the data differently
-    return 'conversion'
+        return 'conversion'
 
 def load_precalculated_model_data(model_name):
     """Load pre-calculated SHAP data for specified model"""
@@ -62,7 +62,18 @@ def enhanced_analysis_worker(query):
         # Load pre-calculated data for selected model
         precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        target_variable = model_info['target']
+        # Use target variable from query classification if available, otherwise use model default
+        target_variable = query_classification.get('target_variable', model_info['target'])
+        
+        # Handle condominium target variable - map to the actual column name in data
+        if target_variable == "2024 Condominium Status - In Condo (%)":
+            # Check if the value_ prefixed version exists in the data
+            if f"value_{target_variable}" in precalc_df.columns:
+                target_variable = f"value_{target_variable}"
+            else:
+                logger.warning(f"Condominium target variable not found in data, using default: {model_info['target']}")
+                target_variable = model_info['target']
+        
         features = model_info['features']
         
         logger.info(f"Using model: {selected_model}")
@@ -194,8 +205,20 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
     
     # Only apply ranking/limiting for ranking queries
     if query_type == 'ranking':
+        # Get the limit from query classification, default to 25 if not specified
+        limit = query_classification.get('limit', 25)
+        logger.info(f"Using limit: {limit} for ranking query")
+        
+        # Check if we're ranking by a specific target variable (like condominium ownership)
+        # If so, rank directly by that variable instead of creating combined scores
+        if target_variable.startswith('value_2024 Condominium Status - In Condo'):
+            # For condominium ownership queries, rank directly by the condo percentage
+            top_data = df.nlargest(limit, target_variable)
+            logger.info(f"Applied direct ranking by {target_variable} with limit {limit}")
+            return top_data
+        
         # For diversity queries, we might want to weight areas with higher diversity
-        if 'diversity' in user_query.lower():
+        elif 'diversity' in user_query.lower():
             # Create a diversity score
             diversity_cols = [col for col in df.columns if 'Visible Minority' in col and col != 'value_2024 Visible Minority Total Population (%)']
             if diversity_cols and 'value_2024 Visible Minority Total Population (%)' in df.columns:
@@ -209,8 +232,8 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
                     df_copy['diversity_score'] * 0.3
                 )
                 
-                top_data = df_copy.nlargest(25, 'combined_score')
-                logger.info("Applied diversity-aware ranking")
+                top_data = df_copy.nlargest(limit, 'combined_score')
+                logger.info(f"Applied diversity-aware ranking with limit {limit}")
                 return top_data
         
         # For income queries, weight by income levels
@@ -226,27 +249,13 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
                     income_normalized * 0.3
                 )
                 
-                top_data = df_copy.nlargest(25, 'combined_score')
-                logger.info("Applied income-aware ranking")
-                return top_data
-        
-        # For housing queries, weight by housing characteristics
-        elif 'condo' in user_query.lower():
-            condo_col = 'value_2024 Condominium Status - In Condo (%)'
-            if condo_col in df.columns:
-                df_copy = df.copy()
-                df_copy['combined_score'] = (
-                    df_copy[target_variable] * 0.7 + 
-                    df_copy[condo_col] * 0.3
-                )
-                
-                top_data = df_copy.nlargest(25, 'combined_score')
-                logger.info("Applied condo-aware ranking")
+                top_data = df_copy.nlargest(limit, 'combined_score')
+                logger.info(f"Applied income-aware ranking with limit {limit}")
                 return top_data
         
         # Default ranking by target variable only for ranking queries
-        top_data = df.nlargest(25, target_variable)
-        logger.info("Applied default ranking by target variable")
+        top_data = df.nlargest(limit, target_variable)
+        logger.info(f"Applied default ranking by {target_variable} with limit {limit}")
         return top_data
     
     # For non-ranking queries (correlation, etc.), return all data
@@ -293,11 +302,18 @@ def build_query_aware_results(df, target_variable, query_classification):
         result = {
             'geo_id': str(row['ID']),
             'FSA_ID': str(row['ID']),
-            'ID': str(row['ID']),
-            target_variable.lower(): safe_float(row[target_variable])
+            'ID': str(row['ID'])
         }
         
-        # Always include conversion rate
+        # Add the target variable with a clean field name
+        if target_variable.startswith('value_2024 Condominium Status - In Condo'):
+            result['condominium_ownership_pct'] = safe_float(row[target_variable])
+            result['target_value'] = safe_float(row[target_variable])
+        else:
+            result[target_variable.lower()] = safe_float(row[target_variable])
+            result['target_value'] = safe_float(row[target_variable])
+        
+        # Always include conversion rate if available
         if 'CONVERSION_RATE' in row:
             result['conversion_rate'] = safe_float(row['CONVERSION_RATE'])
         
