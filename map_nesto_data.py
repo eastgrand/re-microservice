@@ -16,19 +16,14 @@ import re
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
 # --- CORE FIELD MAPPINGS ---
-# These are the key fields that have specific canonical names for the model
+# For ArcGIS demographic data, we'll keep the original field names
+# This eliminates confusion in field resolution
 CORE_FIELD_MAPPINGS = {
-    'FREQUENCY': 'FREQUENCY',
-    'SUM_FUNDED': 'mortgage_approvals', 
-    'CONVERSION_RATE': 'conversion_rate',
-    '2024 Household Average Income (Current Year $)': 'median_income',
-    '2024 Household Discretionary Aggregate Income': 'disposable_income',
-    '2024 Condominium Status - In Condo (%)': 'condo_ownership_pct',
-    '2024 Visible Minority Total Population (%)': 'visible_minority_population_pct'
+    # No field renaming - keep original ArcGIS field names as they are clean and consistent
 }
 
 # The target variable for the model
-TARGET_VARIABLE = 'conversion_rate'
+TARGET_VARIABLE = 'TOTPOP_CY'
 
 def generate_field_alias(field_name):
     """Generate common aliases for a field name"""
@@ -90,15 +85,29 @@ def generate_dynamic_schema(df):
         
         # Generate description
         if col in CORE_FIELD_MAPPINGS:
-            # Use predefined descriptions for core fields
+            # Use predefined descriptions for core demographic fields
             descriptions = {
-                'FREQUENCY': 'Total number of mortgage applications.',
-                'mortgage_approvals': 'Total number of funded mortgage applications.',
-                'conversion_rate': 'The ratio of funded applications to total applications.',
-                'median_income': 'The median household income in the area.',
-                'disposable_income': 'The aggregate discretionary income for households.',
-                'condo_ownership_pct': 'Percentage of households that are condominiums.',
-                'visible_minority_population_pct': 'Percentage of the population identified as a visible minority.'
+                'total_population': 'Total population in the area.',
+                'asian_population': 'Asian population count.',
+                'black_population': 'Black population count.',
+                'white_population': 'White population count.',
+                'american_indian_population': 'American Indian population count.',
+                'pacific_islander_population': 'Pacific Islander population count.',
+                'other_race_population': 'Other race population count.',
+                'multiracial_population': 'Multiracial population count.',
+                'median_income': 'Median household income in the area.',
+                'millennial_population': 'Millennial generation population count.',
+                'genz_population': 'Generation Z population count.',
+                'gen_alpha_population': 'Generation Alpha population count.',
+                'household_population': 'Total household population.',
+                'family_population': 'Total family population.',
+                'hispanic_white_population': 'Hispanic white population count.',
+                'hispanic_black_population': 'Hispanic black population count.',
+                'hispanic_american_indian_population': 'Hispanic American Indian population count.',
+                'hispanic_pacific_islander_population': 'Hispanic Pacific Islander population count.',
+                'hispanic_other_population': 'Hispanic other race population count.',
+                'diversity_index': 'Diversity index score for the area.',
+                'wealth_index': 'Wealth index score for the area.',
             }
             description = descriptions.get(canonical_name, f'Data field: {col}')
         else:
