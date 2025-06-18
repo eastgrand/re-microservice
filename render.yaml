@@ -14,3 +14,8 @@ services:
     plan: starter
     buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
     startCommand: python simple_worker.py
+    envVars:
+      - key: REDIS_URL
+        value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
+      - key: SERVICE_NAME
+        value: "SHAP Demographic Worker v3.0"
