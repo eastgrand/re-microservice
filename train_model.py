@@ -247,14 +247,16 @@ for col in required_columns:
             print(f"Filling {null_count} NaN values in '{col}' with zeros")
             df[col] = df[col].fillna(0)
 
-# Make sure numeric columns are properly typed
-numeric_columns = ['Income', 'Age', 'Mortgage_Approvals']
-for col in numeric_columns:
+# Make sure numeric columns are properly typed - use columns that actually exist
+numeric_columns = []
+for col in ['Income', 'Age', 'TOTPOP_CY', 'MEDDI_CY']:
     if col in df.columns:
+        numeric_columns.append(col)
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
-# Handle any additional NAs created by type conversion
-df = df.dropna(subset=numeric_columns)
+# Only drop NAs if we have numeric columns to check
+if numeric_columns:
+    df = df.dropna(subset=numeric_columns)
 
 logger.info(f"After cleaning: {df.shape[0]} records and {df.shape[1]} columns")
 
@@ -277,8 +279,8 @@ print("Preparing data for training...")
 
 # Exclude non-feature columns. 'ID' is the FSA (postal code) and should only be used as a descriptor, never as a model feature.
 
-# Exclude non-feature columns. 'ID' is the FSA (postal code) and should only be used as a descriptor, never as a model feature.
-TARGET_VARIABLE = 'Mortgage_Approvals'  # New target variable for mortgage data
+# Use total population as target variable since it's a meaningful demographic metric
+TARGET_VARIABLE = 'TOTPOP_CY'  # Total population as target variable
 exclude_cols = ['ID', TARGET_VARIABLE]
 if 'latitude' in df.columns:
     exclude_cols.append('latitude')

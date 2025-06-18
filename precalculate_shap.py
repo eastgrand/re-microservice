@@ -49,9 +49,23 @@ if missing_features:
     print("Using only available features...")
     feature_names = available_features
 
-# Prepare X data
+# Prepare X data - only use numeric features
 X = df[feature_names].copy()
-X = X.fillna(X.median())  # Handle missing values
+
+# Convert to numeric and handle non-numeric columns
+for col in X.columns:
+    if X[col].dtype == 'object':
+        # Skip non-numeric columns or convert if possible
+        try:
+            X[col] = pd.to_numeric(X[col], errors='coerce')
+        except:
+            print(f"Dropping non-numeric column: {col}")
+            X = X.drop(col, axis=1)
+            feature_names = [f for f in feature_names if f != col]
+
+# Fill NaN values with column medians for numeric columns only
+numeric_cols = X.select_dtypes(include=[np.number]).columns
+X[numeric_cols] = X[numeric_cols].fillna(X[numeric_cols].median())
 
 print(f"Data prepared: {X.shape}")
 print(f"Features: {feature_names[:5]}... (showing first 5)")
@@ -110,7 +124,7 @@ print(f"Final SHAP values shape: {shap_values.shape}")
 print("💾 Creating results dataframe...")
 results_data = {
     'ID': df['ID'].values,
-    'CONVERSION_RATE': df['CONVERSION_RATE'].values,
+    'TOTPOP_CY': df['TOTPOP_CY'].values,  # Use total population instead of conversion rate
 }
 
 # Add SHAP values for each feature
@@ -119,7 +133,8 @@ for i, feature in enumerate(feature_names):
 
 # Add original feature values for context  
 for feature in feature_names:
-    results_data[f'value_{feature}'] = df[feature].fillna(df[feature].median()).values
+    if feature in df.columns:
+        results_data[f'value_{feature}'] = df[feature].fillna(df[feature].median() if df[feature].dtype in ['int64', 'float64'] else 0).values
 
 # Create results DataFrame
 results_df = pd.DataFrame(results_data)
