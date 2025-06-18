@@ -113,10 +113,10 @@ class QueryClassifier:
             "success rate": "conversion_rate",
             
             # === POPULATION & DEMOGRAPHICS ===
-            "population": "2024 Total Population",
-            "total population": "2024 Total Population",
-            "people": "2024 Total Population",
-            "residents": "2024 Total Population",
+            "population": "TOTPOP_CY",
+            "total population": "TOTPOP_CY",
+            "people": "TOTPOP_CY",
+            "residents": "TOTPOP_CY",
             
             "female": "2024 Female Household Population (%)",
             "female population": "2024 Female Household Population (%)",
@@ -138,12 +138,12 @@ class QueryClassifier:
             "senior percentage": "2024 Maintainers - 55 to 64 (%)",
             
             # === INCOME & ECONOMIC INDICATORS ===
-            "income": "median_income",
-            "average income": "median_income",
-            "household income": "median_income",
-            "median income": "median_income",
-            "earnings": "median_income",
-            "salary": "median_income",
+            "income": "MEDDI_CY",
+            "average income": "MEDDI_CY",
+            "household income": "MEDDI_CY",
+            "median income": "MEDDI_CY",
+            "earnings": "MEDDI_CY",
+            "salary": "MEDDI_CY",
             "disposable income": "disposable_income",
             "discretionary income": "2024 Household Disposable Aggregate Income",
             "total income": "2024 Household Aggregate Income (Current Year $)",
@@ -237,14 +237,14 @@ class QueryClassifier:
             # Specific ethnic groups
             "chinese": "2024 Visible Minority Chinese (%)",
             "chinese population": "2024 Visible Minority Chinese (%)",
-            "asian": "2024 Visible Minority Chinese (%)",
+            "asian": "ASIAN_CY",
             
             "south asian": "2024 Visible Minority South Asian (%)",
             "indian": "2024 Visible Minority South Asian (%)",
             
-            "black": "2024 Visible Minority Black (%)",
+            "black": "BLACK_CY",
             "african": "2024 Visible Minority Black (%)",
-            "black population": "2024 Visible Minority Black (%)",
+            "black population": "BLACK_CY",
             
             "filipino": "2024 Visible Minority Filipino (%)",
             "filipino population": "2024 Visible Minority Filipino (%)",
@@ -532,7 +532,19 @@ class QueryClassifier:
             "success": "conversion_rate",
             
             # Legacy mappings for backward compatibility
-            "jobs": "2024 Labour Force - Labour Employment Rate"
+            "jobs": "2024 Labour Force - Labour Employment Rate",
+            
+            # New mappings
+            "white": "WHITE_CY",
+            "white population": "WHITE_CY",
+            "american indian": "AMERIND_CY",
+            "pacific islander": "PACIFIC_CY",
+            "other race": "OTHRACE_CY",
+            "multiracial": "RACE2UP_CY",
+            "millennials": "MILLENN_CY",
+            "millennial": "MILLENN_CY",
+            "gen z": "GENZ_CY",
+            "generation z": "GENZ_CY"
         }
     
     def classify(self, query_text: str) -> Tuple[QueryType, float]:
@@ -971,25 +983,25 @@ class QueryClassifier:
         """Map common terms to field names - expanded mapping"""
         field_mapping = {
             # Income related
-            "income": "Median_Income",
-            "earnings": "Median_Income",
-            "salary": "Median_Income",
-            "wealth": "Median_Income",
-            "money": "Median_Income",
+            "income": "MEDDI_CY",
+            "earnings": "MEDDI_CY",
+            "salary": "MEDDI_CY",
+            "wealth": "MEDDI_CY",
+            "money": "MEDDI_CY",
             
             # Population related
-            "population": "Population",
-            "people": "Population",
-            "residents": "Population",
-            "inhabitants": "Population",
-            "demographic": "Population",
+            "population": "TOTPOP_CY",
+            "people": "TOTPOP_CY",
+            "residents": "TOTPOP_CY",
+            "inhabitants": "TOTPOP_CY",
+            "demographic": "TOTPOP_CY",
             
             # Mortgage related
-            "approval": "Mortgage_Approvals",
-            "approvals": "Mortgage_Approvals",
-            "mortgage": "Mortgage_Approvals",
-            "mortgages": "Mortgage_Approvals",
-            "applications": "Mortgage_Approvals",
+            "approval": "mortgage_approvals",
+            "approvals": "mortgage_approvals",
+            "mortgage": "mortgage_approvals",
+            "mortgages": "mortgage_approvals",
+            "applications": "mortgage_approvals",
             
             # Employment related
             "unemployment": "Unemployment_Rate",
