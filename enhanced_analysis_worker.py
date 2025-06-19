@@ -6,7 +6,7 @@ import logging
 from typing import List, Dict
 
 # Import the query classifier
-from query_classifier import QueryClassifier, process_query
+from query_processing.classifier import QueryClassifier, process_query
 
 # Set up logging
 logger = logging.getLogger(__name__)

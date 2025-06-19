@@ -1,27 +1,110 @@
-# Auto-Generated Field Mapping Documentation
+# Field mappings for microservice integration
+# Generated from project configuration
 
-*This document is auto-generated from the Project Configuration Manager. Do not edit manually.*
-
-## Overview
-
-This document maps field names from the frontend layer configuration to the standardized names used in the SHAP microservice.
-
-## Field Mappings by Category
-
-## Usage in Model
-
-These mapped field names are used in the model training and prediction processes to provide more interpretable results. When accessing SHAP values or feature importance, the mapped names will be used.
-
-## Maintenance
-
-This documentation is automatically generated when deploying layer configuration changes through the Project Configuration Manager. To add new fields:
-
-1. Add the field to the layer configuration in the Project Configuration Manager
-2. Set the microserviceField property to the desired canonical name
-3. Deploy the configuration to update all microservice files
-
-## Statistics
-
-- **Total Mappings**: 0
-- **Categories**: 0
-- **Last Updated**: 2025-06-18T19:40:28.247Z
+field_mappings = {
+  "OBJECTID": "OBJECTID",
+  "DESCRIPTION": "DESCRIPTION",
+  "ID": "ID",
+  "TOTPOP_CY": "TOTPOP_CY",
+  "thematic_value": "thematic_value",
+  "Shape__Area": "Shape__Area",
+  "Shape__Length": "Shape__Length",
+  "CreationDate": "CreationDate",
+  "Creator": "Creator",
+  "EditDate": "EditDate",
+  "Editor": "Editor",
+  "MEDDI_CY": "MEDDI_CY",
+  "DIVINDX_CY": "DIVINDX_CY",
+  "WHITE_CY": "WHITE_CY",
+  "WHITE_CY_P": "WHITE_CY_P",
+  "BLACK_CY": "BLACK_CY",
+  "BLACK_CY_P": "BLACK_CY_P",
+  "AMERIND_CY": "AMERIND_CY",
+  "AMERIND_CY_P": "AMERIND_CY_P",
+  "ASIAN_CY": "ASIAN_CY",
+  "ASIAN_CY_P": "ASIAN_CY_P",
+  "PACIFIC_CY": "PACIFIC_CY",
+  "PACIFIC_CY_P": "PACIFIC_CY_P",
+  "OTHRACE_CY": "OTHRACE_CY",
+  "OTHRACE_CY_P": "OTHRACE_CY_P",
+  "RACE2UP_CY": "RACE2UP_CY",
+  "RACE2UP_CY_P": "RACE2UP_CY_P",
+  "HISPWHT_CY": "HISPWHT_CY",
+  "HISPWHT_CY_P": "HISPWHT_CY_P",
+  "HISPBLK_CY": "HISPBLK_CY",
+  "HISPBLK_CY_P": "HISPBLK_CY_P",
+  "HISPAI_CY": "HISPAI_CY",
+  "HISPAI_CY_P": "HISPAI_CY_P",
+  "HISPPI_CY": "HISPPI_CY",
+  "HISPPI_CY_P": "HISPPI_CY_P",
+  "HISPOTH_CY": "HISPOTH_CY",
+  "HISPOTH_CY_P": "HISPOTH_CY_P",
+  "WLTHINDXCY": "WLTHINDXCY",
+  "HHPOP_CY": "HHPOP_CY",
+  "HHPOP_CY_P": "HHPOP_CY_P",
+  "FAMPOP_CY": "FAMPOP_CY",
+  "FAMPOP_CY_P": "FAMPOP_CY_P",
+  "X9051_X": "X9051_X",
+  "X9051_X_A": "X9051_X_A",
+  "MP07109A_B": "MP07109A_B",
+  "MP07109A_B_P": "MP07109A_B_P",
+  "MP07111A_B": "MP07111A_B",
+  "MP07111A_B_P": "MP07111A_B_P",
+  "PSIV7UMKVALM": "PSIV7UMKVALM",
+  "MP30016A_B": "MP30016A_B",
+  "MP30016A_B_P": "MP30016A_B_P",
+  "MP30018A_B": "MP30018A_B",
+  "MP30018A_B_P": "MP30018A_B_P",
+  "MP30019A_B": "MP30019A_B",
+  "MP30019A_B_P": "MP30019A_B_P",
+  "MP30021A_B": "MP30021A_B",
+  "MP30021A_B_P": "MP30021A_B_P",
+  "MP30029A_B": "MP30029A_B",
+  "MP30029A_B_P": "MP30029A_B_P",
+  "MP30030A_B": "MP30030A_B",
+  "MP30030A_B_P": "MP30030A_B_P",
+  "MP30031A_B": "MP30031A_B",
+  "MP30031A_B_P": "MP30031A_B_P",
+  "MP30032A_B": "MP30032A_B",
+  "MP30032A_B_P": "MP30032A_B_P",
+  "MP30033A_B": "MP30033A_B",
+  "MP30033A_B_P": "MP30033A_B_P",
+  "MP30034A_B": "MP30034A_B",
+  "MP30034A_B_P": "MP30034A_B_P",
+  "MP30035A_B": "MP30035A_B",
+  "MP30035A_B_P": "MP30035A_B_P",
+  "MP30036A_B": "MP30036A_B",
+  "MP30036A_B_P": "MP30036A_B_P",
+  "MP30037A_B": "MP30037A_B",
+  "MP30037A_B_P": "MP30037A_B_P",
+  "MP31035A_B": "MP31035A_B",
+  "MP31035A_B_P": "MP31035A_B_P",
+  "MP31042A_B": "MP31042A_B",
+  "MP31042A_B_P": "MP31042A_B_P",
+  "MP33020A_B": "MP33020A_B",
+  "MP33020A_B_P": "MP33020A_B_P",
+  "MP33032A_B": "MP33032A_B",
+  "MP33032A_B_P": "MP33032A_B_P",
+  "MP33031A_B": "MP33031A_B",
+  "MP33031A_B_P": "MP33031A_B_P",
+  "MP33104A_B": "MP33104A_B",
+  "MP33104A_B_P": "MP33104A_B_P",
+  "MP33105A_B": "MP33105A_B",
+  "MP33105A_B_P": "MP33105A_B_P",
+  "MP33106A_B": "MP33106A_B",
+  "MP33106A_B_P": "MP33106A_B_P",
+  "MP33107A_B": "MP33107A_B",
+  "MP33107A_B_P": "MP33107A_B_P",
+  "MP33108A_B": "MP33108A_B",
+  "MP33108A_B_P": "MP33108A_B_P",
+  "MP33119A_B": "MP33119A_B",
+  "MP33119A_B_P": "MP33119A_B_P",
+  "MP33120A_B": "MP33120A_B",
+  "MP33120A_B_P": "MP33120A_B_P",
+  "GENZ_CY": "GENZ_CY",
+  "GENZ_CY_P": "GENZ_CY_P",
+  "GENALPHACY": "GENALPHACY",
+  "GENALPHACY_P": "GENALPHACY_P",
+  "MILLENN_CY": "MILLENN_CY",
+  "MILLENN_CY_P": "MILLENN_CY_P"
+}

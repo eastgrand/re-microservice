@@ -6,7 +6,7 @@ This script tests the classifier with a variety of queries and prints the result
 
 import json
 import sys
-from query_classifier import process_query, QueryType
+from query_processing.classifier import process_query, QueryType
 
 def colorize(text, color):
     """Add ANSI color codes to text for terminal output"""
