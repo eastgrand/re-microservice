@@ -102,7 +102,6 @@ def enhanced_analysis_worker(query):
             else:
                 logger.warning(f"Conversion rate target variable not found in data, using default: {model_info['target']}")
                 target_variable = model_info['target']
-        
         elif target_variable and target_variable.startswith('MP') and '_' in target_variable:
             # Handle MP field codes (e.g., MP30034A_B) - map to value_ prefixed version
             value_target = f"value_{target_variable}"
@@ -112,6 +111,16 @@ def enhanced_analysis_worker(query):
             else:
                 logger.warning(f"MP field '{target_variable}' not found in data (tried '{value_target}'), using default: {model_info['target']}")
                 target_variable = model_info['target']
+        elif target_variable and target_variable.startswith('MP') and '_' in target_variable:
+            # Handle MP field codes (e.g., MP30034A_B) - map to value_ prefixed version
+            value_target = f"value_{target_variable}"
+            if value_target in precalc_df.columns:
+                logger.info(f"Mapped MP field '{target_variable}' to actual column: '{value_target}'")
+                target_variable = value_target
+            else:
+                logger.warning(f"MP field '{target_variable}' not found in data (tried '{value_target}'), using default: {model_info['target']}")
+                target_variable = model_info['target']
+        
         features = model_info['features']
         
         logger.info(f"Using model: {selected_model}")
