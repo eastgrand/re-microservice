@@ -62,8 +62,12 @@ def enhanced_analysis_worker(query):
         # Load pre-calculated data for selected model
         precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        # Use target variable from query classification if available, otherwise use model default
-        target_variable = query_classification.get('target_variable', model_info['target'])
+        # 1️⃣  Respect an explicit target_variable coming from the request – this lets the front-end
+        # choose the exact metric (e.g. MP30034A_B) and avoids the legacy mortgage/income fall-backs
+        requested_target = query.get('target_variable')
+
+        # Use request target if supplied, otherwise fall back to classifier suggestion, then model default
+        target_variable = requested_target or query_classification.get('target_variable', model_info['target'])
         
         # Handle condominium target variable - map to the actual column name in data
         if target_variable == "condo_ownership_pct":
