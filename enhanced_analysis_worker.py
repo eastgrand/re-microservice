@@ -66,52 +66,230 @@ def enhanced_analysis_worker(query):
         # choose the exact metric (e.g. MP30034A_B) and avoids the legacy mortgage/income fall-backs
         requested_target = query.get('target_variable')
 
+        # Add comprehensive field mappings to handle all supported fields
+        # This prevents query failures by mapping frontend field codes to actual column names in precalculated data
+        field_aliases = {
+            # Geographic and basic fields
+            "OBJECTID": "OBJECTID",
+            "ID": "ID", 
+            "DESCRIPTION": "DESCRIPTION",
+            "ZIP_CODE": "ZIP_CODE",
+            
+            # Demographics - Population
+            "TOTPOP_CY": "value_TOTPOP_CY",
+            "HHPOP_CY": "value_HHPOP_CY", 
+            "HHPOP_CY_P": "value_HHPOP_CY_P",
+            "FAMPOP_CY": "value_FAMPOP_CY",
+            "FAMPOP_CY_P": "value_FAMPOP_CY_P",
+            
+            # Demographics - Race/Ethnicity  
+            "DIVINDX_CY": "value_DIVINDX_CY",
+            "WHITE_CY": "value_WHITE_CY",
+            "WHITE_CY_P": "value_WHITE_CY_P", 
+            "BLACK_CY": "value_BLACK_CY",
+            "BLACK_CY_P": "value_BLACK_CY_P",
+            "AMERIND_CY": "value_AMERIND_CY",
+            "AMERIND_CY_P": "value_AMERIND_CY_P",
+            "ASIAN_CY": "value_ASIAN_CY",
+            "ASIAN_CY_P": "value_ASIAN_CY_P",
+            "PACIFIC_CY": "value_PACIFIC_CY", 
+            "PACIFIC_CY_P": "value_PACIFIC_CY_P",
+            "OTHRACE_CY": "value_OTHRACE_CY",
+            "OTHRACE_CY_P": "value_OTHRACE_CY_P",
+            "RACE2UP_CY": "value_RACE2UP_CY",
+            "RACE2UP_CY_P": "value_RACE2UP_CY_P",
+            
+            # Demographics - Hispanic
+            "HISPWHT_CY": "value_HISPWHT_CY",
+            "HISPWHT_CY_P": "value_HISPWHT_CY_P",
+            "HISPBLK_CY": "value_HISPBLK_CY", 
+            "HISPBLK_CY_P": "value_HISPBLK_CY_P",
+            "HISPAI_CY": "value_HISPAI_CY",
+            "HISPAI_CY_P": "value_HISPAI_CY_P",
+            "HISPPI_CY": "value_HISPPI_CY",
+            "HISPPI_CY_P": "value_HISPPI_CY_P", 
+            "HISPOTH_CY": "value_HISPOTH_CY",
+            "HISPOTH_CY_P": "value_HISPOTH_CY_P",
+            
+            # Demographics - Generations
+            "GENZ_CY": "value_GENZ_CY",
+            "GENZ_CY_P": "value_GENZ_CY_P",
+            "GENALPHACY": "value_GENALPHACY",
+            "GENALPHACY_P": "value_GENALPHACY_P", 
+            "MILLENN_CY": "value_MILLENN_CY",
+            "MILLENN_CY_P": "value_MILLENN_CY_P",
+            
+            # Economics
+            "MEDDI_CY": "value_MEDDI_CY",
+            "WLTHINDXCY": "value_WLTHINDXCY",
+            "median_income": "value_MEDDI_CY",  # Keep existing alias
+            
+            # Sports/Recreation Equipment
+            "X9051_X": "value_X9051_X",
+            "X9051_X_A": "value_X9051_X_A",
+            
+            # Athletic Shoe Purchases (MP codes)
+            "MP30016A_B": "value_MP30016A_B",  # Athletic shoes
+            "MP30016A_B_P": "value_MP30016A_B_P",
+            "MP30018A_B": "value_MP30018A_B",  # Basketball shoes
+            "MP30018A_B_P": "value_MP30018A_B_P", 
+            "MP30019A_B": "value_MP30019A_B",  # Cross-training shoes
+            "MP30019A_B_P": "value_MP30019A_B_P",
+            "MP30021A_B": "value_MP30021A_B",  # Running shoes
+            "MP30021A_B_P": "value_MP30021A_B_P",
+            
+            # Brand-specific Athletic Shoes
+            "MP30029A_B": "value_MP30029A_B",  # Adidas
+            "MP30029A_B_P": "value_MP30029A_B_P",
+            "MP30030A_B": "value_MP30030A_B",  # Asics
+            "MP30030A_B_P": "value_MP30030A_B_P",
+            "MP30031A_B": "value_MP30031A_B",  # Converse
+            "MP30031A_B_P": "value_MP30031A_B_P",
+            "MP30032A_B": "value_MP30032A_B",  # Jordan
+            "MP30032A_B_P": "value_MP30032A_B_P",
+            "MP30033A_B": "value_MP30033A_B",  # New Balance
+            "MP30033A_B_P": "value_MP30033A_B_P", 
+            "MP30034A_B": "value_MP30034A_B",  # Nike
+            "MP30034A_B_P": "value_MP30034A_B_P",
+            "MP30035A_B": "value_MP30035A_B",  # Puma
+            "MP30035A_B_P": "value_MP30035A_B_P",
+            "MP30036A_B": "value_MP30036A_B",  # Reebok
+            "MP30036A_B_P": "value_MP30036A_B_P",
+            "MP30037A_B": "value_MP30037A_B",  # Skechers
+            "MP30037A_B_P": "value_MP30037A_B_P",
+            
+            # Sports Clothing Purchases
+            "MP07109A_B": "value_MP07109A_B",  # $300+ sports clothing
+            "MP07109A_B_P": "value_MP07109A_B_P",
+            "MP07111A_B": "value_MP07111A_B",  # $100+ athletic wear
+            "MP07111A_B_P": "value_MP07111A_B_P",
+            "PSIV7UMKVALM": "value_PSIV7UMKVALM",  # $200+ shoes
+            
+            # Store Shopping
+            "MP31035A_B": "value_MP31035A_B",  # Dick's Sporting Goods
+            "MP31035A_B_P": "value_MP31035A_B_P",
+            "MP31042A_B": "value_MP31042A_B",  # Foot Locker
+            "MP31042A_B_P": "value_MP31042A_B_P",
+            
+            # Sports Participation
+            "MP33020A_B": "value_MP33020A_B",  # Jogging/Running
+            "MP33020A_B_P": "value_MP33020A_B_P",
+            "MP33032A_B": "value_MP33032A_B",  # Yoga
+            "MP33032A_B_P": "value_MP33032A_B_P",
+            "MP33031A_B": "value_MP33031A_B",  # Weight lifting
+            "MP33031A_B_P": "value_MP33031A_B_P",
+            
+            # Sports Fandom (Super fans)
+            "MP33104A_B": "value_MP33104A_B",  # MLB
+            "MP33104A_B_P": "value_MP33104A_B_P",
+            "MP33105A_B": "value_MP33105A_B",  # NASCAR
+            "MP33105A_B_P": "value_MP33105A_B_P",
+            "MP33106A_B": "value_MP33106A_B",  # NBA
+            "MP33106A_B_P": "value_MP33106A_B_P",
+            "MP33107A_B": "value_MP33107A_B",  # NFL
+            "MP33107A_B_P": "value_MP33107A_B_P",
+            "MP33108A_B": "value_MP33108A_B",  # NHL
+            "MP33108A_B_P": "value_MP33108A_B_P",
+            "MP33119A_B": "value_MP33119A_B",  # International Soccer
+            "MP33119A_B_P": "value_MP33119A_B_P",
+            "MP33120A_B": "value_MP33120A_B",  # MLS Soccer
+            "MP33120A_B_P": "value_MP33120A_B_P",
+            
+            # Shape fields
+            "Shape__Area": "Shape__Area",
+            "Shape__Length": "Shape__Length",
+            
+            # Metadata fields
+            "CreationDate": "CreationDate",
+            "Creator": "Creator", 
+            "EditDate": "EditDate",
+            "Editor": "Editor",
+            
+            # Internal/computed fields
+            "thematic_value": "thematic_value",
+        }
+        
         # Use request target if supplied, otherwise fall back to classifier suggestion, then model default
-        target_variable = requested_target or query_classification.get('target_variable', model_info['target'])
+        target_variable = requested_target or query_classification.get('target_variable', 'MP30034A_B')
+        original_target = target_variable  # Keep original for result naming
         
-        # Handle condominium target variable - map to the actual column name in data
-        if target_variable == "condo_ownership_pct":
-            # Map to the actual column name in the precalculated data
-            if "value_2024 Condominium Status - In Condo (%)" in precalc_df.columns:
-                target_variable = "value_2024 Condominium Status - In Condo (%)"
-                logger.info(f"Mapped condo_ownership_pct to actual column: {target_variable}")
-            else:
-                logger.warning(f"Condominium target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable == "median_income":
-            # Map to the actual column name in the precalculated data
-            if "value_2024 Household Average Income (Current Year $)" in precalc_df.columns:
-                target_variable = "value_2024 Household Average Income (Current Year $)"
-                logger.info(f"Mapped median_income to actual column: {target_variable}")
-            else:
-                logger.warning(f"Income target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable == "visible_minority_population_pct":
-            # Map to the actual column name in the precalculated data
-            if "value_2024 Visible Minority Total Population (%)" in precalc_df.columns:
-                target_variable = "value_2024 Visible Minority Total Population (%)"
-                logger.info(f"Mapped visible_minority_population_pct to actual column: {target_variable}")
-            else:
-                logger.warning(f"Visible minority target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable == "conversion_rate":
-            # Map to the actual column name in the precalculated data
-            if "CONVERSION_RATE" in precalc_df.columns:
-                target_variable = "CONVERSION_RATE"
-                logger.info(f"Mapped conversion_rate to actual column: {target_variable}")
-            else:
-                logger.warning(f"Conversion rate target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
+        # Step 1: Try to find the field in precalculated data with various naming patterns
+        possible_column_names = []
         
-        elif target_variable and target_variable.startswith('MP') and '_' in target_variable:
-            # Handle MP field codes (e.g., MP30034A_B) - map to value_ prefixed version
+        # First, check if we have a direct mapping in our comprehensive field_aliases
+        if target_variable in field_aliases:
+            possible_column_names.append(field_aliases[target_variable])
+            logger.info(f"Found direct field mapping: {target_variable} -> {field_aliases[target_variable]}")
+        
+        # Add common naming patterns as fallbacks
+        possible_column_names.extend([
+            target_variable,                    # Exact match (e.g., "CONVERSION_RATE")
+            f"value_{target_variable}",         # With value_ prefix (e.g., "value_MP30034A_B")
+            f"value_2024 {target_variable}",    # With value_2024 prefix
+            target_variable.upper(),            # Uppercase version
+            target_variable.lower(),            # Lowercase version
+        ])
+        
+        # Special handling for MP fields (athletic shoe data)
+        if target_variable and target_variable.startswith('MP') and '_' in target_variable:
             value_target = f"value_{target_variable}"
-            if value_target in precalc_df.columns:
-                logger.info(f"Mapped MP field '{target_variable}' to actual column: '{value_target}'")
-                target_variable = value_target
-            else:
-                logger.warning(f"MP field '{target_variable}' not found in data (tried '{value_target}'), using default: {model_info['target']}")
-                target_variable = model_info['target']
+            if value_target not in possible_column_names:
+                possible_column_names.insert(1, value_target)  # High priority for MP fields
+            logger.info(f"Added MP field pattern: {value_target}")
+        
+        # Special handling for demographic fields that might have different prefixes
+        if any(keyword in target_variable.upper() for keyword in ['CY', 'POPULATION', 'INCOME', 'RACE']):
+            demographic_patterns = [
+                f"value_{target_variable}",
+                f"value_2024 {target_variable}",
+                f"{target_variable}_CY" if not target_variable.endswith('_CY') else target_variable,
+            ]
+            for pattern in demographic_patterns:
+                if pattern not in possible_column_names:
+                    possible_column_names.append(pattern)
+        
+        logger.info(f"Searching for target variable '{target_variable}' using patterns: {possible_column_names[:5]}...")  # Log first 5 patterns
+        
+        # Find the actual column name that exists in the data
+        actual_target_column = None
+        for candidate in possible_column_names:
+            if candidate in precalc_df.columns:
+                actual_target_column = candidate
+                break
+        
+        if actual_target_column is None:
+            # Enhanced error reporting with suggestions
+            available_columns = list(precalc_df.columns)
+            logger.error(f"Target variable '{target_variable}' not found in any expected format.")
+            logger.error(f"Searched patterns: {possible_column_names}")
+            logger.error(f"Total available columns: {len(available_columns)}")
+            
+            # Look for similar column names
+            similar_columns = [col for col in available_columns 
+                             if target_variable.lower() in col.lower() or 
+                                any(pattern.lower() in col.lower() for pattern in possible_column_names[:3])]
+            
+            if similar_columns:
+                logger.error(f"Similar columns found: {similar_columns[:10]}")
+            
+            # Show sample of available columns for debugging
+            sample_columns = [col for col in available_columns if col.startswith('value_')][:20]
+            logger.error(f"Sample 'value_' columns: {sample_columns}")
+            
+            # Fallback to model default with warning
+            actual_target_column = model_info['target']
+            logger.warning(f"Falling back to model default target: '{actual_target_column}'")
+            
+            # Return error if even the fallback doesn't exist
+            if actual_target_column not in precalc_df.columns:
+                logger.error(f"Even model default target '{actual_target_column}' not found in data!")
+                return {"success": False, "error": f"Target variable '{target_variable}' and model default '{actual_target_column}' not found in dataset. Available columns: {len(available_columns)} total."}
+        else:
+            logger.info(f"Successfully mapped target variable '{target_variable}' to actual column: '{actual_target_column}'")
+        
+        # Use the actual column name for analysis
+        target_variable = actual_target_column
+        
         features = model_info['features']
         
         logger.info(f"Using model: {selected_model}")
@@ -189,7 +367,7 @@ def apply_query_aware_analysis(df, query_classification, user_query, conversatio
     
     # Check both 'query_type' and 'analysis_type' keys for compatibility
     query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
-    target_variable = query_classification.get('target_variable', 'CONVERSION_RATE')
+    target_variable = query_classification.get('target_variable', 'MP30034A_B')
     
     logger.info(f"Applying query-aware analysis for type: {query_type}")
     
@@ -266,7 +444,7 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
                 df_copy = df.copy()
                 df_copy['diversity_score'] = df_copy['value_2024 Visible Minority Total Population (%)']
                 
-                # Combine with conversion rate for ranking
+                # Combine with target variable for ranking
                 df_copy['combined_score'] = (
                     df_copy[target_variable] * 0.7 + 
                     df_copy['diversity_score'] * 0.3
@@ -335,55 +513,56 @@ def safe_float(value):
         return None
 
 def build_query_aware_results(df, target_variable, query_classification):
-    """Build results with query-specific field selection"""
-    
+    """Build results with query-specific fields"""
     results = []
+    
+    # Extract the original target name for clean field naming
+    # This should be passed from the calling function, but we'll derive it here for now
+    original_target = target_variable
+    
+    # Reverse lookup common mappings to get clean names (only for fields that actually exist)
+    reverse_aliases = {
+        "value_MEDDI_CY": "median_income",  # This field actually exists
+        # Note: Other fields like conversion_rate, condo_ownership_pct don't exist in precalculated data
+    }
+    
+    # Get clean field name for results
+    if target_variable in reverse_aliases:
+        clean_field_name = reverse_aliases[target_variable]
+    elif target_variable.startswith('value_'):
+        # For value_ prefixed fields, remove the prefix and convert to lowercase
+        clean_field_name = target_variable.replace('value_', '').lower()
+    else:
+        # Use lowercase version of the field name
+        clean_field_name = target_variable.lower()
+    
     for _, row in df.iterrows():
         result = {
             'geo_id': str(row['ID']),
-            'FSA_ID': str(row['ID']),
+            'ZIP_CODE': str(row['ID']),
             'ID': str(row['ID'])
         }
         
-        # Add the target variable with a clean field name
-        if target_variable == "value_2024 Condominium Status - In Condo (%)":
-            result['condo_ownership_pct'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        elif target_variable == "value_2024 Household Average Income (Current Year $)":
-            result['median_income'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        elif target_variable == "value_2024 Visible Minority Total Population (%)":
-            result['visible_minority_population_pct'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        elif target_variable == "CONVERSION_RATE":
-            result['conversion_rate'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        else:
-            result[target_variable.lower()] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
+        # Add the target variable with both clean name and target_value
+        target_val = safe_float(row[target_variable])
+        result[clean_field_name] = target_val
+        result['target_value'] = target_val
         
-        # Always include conversion rate if available
-        if 'CONVERSION_RATE' in row:
-            result['conversion_rate'] = safe_float(row['CONVERSION_RATE'])
+        # Add commonly useful fields if they exist in the data
+        if 'TOTPOP_CY' in row:
+            result['total_population'] = safe_float(row['TOTPOP_CY'])
         
-        # Add query-specific fields
-        # Demographic fields
-        if 'value_2024 Visible Minority Total Population (%)' in row:
-            result['visible_minority_population_pct'] = safe_float(row['value_2024 Visible Minority Total Population (%)'])
+        if 'value_MEDDI_CY' in row:
+            result['median_income'] = safe_float(row['value_MEDDI_CY'])
         
-        if 'value_2024 Total Population' in row:
-            result['total_population'] = safe_float(row['value_2024 Total Population'])
+        if 'value_WHITE_CY' in row:
+            result['white_population'] = safe_float(row['value_WHITE_CY'])
         
-        # Financial fields
-        if 'value_2024 Household Average Income (Current Year $)' in row:
-            result['household_average_income'] = safe_float(row['value_2024 Household Average Income (Current Year $)'])
+        if 'value_ASIAN_CY' in row:
+            result['asian_population'] = safe_float(row['value_ASIAN_CY'])
         
-        # Housing fields
-        if 'value_2024 Structure Type Single-Detached House (%)' in row:
-            result['single_detached_house_pct'] = safe_float(row['value_2024 Structure Type Single-Detached House (%)'])
-        
-        if 'value_2024 Condominium Status - In Condo (%)' in row:
-            result['condominium_pct'] = safe_float(row['value_2024 Condominium Status - In Condo (%)'])
+        if 'value_BLACK_CY' in row:
+            result['black_population'] = safe_float(row['value_BLACK_CY'])
         
         # Add combined score if it was calculated
         if 'combined_score' in row:
