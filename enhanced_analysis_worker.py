@@ -65,6 +65,29 @@ def enhanced_analysis_worker(query):
         # 1️⃣  Respect an explicit target_variable coming from the request – this lets the front-end
         # choose the exact metric (e.g. MP30034A_B) and avoids the legacy mortgage/income fall-backs
         requested_target = query.get('target_variable')
+        
+        # 🆕 NEW: Check for bivariate correlation analysis (Nike vs Adidas comparison)
+        matched_fields = query.get('matched_fields', [])
+        metrics = query.get('metrics', [])
+        
+        logger.info(f"DEBUG: matched_fields = {matched_fields}")
+        logger.info(f"DEBUG: metrics = {metrics}")
+        logger.info(f"DEBUG: analysis_type = {analysis_type}")
+        
+        # Detect bivariate correlation: if we have exactly 2 brand fields, do bivariate analysis
+        brand_fields = [field for field in (matched_fields + metrics) if field and field.startswith('MP30') and '_' in field]
+        brand_fields = list(set(brand_fields))  # Remove duplicates
+        
+        logger.info(f"DEBUG: detected brand_fields = {brand_fields}")
+        logger.info(f"DEBUG: len(brand_fields) = {len(brand_fields)}")
+        logger.info(f"DEBUG: analysis_type in ['correlation', 'comparison'] = {analysis_type in ['correlation', 'comparison']}")
+        
+        # Trigger bivariate correlation for both 'correlation' and 'comparison' analysis types
+        if len(brand_fields) == 2 and analysis_type in ['correlation', 'comparison']:
+            logger.info(f"Detected bivariate correlation request: {brand_fields}")
+            return handle_bivariate_correlation(precalc_df, brand_fields, user_query, query_classification)
+        else:
+            logger.info(f"NOT triggering bivariate correlation. Conditions: len(brand_fields)={len(brand_fields)}, analysis_type='{analysis_type}'")
 
         # Add comprehensive field mappings to handle all supported fields
         # This prevents query failures by mapping frontend field codes to actual column names in precalculated data
@@ -435,27 +458,8 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
             logger.info(f"Applied direct ranking by {target_variable} with limit {limit}")
             return top_data
         
-        # For diversity queries, we might want to weight areas with higher diversity
-        elif 'diversity' in user_query.lower():
-            # Create a diversity score
-            diversity_cols = [col for col in df.columns if 'Visible Minority' in col and col != 'value_2024 Visible Minority Total Population (%)']
-            if diversity_cols and 'value_2024 Visible Minority Total Population (%)' in df.columns:
-                # Calculate diversity index (higher when multiple groups are present)
-                df_copy = df.copy()
-                df_copy['diversity_score'] = df_copy['value_2024 Visible Minority Total Population (%)']
-                
-                # Combine with target variable for ranking
-                df_copy['combined_score'] = (
-                    df_copy[target_variable] * 0.7 + 
-                    df_copy['diversity_score'] * 0.3
-                )
-                
-                top_data = df_copy.nlargest(limit, 'combined_score')
-                logger.info(f"Applied diversity-aware ranking with limit {limit}")
-                return top_data
-        
         # For income queries, weight by income levels
-        elif 'income' in user_query.lower():
+        if 'income' in user_query.lower():
             income_col = 'value_2024 Household Average Income (Current Year $)'
             if income_col in df.columns:
                 df_copy = df.copy()
@@ -818,15 +822,6 @@ def build_geographic_context(df, target_variable, user_query):
     # Build regional patterns based on available demographic/economic indicators
     regional_patterns = {}
     
-    # Check for diversity patterns
-    diversity_col = 'value_2024 Visible Minority Total Population (%)'
-    if diversity_col in df.columns:
-        diversity_corr = df[[target_variable, diversity_col]].corr().iloc[0, 1]
-        regional_patterns['diversity_relationship'] = {
-            "correlation": safe_float(diversity_corr),
-            "description": f"{'Positive' if diversity_corr > 0.1 else 'Negative' if diversity_corr < -0.1 else 'Weak'} relationship between diversity and {target_variable.lower()}"
-        }
-    
     # Check for income patterns
     income_col = 'value_2024 Household Average Income (Current Year $)'
     if income_col in df.columns:
@@ -857,32 +852,155 @@ def build_geographic_context(df, target_variable, user_query):
     
     return {
         "geographic_scope": geographic_scope,
-        "area_coverage": total_areas,
-        "value_statistics": {
-            "range": safe_float(value_range),
-            "mean": safe_float(mean_value),
-            "geographic_diversity": safe_float(value_range / mean_value if mean_value != 0 else 0)
-        },
-        "top_performers": {
-            "count": len(top_5),
-            "areas": top_5['ID'].tolist(),
-            "avg_value": safe_float(top_5[target_variable].mean()),
-            "value_range": safe_float(top_5[target_variable].max() - top_5[target_variable].min())
-        },
-        "bottom_performers": {
-            "count": len(bottom_5),
-            "areas": bottom_5['ID'].tolist(),
-            "avg_value": safe_float(bottom_5[target_variable].mean()),
-            "value_range": safe_float(bottom_5[target_variable].max() - bottom_5[target_variable].min())
-        },
+        "area_coverage": safe_float((unique_ids / total_areas) * 100),
         "regional_patterns": regional_patterns,
-        "adjacent_area_analysis": {
-            "coverage_description": f"Analysis covers {total_areas} geographic areas",
-            "spatial_continuity": "Available" if total_areas > 10 else "Limited",
-            "pattern_reliability": "High" if total_areas > 20 else "Moderate" if total_areas > 10 else "Limited"
+        "value_range": {
+            "min": safe_float(values.min()),
+            "max": safe_float(values.max()),
+            "mean": safe_float(mean_value),
+            "range_span": safe_float(value_range)
         },
-        "context_description": f"Geographic analysis of {total_areas} areas showing {geographic_scope} patterns with {len(regional_patterns)} demographic/economic relationships identified"
+        "top_areas": {
+            "highest": [{"id": str(row['ID']), "value": safe_float(row[target_variable])} for _, row in top_5.iterrows()],
+            "lowest": [{"id": str(row['ID']), "value": safe_float(row[target_variable])} for _, row in bottom_5.iterrows()]
+        },
+        "context_description": f"Analysis covers {unique_ids} areas with {geographic_scope} scope. "
+                             f"Values range from {values.min():.2f} to {values.max():.2f} "
+                             f"(mean: {mean_value:.2f})"
     }
+
+def handle_bivariate_correlation(df, brand_fields, user_query, query_classification):
+    """Handle bivariate correlation analysis for brand comparisons like Nike vs Adidas"""
+    
+    try:
+        # Map field names to actual column names in the data
+        field_aliases = {
+            "MP30034A_B": "value_MP30034A_B",  # Nike Athletic Shoes
+            "MP30029A_B": "value_MP30029A_B",  # Adidas Athletic Shoes
+            "MP30032A_B": "value_MP30032A_B",  # Jordan Athletic Shoes
+            "MP30031A_B": "value_MP30031A_B",  # Converse Athletic Shoes
+            "MP30033A_B": "value_MP30033A_B",  # New Balance Athletic Shoes
+            "MP30035A_B": "value_MP30035A_B",  # Puma Athletic Shoes
+            "MP30036A_B": "value_MP30036A_B",  # Reebok Athletic Shoes
+            "MP30037A_B": "value_MP30037A_B",  # Skechers Athletic Shoes
+            "MP30016A_B": "value_MP30016A_B",  # Athletic Shoes (general)
+        }
+        
+        # Get the actual column names
+        field1_name = brand_fields[0]
+        field2_name = brand_fields[1]
+        
+        col1 = field_aliases.get(field1_name, f"value_{field1_name}")
+        col2 = field_aliases.get(field2_name, f"value_{field2_name}")
+        
+        logger.info(f"Bivariate correlation: {field1_name} ({col1}) vs {field2_name} ({col2})")
+        
+        # Check if columns exist in the data
+        if col1 not in df.columns:
+            logger.warning(f"Column {col1} not found in data. Available columns: {list(df.columns)}")
+            return {"success": False, "error": f"Data not available for {field1_name}"}
+        
+        if col2 not in df.columns:
+            logger.warning(f"Column {col2} not found in data. Available columns: {list(df.columns)}")
+            return {"success": False, "error": f"Data not available for {field2_name}"}
+        
+        # Filter out rows with missing data
+        valid_data = df[[col1, col2, 'ID']].dropna()
+        
+        if len(valid_data) < 3:
+            logger.warning(f"Insufficient data for correlation: only {len(valid_data)} valid records")
+            return {"success": False, "error": "Insufficient data for correlation analysis"}
+        
+        # Calculate correlation
+        correlation_matrix = valid_data[[col1, col2]].corr()
+        correlation_value = correlation_matrix.iloc[0, 1]
+        
+        logger.info(f"Calculated correlation: {correlation_value:.4f}")
+        
+        # Build results with both variables for each area
+        results = []
+        for _, row in valid_data.iterrows():
+            result = {
+                'geo_id': str(row['ID']),
+                'ZIP_CODE': str(row['ID']),
+                'ID': str(row['ID']),
+                'primary_value': safe_float(row[col1]),      # First brand (e.g., Nike)
+                'comparison_value': safe_float(row[col2]),   # Second brand (e.g., Adidas)
+                'correlation_strength': safe_float(abs(correlation_value)),
+                # Add field names in multiple formats for frontend compatibility
+                field1_name: safe_float(row[col1]),          # Original case (MP30034A_B)
+                field2_name: safe_float(row[col2]),          # Original case (MP30029A_B)
+                field1_name.lower(): safe_float(row[col1]),  # Lowercase (mp30034a_b)
+                field2_name.lower(): safe_float(row[col2]),  # Lowercase (mp30029a_b)
+            }
+            results.append(result)
+        
+        # Create feature importance showing the correlation
+        feature_importance = [
+            {
+                'feature': f'{field1_name}_vs_{field2_name}_correlation',
+                'importance': safe_float(abs(correlation_value)),
+                'correlation': safe_float(correlation_value),
+                'description': f'Correlation between {field1_name} and {field2_name}'
+            }
+        ]
+        
+        # Build summary
+        brand1_name = get_brand_name_from_field(field1_name)
+        brand2_name = get_brand_name_from_field(field2_name)
+        
+        if abs(correlation_value) > 0.7:
+            strength = "strong"
+        elif abs(correlation_value) > 0.3:
+            strength = "moderate"
+        else:
+            strength = "weak"
+        
+        direction = "positive" if correlation_value > 0 else "negative"
+        
+        summary = f"Analysis shows a {strength} {direction} correlation ({correlation_value:.3f}) between {brand1_name} and {brand2_name} athletic shoe purchases across regions."
+        
+        # Add geographic context
+        top_areas = valid_data.nlargest(5, col1)
+        if len(top_areas) > 0:
+            summary += f" Areas with high {brand1_name} purchases also tend to have {'high' if correlation_value > 0 else 'low'} {brand2_name} purchases."
+        
+        return {
+            "success": True,
+            "results": results,
+            "summary": summary,
+            "feature_importance": feature_importance,
+            "correlation_analysis": {
+                "correlation_coefficient": safe_float(correlation_value),
+                "correlation_strength": strength,
+                "correlation_direction": direction,
+                "sample_size": len(valid_data),
+                "field1": field1_name,
+                "field2": field2_name,
+                "brand1": brand1_name,
+                "brand2": brand2_name
+            },
+            "analysis_type": "bivariate_correlation"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in bivariate correlation analysis: {str(e)}")
+        return {"success": False, "error": f"Bivariate correlation analysis failed: {str(e)}"}
+
+def get_brand_name_from_field(field_code):
+    """Convert field codes to human-readable brand names"""
+    brand_mapping = {
+        "MP30034A_B": "Nike",
+        "MP30029A_B": "Adidas", 
+        "MP30032A_B": "Jordan",
+        "MP30031A_B": "Converse",
+        "MP30033A_B": "New Balance",
+        "MP30035A_B": "Puma",
+        "MP30036A_B": "Reebok",
+        "MP30037A_B": "Skechers",
+        "MP30016A_B": "Athletic Shoes"
+    }
+    return brand_mapping.get(field_code, field_code)
 
 # Example usage patterns for different analysis types:
 
