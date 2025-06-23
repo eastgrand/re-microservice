@@ -75,10 +75,19 @@ def enhanced_analysis_worker(query):
         logger.info(f"DEBUG: analysis_type = {analysis_type}")
         
         # Detect bivariate correlation: if we have exactly 2 brand fields, do bivariate analysis
-        brand_fields = [field for field in (matched_fields + metrics) if field and field.startswith('MP30') and '_' in field]
-        # Remove duplicates while preserving order (set() can reorder elements)
+        all_brand_fields = [field for field in (matched_fields + metrics) if field and field.startswith('MP30') and '_' in field]
+        # Remove duplicates while preserving order (set() can reorder elements)  
         seen = set()
-        brand_fields = [field for field in brand_fields if not (field in seen or seen.add(field))]
+        all_brand_fields = [field for field in all_brand_fields if not (field in seen or seen.add(field))]
+        
+        # Ensure target_variable is first if it's a brand field (for Nike vs Adidas, Nike should be primary)
+        brand_fields = []
+        if requested_target and requested_target.startswith('MP30') and '_' in requested_target and requested_target in all_brand_fields:
+            brand_fields.append(requested_target)
+            # Add other brand fields except the target
+            brand_fields.extend([f for f in all_brand_fields if f != requested_target])
+        else:
+            brand_fields = all_brand_fields
         
         logger.info(f"DEBUG: detected brand_fields = {brand_fields}")
         logger.info(f"DEBUG: len(brand_fields) = {len(brand_fields)}")
