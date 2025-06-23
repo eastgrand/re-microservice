@@ -174,9 +174,7 @@ def generate_intent_aware_summary(intent: Dict, feature_importance: List[Dict],
             summary = "To elaborate on that analysis, "
     else:
         # Start with a direct answer to their question
-        if analysis_type == 'ranking' and 'diversity' in key_concepts and top_results:
-            summary = f"Looking at areas with both high diversity and strong {target_variable.lower().replace('_', ' ')}, "
-        elif analysis_type == 'correlation' and len(key_concepts) >= 2:
+        if analysis_type == 'correlation' and len(key_concepts) >= 2:
             summary = f"When examining the relationship between {' and '.join(key_concepts)}, "
         elif analysis_type == 'ranking' and 'income' in key_concepts:
             summary = f"Focusing on areas with high income levels and strong {target_variable.lower().replace('_', ' ')}, "

@@ -1,68 +1,21 @@
-# filepath: /Users/voldeck/code/shap-microservice/render.yaml.new
+# Blueprint-Managed SHAP Demographic Analytics v3.0
 services:
-  # Main web service for the API endpoints
   - type: web
-    name: nesto-mortgage-analytics
+    name: shap-demographic-analytics-v3
     env: python
     plan: starter
-    buildCommand: >-
-      echo "Starting optimized build process" && 
-      chmod +x ./render_pre_deploy.sh &&
-      echo "Running pre-deployment checks..." &&
-      ./render_pre_deploy.sh &&
-      echo "⚡ Pre-deployment successful - Model files verified" &&
-      chmod +x ./deploy_to_render.sh &&
-      ./deploy_to_render.sh &&
-      pip install psutil python-dotenv
-    startCommand: >-
-      echo "Starting web service" &&
-      python3 -c "import gc; gc.enable()" &&
-      python3 -c "import sys; sys.path.append('.')" &&
-      gunicorn --config=gunicorn_config.py app:app
-    envVars:
-      - key: AGGRESSIVE_MEMORY_MANAGEMENT
-        value: "true"
-      - key: SHAP_BATCH_SIZE
-        value: "500"
-      - key: SHAP_MAX_BATCH_SIZE
-        value: "500"
-      - key: REDIS_URL
-        value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
-      - key: REDIS_HEALTH_CHECK_INTERVAL
-        value: "30"
-      - key: API_KEY
-        sync: false
-      - key: PORT
-        value: "10000"
-  
-  # Worker service for processing SHAP jobs
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
+    buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
+
+  # Worker service for background processing
   - type: worker
-    name: nesto-shap-worker
+    name: shap-demographic-worker-v3
     env: python
     plan: starter
-    buildCommand: >-
-      echo "Building optimized worker service" &&
-      pip install numpy pandas xgboost scikit-learn psutil python-dotenv rq redis &&
-      chmod +x ./render_pre_deploy.sh &&
-      ./render_pre_deploy.sh &&
-      chmod +x ./deploy_to_render.sh &&
-      export SKIP_MODEL_TRAINING=true &&
-      ./deploy_to_render.sh
-    startCommand: >-
-      echo "Starting memory-optimized SHAP worker" &&
-      python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
-      chmod +x ./simple_worker.py &&
-      ./simple_worker.py
+    buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
+    startCommand: python simple_worker.py
     envVars:
-      - key: AGGRESSIVE_MEMORY_MANAGEMENT
-        value: "false"
-      - key: SHAP_BATCH_SIZE
-        value: "500"
-      - key: SHAP_MAX_BATCH_SIZE
-        value: "500"
       - key: REDIS_URL
         value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
-      - key: REDIS_HEALTH_CHECK_INTERVAL
-        value: "30"
-      - key: API_KEY
-        sync: false
+      - key: SERVICE_NAME
+        value: "SHAP Demographic Worker v3.0"
