@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build --no-lint",
+    "start": "next start",
+    "lint": "next lint",
+    "validate-queries": "node scripts/validate-queries.js",
+    "generate-field-mappings": "node scripts/generate-field-mappings.js",
+    "integrate-field-mappings": "node scripts/integrate-field-mappings.js",
+    "production-check": "npm run generate-field-mappings && npm run integrate-field-mappings && npm run validate-queries && npm run build",
+    "deploy-ready": "npm run production-check && echo '✅ PRODUCTION READY - All queries validated and build successful'"
+  }
+}

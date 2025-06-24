@@ -495,6 +495,74 @@ def get_query_aware_top_areas(df, query_classification, target_variable, user_qu
     logger.info(f"Returning all data for {query_type} query type")
     return df
 
+def get_human_readable_field_name(field_code):
+    """Convert field codes to human-readable names"""
+    
+    # Field aliases mapping from technical codes to human-readable names
+    field_aliases = {
+        # Brand fields
+        "MP30029A_B": "Adidas Athletic Shoes",
+        "MP30030A_B": "ASICS Athletic Shoes", 
+        "MP30031A_B": "Converse Athletic Shoes",
+        "MP30032A_B": "Jordan Athletic Shoes",
+        "MP30033A_B": "New Balance Athletic Shoes",
+        "MP30034A_B": "Nike Athletic Shoes",
+        "MP30035A_B": "Puma Athletic Shoes",
+        "MP30036A_B": "Reebok Athletic Shoes",
+        "MP30037A_B": "Skechers Athletic Shoes",
+        
+        # Demographic fields
+        "TOTPOP_CY": "Total Population",
+        "MEDDI_CY": "Median Disposable Income",
+        "DIVINDX_CY": "Diversity Index",
+        "WHITE_CY": "White Population",
+        "BLACK_CY": "Black Population",
+        "ASIAN_CY": "Asian Population",
+        "HISPWHT_CY": "Hispanic White Population",
+        "GENZ_CY": "Gen Z Population",
+        "MILLENN_CY": "Millennial Population",
+        
+        # Sports participation
+        "MP33020A_B": "Jogging/Running Participation",
+        "MP33032A_B": "Yoga Participation", 
+        "MP33031A_B": "Weight Lifting Participation",
+        
+        # Sports fandom
+        "MP33104A_B": "MLB Super Fan",
+        "MP33105A_B": "NASCAR Super Fan",
+        "MP33106A_B": "NBA Super Fan",
+        "MP33107A_B": "NFL Super Fan",
+        "MP33108A_B": "NHL Super Fan",
+        "MP33119A_B": "International Soccer Super Fan",
+        "MP33120A_B": "MLS Soccer Super Fan",
+        
+        # Store shopping
+        "MP31035A_B": "Dick's Sporting Goods Shopping",
+        "MP31042A_B": "Foot Locker Shopping",
+    }
+    
+    # Handle correlation field patterns like "MP30034A_B_vs_MP30029A_B_correlation"
+    if '_vs_' in field_code and field_code.endswith('_correlation'):
+        parts = field_code.replace('_correlation', '').split('_vs_')
+        if len(parts) == 2:
+            field1_name = get_human_readable_field_name(parts[0])
+            field2_name = get_human_readable_field_name(parts[1])
+            return f"{field1_name} vs {field2_name}"
+    
+    # Handle value_ prefixed fields
+    if field_code.startswith('value_'):
+        base_field = field_code.replace('value_', '')
+        if base_field in field_aliases:
+            return field_aliases[base_field]
+        field_code = base_field  # Continue with base field for other processing
+    
+    # Direct mapping
+    if field_code in field_aliases:
+        return field_aliases[field_code]
+    
+    # Fallback to prettified field name
+    return field_code.replace('_', ' ').title()
+
 def calculate_query_aware_feature_importance(df, query_specific_features, query_classification):
     """Calculate feature importance with query-specific weighting"""
     
@@ -508,7 +576,7 @@ def calculate_query_aware_feature_importance(df, query_specific_features, query_
             importance_value = float(importance) if pd.notna(importance) else None
             if importance_value is not None:  # Only add non-null values
                 feature_importance.append({
-                    'feature': feature,
+                    'feature': get_human_readable_field_name(feature),  # Convert to human-readable name
                     'importance': importance_value
                 })
     
