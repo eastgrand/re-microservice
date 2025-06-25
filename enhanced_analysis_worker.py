@@ -449,52 +449,6 @@ def apply_query_aware_analysis(df, query_classification, user_query, conversatio
     
     return filtered_data, query_specific_features
 
-def get_query_aware_top_areas(df, query_classification, target_variable, user_query):
-    """Get top areas using query-aware ranking"""
-    
-    # Check both 'query_type' and 'analysis_type' keys for compatibility
-    query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
-    
-    # Only apply ranking/limiting for ranking queries
-    if query_type == 'ranking':
-        # Get the limit from query classification, default to 25 if not specified
-        limit = query_classification.get('limit', 25)
-        logger.info(f"Using limit: {limit} for ranking query")
-        
-        # Check if we're ranking by a specific target variable (like condominium ownership)
-        # If so, rank directly by that variable instead of creating combined scores
-        if target_variable == "value_2024 Condominium Status - In Condo (%)":
-            # For condominium ownership queries, rank directly by the condo percentage
-            top_data = df.nlargest(limit, target_variable)
-            logger.info(f"Applied direct ranking by {target_variable} with limit {limit}")
-            return top_data
-        
-        # For income queries, weight by income levels
-        if 'income' in user_query.lower():
-            income_col = 'value_2024 Household Average Income (Current Year $)'
-            if income_col in df.columns:
-                df_copy = df.copy()
-                # Normalize income for scoring
-                income_normalized = (df_copy[income_col] - df_copy[income_col].min()) / (df_copy[income_col].max() - df_copy[income_col].min())
-                
-                df_copy['combined_score'] = (
-                    df_copy[target_variable] * 0.7 + 
-                    income_normalized * 0.3
-                )
-                
-                top_data = df_copy.nlargest(limit, 'combined_score')
-                logger.info(f"Applied income-aware ranking with limit {limit}")
-                return top_data
-        
-        # Default ranking by target variable only for ranking queries
-        top_data = df.nlargest(limit, target_variable)
-        logger.info(f"Applied default ranking by {target_variable} with limit {limit}")
-        return top_data
-    
-    # For non-ranking queries (correlation, etc.), return all data
-    logger.info(f"Returning all data for {query_type} query type")
-    return df
-
 def get_human_readable_field_name(field_code):
     """Convert field codes to human-readable names"""
     
@@ -562,6 +516,52 @@ def get_human_readable_field_name(field_code):
     
     # Fallback to prettified field name
     return field_code.replace('_', ' ').title()
+
+def get_query_aware_top_areas(df, query_classification, target_variable, user_query):
+    """Get top areas using query-aware ranking"""
+    
+    # Check both 'query_type' and 'analysis_type' keys for compatibility
+    query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
+    
+    # Only apply ranking/limiting for ranking queries
+    if query_type == 'ranking':
+        # Get the limit from query classification, default to 25 if not specified
+        limit = query_classification.get('limit', 25)
+        logger.info(f"Using limit: {limit} for ranking query")
+        
+        # Check if we're ranking by a specific target variable (like condominium ownership)
+        # If so, rank directly by that variable instead of creating combined scores
+        if target_variable == "value_2024 Condominium Status - In Condo (%)":
+            # For condominium ownership queries, rank directly by the condo percentage
+            top_data = df.nlargest(limit, target_variable)
+            logger.info(f"Applied direct ranking by {target_variable} with limit {limit}")
+            return top_data
+        
+        # For income queries, weight by income levels
+        if 'income' in user_query.lower():
+            income_col = 'value_2024 Household Average Income (Current Year $)'
+            if income_col in df.columns:
+                df_copy = df.copy()
+                # Normalize income for scoring
+                income_normalized = (df_copy[income_col] - df_copy[income_col].min()) / (df_copy[income_col].max() - df_copy[income_col].min())
+                
+                df_copy['combined_score'] = (
+                    df_copy[target_variable] * 0.7 + 
+                    income_normalized * 0.3
+                )
+                
+                top_data = df_copy.nlargest(limit, 'combined_score')
+                logger.info(f"Applied income-aware ranking with limit {limit}")
+                return top_data
+        
+        # Default ranking by target variable only for ranking queries
+        top_data = df.nlargest(limit, target_variable)
+        logger.info(f"Applied default ranking by {target_variable} with limit {limit}")
+        return top_data
+    
+    # For non-ranking queries (correlation, etc.), return all data
+    logger.info(f"Returning all data for {query_type} query type")
+    return df
 
 def calculate_query_aware_feature_importance(df, query_specific_features, query_classification):
     """Calculate feature importance with query-specific weighting"""
@@ -998,14 +998,20 @@ def handle_bivariate_correlation(df, brand_fields, user_query, query_classificat
         
         # Build results with both variables for each area
         results = []
+        correlation_field_name = f'{field1_name}_vs_{field2_name}_correlation'
+        
         for _, row in valid_data.iterrows():
             result = {
                 'geo_id': str(row['ID']),
                 'ZIP_CODE': str(row['ID']),
                 'ID': str(row['ID']),
+                'FSA_ID': str(row['ID']),  # Add FSA_ID for compatibility
                 'primary_value': safe_float(row[col1]),      # First brand (e.g., Nike)
                 'comparison_value': safe_float(row[col2]),   # Second brand (e.g., Adidas)
                 'correlation_strength': safe_float(abs(correlation_value)),
+                'correlation_score': safe_float(abs(correlation_value)),  # Alternative field name
+                # Add the specific correlation field that frontend expects
+                correlation_field_name: safe_float(abs(correlation_value)),
                 # Add field names in multiple formats for frontend compatibility
                 field1_name: safe_float(row[col1]),          # Original case (MP30034A_B)
                 field2_name: safe_float(row[col2]),          # Original case (MP30029A_B)
