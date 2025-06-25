@@ -1021,6 +1021,9 @@ def handle_bivariate_correlation(df, brand_fields, user_query, query_classificat
                 field2_name: safe_float(row[col2]),          # Original case (MP30029A_B)
                 field1_name.lower(): safe_float(row[col1]),  # Lowercase (mp30034a_b)
                 field2_name.lower(): safe_float(row[col2]),  # Lowercase (mp30029a_b)
+                # Add snake_case versions for frontend compatibility
+                field1_name.lower().replace('a_b', '_a_b'): safe_float(row[col1]),  # Snake case (mp30034_a_b)
+                field2_name.lower().replace('a_b', '_a_b'): safe_float(row[col2]),  # Snake case (mp30029_a_b)
             }
             results.append(result)
         
