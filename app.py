@@ -344,6 +344,86 @@ def analyze():
 
     logger.info(f"Received analysis request with target '{target_variable}' and fields {matched_fields}")
 
+    # --- Special handling for brand comparison queries ---
+    query = data.get('query', '').lower()
+    analysis_type = data.get('analysis_type', '').lower()
+    
+    # Detect correlation/comparison queries dynamically
+    is_correlation_query = (
+        # Direct analysis type check
+        analysis_type == 'correlation' or
+        # Query contains comparison/correlation keywords
+        any(keyword in query for keyword in ['vs', 'versus', 'compare', 'correlation', 'relationship', 'between']) and
+        # Has exactly 2 fields (typical for bivariate correlation)
+        len(matched_fields) == 2
+    )
+    
+    if is_correlation_query and len(matched_fields) >= 2:
+        logger.info(f"Detected correlation/comparison query - routing to correlation analysis for fields: {matched_fields[:2]}")
+        
+        # Use the correlation analysis logic with the first two matched fields
+        var1, var2 = matched_fields[0], matched_fields[1]
+        
+        try:
+            # Filter out rows with missing values in either variable
+            valid_data = df[[var1, var2, 'ID']].dropna()
+            
+            if len(valid_data) < 10:
+                abort(400, description="Insufficient data points for correlation analysis (need at least 10).")
+            
+            # Calculate correlation coefficient
+            correlation_coef = valid_data[var1].corr(valid_data[var2])
+            
+            if pd.isna(correlation_coef):
+                abort(400, description="Unable to calculate correlation - insufficient valid data.")
+            
+            # Create results in the format expected by the frontend
+            results = []
+            for _, row in valid_data.iterrows():
+                results.append({
+                    'ID': row['ID'],
+                    'geo_id': row['ID'],  # Alias for compatibility
+                    'primary_value': float(row[var1]),
+                    'comparison_value': float(row[var2]),
+                    'correlation_strength': float(correlation_coef),
+                    var1: float(row[var1]),  # Include original field names
+                    var2: float(row[var2])
+                })
+            
+            # Prepare correlation analysis summary
+            correlation_analysis = {
+                'coefficient': float(correlation_coef),
+                'strength': 'strong' if abs(correlation_coef) > 0.7 else 'moderate' if abs(correlation_coef) > 0.4 else 'weak',
+                'direction': 'positive' if correlation_coef > 0 else 'negative',
+                'sample_size': len(valid_data),
+                'variables': {
+                    'primary': var1,
+                    'comparison': var2
+                }
+            }
+            
+            response = {
+                'analysis_type': 'bivariate_correlation',
+                'results': results,
+                'correlation_analysis': correlation_analysis,
+                'success': True,
+                'metadata': {
+                    'total_records': len(results),
+                    'correlation_coefficient': float(correlation_coef),
+                    'variables_analyzed': [var1, var2]
+                }
+            }
+            
+            logger.info(f"Correlation analysis completed: {correlation_coef:.4f} between {var1} and {var2}")
+            return safe_jsonify(response)
+            
+        except Exception as e:
+            logger.error(f"Error in correlation analysis: {str(e)}")
+            logger.error(traceback.format_exc())
+            # Fall through to regular analysis if correlation fails
+
+    # --- Regular Analysis (existing code) ---
+
     # --- Real Analysis ---
     # Call the real analysis worker function
     try:
