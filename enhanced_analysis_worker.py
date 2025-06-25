@@ -626,6 +626,10 @@ def build_query_aware_results(df, target_variable, query_classification):
             'ID': str(row['ID'])
         }
         
+        # Add DESCRIPTION field if it exists (contains ZIP + City like "10001 (New York)")
+        if 'value_DESCRIPTION' in row and pd.notna(row['value_DESCRIPTION']):
+            result['DESCRIPTION'] = str(row['value_DESCRIPTION'])
+        
         # Add the target variable with both clean name and target_value
         target_val = safe_float(row[target_variable])
         result[clean_field_name] = target_val
