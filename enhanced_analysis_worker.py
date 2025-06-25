@@ -370,7 +370,7 @@ def enhanced_analysis_worker(query):
         
         return {
             "success": True,
-            "analysisType": analysis_type,  # Include analysis type at top level for frontend
+            "analysis_type": analysis_type,  # Standardized field name for frontend consistency
             "results": results,
             "summary": None,  # Let Claude handle all narrative explanations
             "feature_importance": feature_importance,
