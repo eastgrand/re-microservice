@@ -12,8 +12,9 @@ print("🚀 Starting SHAP pre-calculation for entire dataset...")
 
 # Load the 83-feature model (go back to the smart feature selection)
 print("📊 Loading dataset and model...")
-df = pd.read_csv('data/nesto_merge_0.csv')
+df = pd.read_csv('data/nesto_merge_0.csv')  # Use the original dataset with brand fields
 print(f"Dataset shape: {df.shape}")
+print(f"Available brand fields: {[col for col in df.columns if 'MP30034A_B' in col or 'MP30029A_B' in col]}")
 
 # Load the 83-feature model we created earlier
 try:
