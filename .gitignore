@@ -210,3 +210,6 @@ temp/
 
 # Virtual environments
 venv_py311/
+
+# Ignore stray local micro-service folder created during testing
+shap-microservice/
