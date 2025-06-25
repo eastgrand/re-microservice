@@ -5,17 +5,26 @@ services:
     env: python
     plan: starter
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
-    buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
+    buildCommand: |
+      pip install --upgrade pip setuptools wheel && \
+      pip install -r requirements.txt && \
+      patch -p1 < shap-numpy-fix.patch && \
+      python precalculate_shap.py
 
   # Worker service for background processing
   - type: worker
     name: shap-demographic-worker-v3
     env: python
     plan: starter
-    buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
+    buildCommand: |
+      pip install --upgrade pip setuptools wheel && \
+      pip install -r requirements.txt && \
+      patch -p1 < shap-numpy-fix.patch
     startCommand: python simple_worker.py
     envVars:
       - key: REDIS_URL
-        value: "rediss://default:AVnAAAIjcDEzZjMwMjdiYWI5MjA0NjY3YTQ4ZjRjZjZjNWZhNTdmM3AxMA@ruling-stud-22976.upstash.io:6379"
+        fromService:
+          type: redis
+          name: upstash-redis-cache
       - key: SERVICE_NAME
         value: "SHAP Demographic Worker v3.0"
