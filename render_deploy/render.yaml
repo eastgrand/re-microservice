@@ -5,20 +5,24 @@ services:
     name: nesto-mortgage-analytics
     env: python
     plan: starter
-    buildCommand: >-
-      echo "Starting optimized build process" && 
-      pip install -r render_deploy/requirements.txt &&
-      cd render_deploy &&
-      chmod +x ./render_pre_deploy.sh &&
-      echo "Running pre-deployment checks..." &&
-      ./render_pre_deploy.sh &&
-      echo "⚡ Pre-deployment successful - Model files verified" &&
-      chmod +x ./deploy_to_render.sh &&
+    buildCommand: |
+      echo "Starting optimized build process"
+      pip install -r render_deploy/requirements.txt
+      # Apply the patch to fix the numpy.int issue in the shap library
+      patch -p1 < shap-numpy-fix.patch
+      # Regenerate the shap values with the patched library
+      python precalculate_shap.py
+      cd render_deploy
+      chmod +x ./render_pre_deploy.sh
+      echo "Running pre-deployment checks..."
+      ./render_pre_deploy.sh
+      echo "⚡ Pre-deployment successful - Model files verified"
+      chmod +x ./deploy_to_render.sh
       ./deploy_to_render.sh
-    startCommand: >-
-      echo "Starting web service..." &&
-      cd render_deploy &&
-      export PYTHONPATH=$PYTHONPATH:$(pwd) &&
+    startCommand: |
+      echo "Starting web service..."
+      cd render_deploy
+      export PYTHONPATH=$PYTHONPATH:$(pwd)
       gunicorn --config gunicorn_config.py app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: AGGRESSIVE_MEMORY_MANAGEMENT
@@ -40,18 +44,22 @@ services:
   - type: worker
     name: nesto-mortgage-analytics-worker-1747359907-1747359755-05162025
     env: python
-    buildCommand: >-
-      echo "Building optimized worker service" &&
-      pip install -r render_deploy/requirements.txt &&
-      cd render_deploy &&
-      chmod +x ./render_pre_deploy.sh &&
-      ./render_pre_deploy.sh &&
-      chmod +x ./deploy_to_render.sh &&
-      export SKIP_MODEL_TRAINING=true &&
+    buildCommand: |
+      echo "Building optimized worker service"
+      pip install -r render_deploy/requirements.txt
+      # Apply the patch to fix the numpy.int issue in the shap library
+      patch -p1 < shap-numpy-fix.patch
+      # Regenerate the shap values with the patched library
+      python precalculate_shap.py
+      cd render_deploy
+      chmod +x ./render_pre_deploy.sh
+      ./render_pre_deploy.sh
+      chmod +x ./deploy_to_render.sh
+      export SKIP_MODEL_TRAINING=true
       ./deploy_to_render.sh
-    startCommand: >-
-      echo "Starting memory-optimized SHAP worker" &&
-      cd render_deploy &&
+    startCommand: |
+      echo "Starting memory-optimized SHAP worker"
+      cd render_deploy
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
       chmod +x ./simple_worker.py &&
       python3 -c "import gc; gc.enable(); print('Garbage collection enabled')" &&
