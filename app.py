@@ -351,27 +351,72 @@ def analyze():
     # Detect correlation/comparison queries dynamically
     is_correlation_query = (
         # Direct analysis type check
-        analysis_type == 'correlation' or
+        analysis_type == 'correlation' or analysis_type == 'multi_brand_comparison' or
         # Query contains comparison/correlation keywords
         any(keyword in query for keyword in ['vs', 'versus', 'compare', 'correlation', 'relationship', 'between']) and
-        # Has exactly 2 fields (typical for bivariate correlation)
-        len(matched_fields) == 2
+        # Has 2+ fields for analysis
+        len(matched_fields) >= 2
     )
     
     if is_correlation_query and len(matched_fields) >= 2:
-        logger.info(f"Detected correlation/comparison query - routing to correlation analysis for fields: {matched_fields[:2]}")
+        logger.info(f"Detected correlation/comparison query - routing to correlation analysis for fields: {matched_fields}")
         
+        # For multi-brand comparisons (3+ fields), handle all fields
+        if len(matched_fields) >= 3:
+            logger.info(f"Multi-brand comparison detected with {len(matched_fields)} fields")
+            # Use all matched fields for multi-brand analysis
+            all_fields = matched_fields
+        else:
         # Use the correlation analysis logic with the first two matched fields
+            all_fields = matched_fields[:2]
+        
         var1, var2 = matched_fields[0], matched_fields[1]
         
         try:
-            # Filter out rows with missing values in either variable
-            valid_data = df[[var1, var2, 'ID']].dropna()
+            # Filter out rows with missing values in any of the analyzed variables
+            analysis_fields = all_fields + ['ID']
+            valid_data = df[analysis_fields].dropna()
             
             if len(valid_data) < 10:
                 abort(400, description="Insufficient data points for correlation analysis (need at least 10).")
             
-            # Calculate correlation coefficient
+            # For multi-field analysis, calculate pairwise correlations
+            if len(all_fields) >= 3:
+                # Multi-brand comparison
+                correlations = {}
+                for i, field1 in enumerate(all_fields):
+                    for j, field2 in enumerate(all_fields):
+                        if i != j:
+                            corr = valid_data[field1].corr(valid_data[field2])
+                            if not pd.isna(corr):
+                                correlations[f"{field1}_vs_{field2}"] = float(corr)
+                
+                # Create results with all field values
+                results = []
+                for _, row in valid_data.iterrows():
+                    result_row = {
+                        'ID': row['ID'],
+                        'geo_id': row['ID'],  # Alias for compatibility
+                        'primary_value': float(row[all_fields[0]]),
+                        'comparison_value': float(row[all_fields[1]]) if len(all_fields) > 1 else 0
+                    }
+                    
+                    # Add all field values to the result
+                    for field in all_fields:
+                        result_row[field] = float(row[field])
+                    
+                    results.append(result_row)
+                
+                # Prepare multi-field analysis summary
+                correlation_analysis = {
+                    'correlations': correlations,
+                    'sample_size': len(valid_data),
+                    'variables': all_fields,
+                    'analysis_type': 'multi_brand_comparison'
+                }
+                
+            else:
+                # Standard two-field correlation
             correlation_coef = valid_data[var1].corr(valid_data[var2])
             
             if pd.isna(correlation_coef):
@@ -402,6 +447,21 @@ def analyze():
                 }
             }
             
+            # Prepare response based on analysis type
+            if len(all_fields) >= 3:
+                response = {
+                    'analysis_type': 'multi_brand_comparison',
+                    'results': results,
+                    'correlation_analysis': correlation_analysis,
+                    'success': True,
+                    'metadata': {
+                        'total_records': len(results),
+                        'variables_analyzed': all_fields,
+                        'analysis_type': 'multi_brand_comparison'
+                    }
+                }
+                logger.info(f"Multi-brand analysis completed for {len(all_fields)} brands: {all_fields}")
+            else:
             response = {
                 'analysis_type': 'bivariate_correlation',
                 'results': results,
@@ -413,8 +473,8 @@ def analyze():
                     'variables_analyzed': [var1, var2]
                 }
             }
-            
             logger.info(f"Correlation analysis completed: {correlation_coef:.4f} between {var1} and {var2}")
+            
             return safe_jsonify(response)
             
         except Exception as e:
