@@ -380,10 +380,14 @@ def analyze():
             if len(valid_data) < 10:
                 abort(400, description="Insufficient data points for correlation analysis (need at least 10).")
             
+            # Initialize variables
+            correlation_coef = None
+            correlations = {}
+            results = []
+            
             # For multi-field analysis, calculate pairwise correlations
             if len(all_fields) >= 3:
                 # Multi-brand comparison
-                correlations = {}
                 for i, field1 in enumerate(all_fields):
                     for j, field2 in enumerate(all_fields):
                         if i != j:
@@ -392,7 +396,6 @@ def analyze():
                                 correlations[f"{field1}_vs_{field2}"] = float(corr)
                 
                 # Create results with all field values
-                results = []
                 for _, row in valid_data.iterrows():
                     result_row = {
                         'ID': row['ID'],
@@ -415,6 +418,19 @@ def analyze():
                     'analysis_type': 'multi_brand_comparison'
                 }
                 
+                response = {
+                    'analysis_type': 'multi_brand_comparison',
+                    'results': results,
+                    'correlation_analysis': correlation_analysis,
+                    'success': True,
+                    'metadata': {
+                        'total_records': len(results),
+                        'variables_analyzed': all_fields,
+                        'analysis_type': 'multi_brand_comparison'
+                    }
+                }
+                logger.info(f"Multi-brand analysis completed for {len(all_fields)} brands: {all_fields}")
+                
             else:
                 # Standard two-field correlation
                 correlation_coef = valid_data[var1].corr(valid_data[var2])
@@ -423,7 +439,6 @@ def analyze():
                     abort(400, description="Unable to calculate correlation - insufficient valid data.")
                 
                 # Create results in the format expected by the frontend
-                results = []
                 for _, row in valid_data.iterrows():
                     results.append({
                         'ID': row['ID'],
@@ -447,35 +462,20 @@ def analyze():
                     }
                 }
                 
-                # Prepare response based on analysis type
-                if len(all_fields) >= 3:
-                    response = {
-                        'analysis_type': 'multi_brand_comparison',
-                        'results': results,
-                        'correlation_analysis': correlation_analysis,
-                        'success': True,
-                        'metadata': {
-                            'total_records': len(results),
-                            'variables_analyzed': all_fields,
-                            'analysis_type': 'multi_brand_comparison'
-                        }
+                response = {
+                    'analysis_type': 'bivariate_correlation',
+                    'results': results,
+                    'correlation_analysis': correlation_analysis,
+                    'success': True,
+                    'metadata': {
+                        'total_records': len(results),
+                        'correlation_coefficient': float(correlation_coef),
+                        'variables_analyzed': [var1, var2]
                     }
-                    logger.info(f"Multi-brand analysis completed for {len(all_fields)} brands: {all_fields}")
-                else:
-                    response = {
-                        'analysis_type': 'bivariate_correlation',
-                        'results': results,
-                        'correlation_analysis': correlation_analysis,
-                        'success': True,
-                        'metadata': {
-                            'total_records': len(results),
-                            'correlation_coefficient': float(correlation_coef),
-                            'variables_analyzed': [var1, var2]
-                        }
-                    }
-                    logger.info(f"Correlation analysis completed: {correlation_coef:.4f} between {var1} and {var2}")
-                
-                return safe_jsonify(response)
+                }
+                logger.info(f"Correlation analysis completed: {correlation_coef:.4f} between {var1} and {var2}")
+            
+            return safe_jsonify(response)
                 
         except Exception as e:
             logger.error(f"Error in correlation analysis: {str(e)}")
