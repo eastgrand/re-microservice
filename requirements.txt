@@ -18,3 +18,9 @@ psutil==5.9.5
 pytest==7.3.1
 memory-profiler==0.61.0
 PyYAML>=6.0
+geopandas==0.13.2
+shapely==1.8.5.post1
+libpysal==4.9.2
+esda==2.5.0
+pyproj==3.5.0
+rtree==1.0.1

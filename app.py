@@ -1993,3 +1993,141 @@ if __name__ == '__main__':
 #     return jsonify({'status': job.get_status()}), 202
 
 # ---------------------------------------------------------------------------
+
+# --- Local Correlation (LISA) Dependencies ---
+try:
+    import geopandas as gpd
+    from shapely.geometry import shape  # Convert GeoJSON to shapely geometry
+    from libpysal.weights import KNN
+    from esda.moran import Moran_Local_BV
+except ImportError:
+    # Modules may not be installed in some environments; log warning – the endpoint will error gracefully
+    gpd = None  # type: ignore
+    shape = None  # type: ignore
+    KNN = None  # type: ignore
+    Moran_Local_BV = None  # type: ignore
+    logger.warning("geopandas / libpysal / esda not installed – /local_corr endpoint will be unavailable")
+
+@app.route('/local_corr', methods=['POST'])
+def calculate_local_correlation():
+    """
+    Compute bivariate Local Moran's I (LISA) between two variables for each feature.
+
+    Expected JSON body:
+    {
+        "field_x": "column_name_1",
+        "field_y": "column_name_2",
+        "features": [ { "geometry": {..}, "attributes": { "field_x": .., "field_y": .. }} ],
+        "k_neighbors": 6  # optional (default 6)
+    }
+    Returns GeoJSON-like list of features with added attributes:
+        local_I, p_value, cluster (int)
+    """
+    if gpd is None or shape is None or KNN is None or Moran_Local_BV is None:
+        return safe_jsonify({
+            "error": "geopandas / libpysal / esda not installed on server."}, 501)
+
+    data = request.json or {}
+    field_x = data.get('field_x')
+    field_y = data.get('field_y')
+    raw_features = data.get('features', [])
+    k_neighbors = int(data.get('k_neighbors', 6))
+
+    # Validate input
+    if not field_x or not field_y:
+        abort(400, description="Missing required 'field_x' or 'field_y'")
+    if not raw_features:
+        abort(400, description="No features supplied for local correlation analysis")
+
+    logger.info(f"Starting local correlation for {len(raw_features)} features (k={k_neighbors}) → {field_x} vs {field_y}")
+
+    try:
+        # Build GeoDataFrame
+        geometries = []
+        values_x = []
+        values_y = []
+        feature_geometries = []  # preserve for output
+
+        for feat in raw_features:
+            geom_json = feat.get('geometry')
+            attrs = feat.get('attributes', feat.get('properties', {}))
+
+            if geom_json is None:
+                continue  # skip features without geometry
+
+            geometries.append(shape(geom_json))
+            feature_geometries.append(geom_json)
+
+            val_x = attrs.get(field_x)
+            val_y = attrs.get(field_y)
+            # Convert to float safely
+            try:
+                val_x = float(val_x) if val_x is not None else np.nan
+            except Exception:
+                val_x = np.nan
+            try:
+                val_y = float(val_y) if val_y is not None else np.nan
+            except Exception:
+                val_y = np.nan
+
+            values_x.append(val_x)
+            values_y.append(val_y)
+
+        gdf = gpd.GeoDataFrame({
+            'val_x': values_x,
+            'val_y': values_y
+        }, geometry=geometries, crs="EPSG:4326")
+
+        # Drop rows with missing values
+        gdf = gdf.dropna(subset=['val_x', 'val_y'])
+
+        if gdf.empty or len(gdf) < 3:
+            abort(400, description="Insufficient valid features for local correlation analysis")
+
+        # Build spatial weights matrix using k-nearest neighbors
+        w = KNN.from_dataframe(gdf, k=k_neighbors)
+        w.transform = 'r'
+
+        lisa = Moran_Local_BV(gdf['val_x'], gdf['val_y'], w)
+
+        local_I = lisa.Is
+        pvals = lisa.p_sim
+        clusters = lisa.q  # 1=HH,2=LH,3=LL,4=HL
+
+        # Build response features list aligned with original order (may differ due to dropna)
+        results = []
+        idx_mapping = list(gdf.index)
+        for idx_out, idx_orig in enumerate(idx_mapping):
+            res_feat = {
+                'geometry': feature_geometries[idx_orig],
+                'attributes': {
+                    'OBJECTID': int(idx_out + 1),
+                    'local_I': float(local_I[idx_out]),
+                    'p_value': float(pvals[idx_out]),
+                    'cluster': int(clusters[idx_out])
+                }
+            }
+            results.append(res_feat)
+
+        response = {
+            'analysis_type': 'local_correlation',
+            'features': results,
+            'metadata': {
+                'field_x': field_x,
+                'field_y': field_y,
+                'k_neighbors': k_neighbors,
+                'feature_count': len(results)
+            },
+            'success': True
+        }
+
+        logger.info("Local correlation analysis completed successfully")
+        return safe_jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Local correlation analysis failed: {e}")
+        logger.error(traceback.format_exc())
+        return safe_jsonify({
+            'error': f'Local correlation failed: {str(e)}',
+            'success': False
+        }, 500)

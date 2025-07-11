@@ -956,25 +956,28 @@ def handle_bivariate_correlation(df, brand_fields, user_query, query_classificat
     """Handle bivariate correlation analysis for brand comparisons like Nike vs Adidas"""
     
     try:
-        # Map field names to actual column names in the data
-        field_aliases = {
-            "MP30034A_B": "value_MP30034A_B",  # Nike Athletic Shoes
-            "MP30029A_B": "value_MP30029A_B",  # Adidas Athletic Shoes
-            "MP30032A_B": "value_MP30032A_B",  # Jordan Athletic Shoes
-            "MP30031A_B": "value_MP30031A_B",  # Converse Athletic Shoes
-            "MP30033A_B": "value_MP30033A_B",  # New Balance Athletic Shoes
-            "MP30035A_B": "value_MP30035A_B",  # Puma Athletic Shoes
-            "MP30036A_B": "value_MP30036A_B",  # Reebok Athletic Shoes
-            "MP30037A_B": "value_MP30037A_B",  # Skechers Athletic Shoes
-            "MP30016A_B": "value_MP30016A_B",  # Athletic Shoes (general)
-        }
-        
-        # Get the actual column names
+        # Get the actual column names - dynamically map any field to its column name
         field1_name = brand_fields[0]
         field2_name = brand_fields[1]
         
-        col1 = field_aliases.get(field1_name, f"value_{field1_name}")
-        col2 = field_aliases.get(field2_name, f"value_{field2_name}")
+        # Dynamic column mapping: try common patterns for field naming
+        def get_column_name(field_name):
+            possible_names = [
+                f"value_{field_name}",  # Standard pattern: value_MP30034A_B
+                field_name,             # Direct field name: MP30034A_B
+                field_name.lower(),     # Lowercase: mp30034a_b
+                f"value_{field_name.lower()}"  # Lowercase with prefix: value_mp30034a_b
+            ]
+            
+            for name in possible_names:
+                if name in df.columns:
+                    return name
+            
+            # If none found, return the standard pattern and let error handling catch it
+            return f"value_{field_name}"
+        
+        col1 = get_column_name(field1_name)
+        col2 = get_column_name(field2_name)
         
         logger.info(f"Bivariate correlation: {field1_name} ({col1}) vs {field2_name} ({col2})")
         
@@ -1080,19 +1083,9 @@ def handle_bivariate_correlation(df, brand_fields, user_query, query_classificat
         return {"success": False, "error": f"Bivariate correlation analysis failed: {str(e)}"}
 
 def get_brand_name_from_field(field_code):
-    """Convert field codes to human-readable brand names"""
-    brand_mapping = {
-        "MP30034A_B": "Nike",
-        "MP30029A_B": "Adidas", 
-        "MP30032A_B": "Jordan",
-        "MP30031A_B": "Converse",
-        "MP30033A_B": "New Balance",
-        "MP30035A_B": "Puma",
-        "MP30036A_B": "Reebok",
-        "MP30037A_B": "Skechers",
-        "MP30016A_B": "Athletic Shoes"
-    }
-    return brand_mapping.get(field_code, field_code)
+    """Convert field codes to human-readable names using the existing helper function"""
+    # Use the existing get_human_readable_field_name function which has comprehensive mappings
+    return get_human_readable_field_name(field_code)
 
 # Example usage patterns for different analysis types:
 
