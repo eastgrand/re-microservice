@@ -28,8 +28,9 @@ from map_nesto_data import MASTER_SCHEMA, TARGET_VARIABLE, load_and_preprocess_d
 from enhanced_analysis_worker import enhanced_analysis_worker
 from field_utils import resolve_field_name
 from memory_utils import (
-    intelligent_sampling, batch_process_shap, 
-    get_memory_usage, force_garbage_collection
+    get_memory_usage, force_garbage_collection,
+    batch_shap_calculation, memory_safe_shap_wrapper,
+    get_endpoint_config
 )
 
 # --- FLASK APP SETUP ---
