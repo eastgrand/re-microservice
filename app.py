@@ -15,6 +15,8 @@ import json
 from map_nesto_data import MASTER_SCHEMA, TARGET_VARIABLE, load_and_preprocess_data, initialize_schema
 # Import the real analysis function
 from enhanced_analysis_worker import enhanced_analysis_worker
+# Import field resolution utilities
+from field_utils import resolve_field_name
 
 # --- Redis/RQ Imports for Async Jobs ---
 import redis
@@ -314,9 +316,9 @@ def analyze():
         logger.warning(f"No match found for field: '{field_name}'")
         return field_name
     
-    # Resolve target variable and matched fields
+    # Resolve target variable and matched fields using imported function
     if target_variable:
-        resolved_target = resolve_field_name(target_variable)
+        resolved_target = resolve_field_name(target_variable, AVAILABLE_COLUMNS, MASTER_SCHEMA)
         if resolved_target != target_variable:
             logger.info(f"Resolved target variable '{target_variable}' to '{resolved_target}'")
             data['target_variable'] = resolved_target
@@ -324,7 +326,7 @@ def analyze():
     
     resolved_matched_fields = []
     for field in matched_fields:
-        resolved_field = resolve_field_name(field)
+        resolved_field = resolve_field_name(field, AVAILABLE_COLUMNS, MASTER_SCHEMA)
         if resolved_field != field:
             logger.info(f"Resolved field '{field}' to '{resolved_field}'")
         resolved_matched_fields.append(resolved_field)
@@ -819,7 +821,7 @@ def detect_outliers():
     
     try:
         # Resolve target field name
-        actual_target_field = resolve_field_name(target_field)
+        actual_target_field = resolve_field_name(target_field, df.columns.tolist(), MASTER_SCHEMA)
         if actual_target_field not in df.columns:
             return safe_jsonify({
                 "error": f"Target field '{target_field}' not found in dataset. Available fields: {list(df.columns)}"
@@ -1042,7 +1044,7 @@ def analyze_scenario():
     
     try:
         # Resolve target field name
-        actual_target_field = resolve_field_name(target_field)
+        actual_target_field = resolve_field_name(target_field, df.columns.tolist(), MASTER_SCHEMA)
         if actual_target_field not in df.columns:
             return safe_jsonify({
                 "error": f"Target field '{target_field}' not found in dataset. Available fields: {list(df.columns)}"
@@ -1492,6 +1494,7 @@ def profile_segments():
             return safe_jsonify({"error": "Invalid segment method. Use 'percentile' or 'kmeans'"}, 400)
         
         # Train model for SHAP analysis
+        from sklearn.ensemble import RandomForestRegressor
         model = RandomForestRegressor(n_estimators=100, random_state=42)
         model.fit(X, y)
         
@@ -1639,6 +1642,18 @@ def compare_groups():
         # Validate fields
         if target_field not in df.columns:
             return safe_jsonify({"error": f"Target field '{target_field}' not found in dataset"}, 400)
+        
+        # Handle missing grouping field with fallback logic
+        if not grouping_field:
+            # Auto-detect grouping field or use a default categorical field
+            categorical_fields = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            # Filter out ID-like fields
+            categorical_fields = [f for f in categorical_fields if not f.upper().startswith(('ID', 'OBJECTID', 'DESCRIPTION'))]
+            if categorical_fields:
+                grouping_field = categorical_fields[0]
+                logger.info(f"Auto-selected grouping field: {grouping_field}")
+            else:
+                return safe_jsonify({"error": "No grouping field specified and no suitable categorical fields found"}, 400)
         
         if grouping_field not in df.columns:
             return safe_jsonify({"error": f"Grouping field '{grouping_field}' not found in dataset"}, 400)
@@ -2235,15 +2250,21 @@ def identify_spatial_clusters():
         if len(valid_features) < 2:
             return safe_jsonify({"error": "Need at least 2 valid features for clustering"}, 400)
         
-        # Prepare data
+        # Prepare data with robust NaN handling
         X = df[valid_features].fillna(df[valid_features].median())
         y = df[target_field].fillna(df[target_field].median()) if target_field else None
+        
+        # Ensure no NaN values remain and handle infinite values
+        X = X.replace([np.inf, -np.inf], np.nan).fillna(X.median())
+        # Final verification - replace any remaining NaN with 0
+        if X.isnull().any().any():
+            X = X.fillna(0)
         
         # Perform clustering
         from sklearn.cluster import KMeans
         from sklearn.preprocessing import StandardScaler
         
-        # Standardize features
+        # Standardize features with robust preprocessing
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
