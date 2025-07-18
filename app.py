@@ -401,12 +401,13 @@ def internal_error(error):
         "timestamp": datetime.now().isoformat()
     }, 500)
 
+# --- STARTUP INITIALIZATION ---
+# Load model and data during module import (for both gunicorn and direct run)
+load_model_and_data()
+
 # --- STARTUP ---
 if __name__ == '__main__':
-    # Load model and data
-    load_model_and_data()
-    
-    # Run the app
+    # Run the app (model already loaded above)
     port = int(os.environ.get('PORT', 5001))
     logger.info(f"🚀 Starting SHAP Microservice (Redis-Free) on port {port}")
     app.run(host='0.0.0.0', port=port, debug=DEBUG) 
