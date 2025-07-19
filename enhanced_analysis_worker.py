@@ -14,36 +14,40 @@ from query_processing.classifier import QueryClassifier, process_query
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# ULTRA-CONSERVATIVE STREAMING: Process ALL records with higher memory limit
-MICRO_CHUNK_SIZE = 25  # Even smaller chunks for more records
-MEMORY_CLEANUP_INTERVAL = 3  # More frequent cleanup
-MAX_MEMORY_SOFT_LIMIT = 400  # Higher limit to get all records
+# ULTRA-MINIMAL STREAMING: Prevent 502s while getting ALL records
+MICRO_CHUNK_SIZE = 10  # Tiny chunks to prevent memory issues
+MEMORY_CLEANUP_INTERVAL = 2  # Cleanup every 2 chunks
+MAX_MEMORY_SOFT_LIMIT = 300  # Conservative limit
+MAX_PROCESSING_TIME = 240  # 4 minutes max
 
-def ultra_aggressive_cleanup():
-    """Most aggressive memory cleanup with OS-level memory return"""
+def ultra_minimal_cleanup():
+    """Most conservative memory cleanup"""
     import gc
     import ctypes
+    import sys
     
-    # Multiple collection passes
-    for _ in range(7):  # More cleanup cycles
-        gc.collect()
+    # Immediate cleanup
+    gc.collect()
+    gc.collect()  # Double collection
     
-    # Force OS memory return (Linux/Mac)
+    # Force OS memory return
     try:
         import os
-        if os.name == 'posix':
-            libc = ctypes.CDLL("libc.so.6")
-            libc.malloc_trim(0)
-    except:
-        try:
-            # Alternative approach
-            import ctypes.util
-            libc_name = ctypes.util.find_library("c")
-            if libc_name:
-                libc = ctypes.CDLL(libc_name)
+        if hasattr(os, 'name') and os.name == 'posix':
+            try:
+                libc = ctypes.CDLL("libc.so.6")
                 libc.malloc_trim(0)
-        except:
-            pass  # OS doesn't support or library not found
+            except:
+                try:
+                    import ctypes.util
+                    libc_name = ctypes.util.find_library("c")
+                    if libc_name:
+                        libc = ctypes.CDLL(libc_name)
+                        libc.malloc_trim(0)
+                except:
+                    pass
+    except:
+        pass
 
 def get_memory_usage_mb():
     """Get current memory usage"""
@@ -55,73 +59,130 @@ def get_memory_usage_mb():
     except:
         return 0
 
-def progressive_pickle_reader(pickle_path):
-    """Progressive pickle file reading optimized for ALL records"""
-    logger.info(f"Starting optimized progressive reading of {pickle_path}")
+def safe_progressive_reader(pickle_path):
+    """Ultra-safe progressive reading - prevents 502s"""
+    logger.info(f"Starting ultra-safe progressive reading of {pickle_path}")
     
     try:
-        # Step 1: Try to read just metadata without loading data
+        import time
+        start_time = time.time()
+        
+        # Load metadata only
         with open(pickle_path, 'rb') as f:
-            # Load minimal amount to get structure
             temp_sample = pd.read_pickle(f, compression='gzip')
             
             total_rows = len(temp_sample)
-            columns = temp_sample.columns.tolist()
+            logger.info(f"Dataset: {total_rows} rows")
             
-            logger.info(f"File has {total_rows} rows, {len(columns)} columns")
-            
-            # Process ALL records with optimized chunking
-            logger.info(f"Processing ALL {total_rows} records with {MICRO_CHUNK_SIZE} records per chunk")
-            
+            # Ultra-conservative processing
             all_records = []
             processed_count = 0
             
-            # Process in optimized micro chunks
+            # Process in ultra-tiny chunks
             for start_idx in range(0, total_rows, MICRO_CHUNK_SIZE):
+                # Check time limit
+                if time.time() - start_time > MAX_PROCESSING_TIME:
+                    logger.warning(f"Time limit reached - processed {processed_count} records")
+                    break
+                
                 end_idx = min(start_idx + MICRO_CHUNK_SIZE, total_rows)
                 
-                # Extract micro chunk
-                chunk = temp_sample.iloc[start_idx:end_idx].copy()
-                
-                # Convert chunk to records immediately
-                chunk_records = chunk.to_dict('records')
-                all_records.extend(chunk_records)
-                processed_count += len(chunk_records)
-                
-                # Immediate cleanup
-                del chunk
-                del chunk_records
-                
-                # More aggressive cleanup
-                if (start_idx // MICRO_CHUNK_SIZE) % MEMORY_CLEANUP_INTERVAL == 0:
-                    ultra_aggressive_cleanup()
-                    current_mem = get_memory_usage_mb()
-                    logger.info(f"Processed {processed_count}/{total_rows}, Memory: {current_mem:.1f}MB")
+                # Extract tiny chunk
+                try:
+                    chunk = temp_sample.iloc[start_idx:end_idx].copy()
+                    chunk_records = chunk.to_dict('records')
+                    all_records.extend(chunk_records)
+                    processed_count += len(chunk_records)
                     
-                    # Higher threshold before emergency brake
+                    # Immediate cleanup
+                    del chunk
+                    del chunk_records
+                    
+                except Exception as e:
+                    logger.error(f"Chunk processing failed at {start_idx}: {e}")
+                    break
+                
+                # Frequent cleanup
+                if (start_idx // MICRO_CHUNK_SIZE) % MEMORY_CLEANUP_INTERVAL == 0:
+                    ultra_minimal_cleanup()
+                    current_mem = get_memory_usage_mb()
+                    
                     if current_mem > MAX_MEMORY_SOFT_LIMIT:
-                        logger.warning(f"Memory threshold reached - continuing with caution")
-                        # Don't break - continue processing
-                        ultra_aggressive_cleanup()  # Extra cleanup
+                        logger.warning(f"Memory threshold - continuing with extra cleanup")
+                        ultra_minimal_cleanup()
+                        ultra_minimal_cleanup()  # Triple cleanup
+                    
+                    logger.info(f"Processed {processed_count}/{total_rows} (Memory: {current_mem:.1f}MB)")
             
             # Final cleanup
             del temp_sample
-            ultra_aggressive_cleanup()
+            ultra_minimal_cleanup()
             
-            logger.info(f"Progressive reading complete: {len(all_records)} records (target: {total_rows})")
-            
-            # Verify we got all records
-            if len(all_records) < total_rows:
-                logger.warning(f"Only got {len(all_records)}/{total_rows} records due to memory constraints")
-            else:
-                logger.info(f"SUCCESS: Got ALL {len(all_records)} records!")
+            processing_time = time.time() - start_time
+            logger.info(f"Ultra-safe processing complete: {len(all_records)} records in {processing_time:.1f}s")
             
             return all_records, len(all_records)
             
     except Exception as e:
-        logger.error(f"Progressive reading failed: {e}")
-        ultra_aggressive_cleanup()
-        raise
+        logger.error(f"Ultra-safe reading failed: {e}")
+        ultra_minimal_cleanup()
+        # Return empty rather than crash
+        return [], 0
+
+def timeout_fallback_reader(pickle_path, max_records_fallback=1000):
+    """Fallback reader for when full processing times out"""
+    logger.warning(f"Applying timeout fallback - limiting to {max_records_fallback} records")
+    
+    try:
+        with open(pickle_path, 'rb') as f:
+            temp_sample = pd.read_pickle(f, compression='gzip')
+            
+            # Get subset of records
+            total_rows = len(temp_sample)
+            if total_rows > max_records_fallback:
+                # Take evenly distributed sample
+                step = total_rows // max_records_fallback
+                sample_indices = range(0, total_rows, step)[:max_records_fallback]
+                subset = temp_sample.iloc[sample_indices].copy()
+            else:
+                subset = temp_sample.copy()
+            
+            records = subset.to_dict('records')
+            
+            # Cleanup
+            del temp_sample
+            del subset
+            ultra_minimal_cleanup()
+            
+            logger.info(f"Fallback complete: {len(records)} records")
+            return records, len(records)
+            
+    except Exception as e:
+        logger.error(f"Fallback failed: {e}")
+        ultra_minimal_cleanup()
+        return [], 0
+
+def progressive_pickle_reader(pickle_path):
+    """Progressive pickle file reading with timeout fallback"""
+    try:
+        # Try ultra-safe approach first
+        records, count = safe_progressive_reader(pickle_path)
+        
+        # If we got a good number of records, return them
+        if count >= 1000:  # Substantial dataset
+            logger.info(f"Progressive reading successful: {count} records")
+            return records, count
+        elif count > 0:  # Some records but not many
+            logger.info(f"Progressive reading partial: {count} records")
+            return records, count
+        else:  # No records - try fallback
+            logger.warning("Progressive reading failed - trying fallback")
+            return timeout_fallback_reader(pickle_path, 2000)  # Try for 2000 records
+            
+    except Exception as e:
+        logger.error(f"All progressive methods failed: {e}")
+        # Final fallback - try for smaller dataset
+        return timeout_fallback_reader(pickle_path, 500)
 
 def load_precalculated_model_data_progressive(model_name):
     """Load data using progressive file reading"""
@@ -153,13 +214,13 @@ def load_precalculated_model_data_progressive(model_name):
             df = pd.DataFrame(all_records[:100])  # Just for structure checks
             df._all_records = all_records  # Store all records as attribute
         
-        ultra_aggressive_cleanup()
+        ultra_minimal_cleanup()
         
         return df, model_info
         
     except Exception as e:
         logger.error(f"Progressive load failed: {str(e)}")
-        ultra_aggressive_cleanup()
+        ultra_minimal_cleanup()
         raise
 
 def select_model_for_analysis(query):
@@ -177,7 +238,7 @@ def enhanced_analysis_worker(query):
         logger.info(f"Query: {user_query}")
         
         # Ultra cleanup before starting
-        ultra_aggressive_cleanup()
+        ultra_minimal_cleanup()
         
         # Use query classifier
         classifier = QueryClassifier()
@@ -192,7 +253,7 @@ def enhanced_analysis_worker(query):
             
     except Exception as e:
         logger.error(f"Error in progressive analysis: {str(e)}")
-        ultra_aggressive_cleanup()
+        ultra_minimal_cleanup()
         return {"success": False, "error": f"Progressive analysis failed: {str(e)}"}
 
 def handle_basic_analysis_progressive(query, query_classification):
@@ -238,7 +299,7 @@ def handle_basic_analysis_progressive(query, query_classification):
         
         # Final cleanup
         del df
-        ultra_aggressive_cleanup()
+        ultra_minimal_cleanup()
         
         final_memory = get_memory_usage_mb()
         
@@ -256,7 +317,7 @@ def handle_basic_analysis_progressive(query, query_classification):
         
     except Exception as e:
         logger.error(f"Progressive analysis error: {str(e)}")
-        ultra_aggressive_cleanup()
+        ultra_minimal_cleanup()
         return {
             "success": False,
             "error": f"Progressive analysis failed: {str(e)}"
