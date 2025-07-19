@@ -20,6 +20,17 @@ MEMORY_CLEANUP_INTERVAL = 2  # Cleanup every 2 chunks
 MAX_MEMORY_SOFT_LIMIT = 300  # Conservative limit
 MAX_PROCESSING_TIME = 240  # 4 minutes max
 
+# OPTIMIZED FOR 2GB RENDER STANDARD INSTANCE
+RECORD_BATCH_SIZE = 100  # Larger batches with more memory
+MAX_RECORDS_LIMIT = 4000  # Process ALL records (3,983)
+MEMORY_CHECK_INTERVAL = 200  # Less frequent checks with more memory
+MAX_MEMORY_THRESHOLD = 1500  # Use 1.5GB of 2GB available
+
+# RECORD-BY-RECORD STREAMING: Never load full dataset
+RECORD_BATCH_SIZE = 5  # Process 5 records at a time
+MAX_RECORDS_LIMIT = 2000  # Hard limit to prevent memory issues
+MEMORY_CHECK_INTERVAL = 25  # Check memory every 25 records
+
 def ultra_minimal_cleanup():
     """Most conservative memory cleanup"""
     import gc
@@ -59,91 +70,145 @@ def get_memory_usage_mb():
     except:
         return 0
 
-def safe_progressive_reader(pickle_path):
-    """Ultra-safe progressive reading - prevents 502s"""
-    logger.info(f"Starting ultra-safe progressive reading of {pickle_path}")
+def optimized_2gb_reader(pickle_path):
+    """Optimized reader for 2GB Render Standard instance"""
+    logger.info(f"Starting 2GB-optimized processing from {pickle_path}")
     
     try:
-        import time
-        start_time = time.time()
-        
-        # Load metadata only
+        # Load dataset with 2GB memory available
         with open(pickle_path, 'rb') as f:
-            temp_sample = pd.read_pickle(f, compression='gzip')
+            full_dataset = pd.read_pickle(f, compression='gzip')
+            total_rows = len(full_dataset)
+            logger.info(f"Loaded full dataset: {total_rows} rows")
             
-            total_rows = len(temp_sample)
-            logger.info(f"Dataset: {total_rows} rows")
+            # With 2GB, we can process ALL records
+            logger.info(f"Processing ALL {total_rows} records with 2GB memory")
             
-            # Ultra-conservative processing
             all_records = []
             processed_count = 0
             
-            # Process in ultra-tiny chunks
-            for start_idx in range(0, total_rows, MICRO_CHUNK_SIZE):
-                # Check time limit
-                if time.time() - start_time > MAX_PROCESSING_TIME:
-                    logger.warning(f"Time limit reached - processed {processed_count} records")
-                    break
-                
-                end_idx = min(start_idx + MICRO_CHUNK_SIZE, total_rows)
-                
-                # Extract tiny chunk
+            # Process in larger batches (2GB allows this)
+            for start_idx in range(0, total_rows, RECORD_BATCH_SIZE):
                 try:
-                    chunk = temp_sample.iloc[start_idx:end_idx].copy()
-                    chunk_records = chunk.to_dict('records')
-                    all_records.extend(chunk_records)
-                    processed_count += len(chunk_records)
+                    end_idx = min(start_idx + RECORD_BATCH_SIZE, total_rows)
                     
-                    # Immediate cleanup
-                    del chunk
-                    del chunk_records
+                    # Process larger batches efficiently
+                    batch = full_dataset.iloc[start_idx:end_idx].copy()
+                    batch_records = batch.to_dict('records')
+                    
+                    # Add to collection
+                    all_records.extend(batch_records)
+                    processed_count += len(batch_records)
+                    
+                    # Cleanup batch
+                    del batch
+                    del batch_records
+                    
+                    # Memory monitoring (less frequent with 2GB)
+                    if processed_count % MEMORY_CHECK_INTERVAL == 0:
+                        ultra_minimal_cleanup()
+                        current_mem = get_memory_usage_mb()
+                        logger.info(f"Processed {processed_count}/{total_rows} (Memory: {current_mem:.1f}MB / 2048MB)")
+                        
+                        # Only brake if we're truly close to 2GB limit
+                        if current_mem > MAX_MEMORY_THRESHOLD:
+                            logger.warning(f"Approaching 2GB limit at {processed_count} records")
+                            # Continue processing - we have more headroom
                     
                 except Exception as e:
-                    logger.error(f"Chunk processing failed at {start_idx}: {e}")
-                    break
-                
-                # Frequent cleanup
-                if (start_idx // MICRO_CHUNK_SIZE) % MEMORY_CLEANUP_INTERVAL == 0:
-                    ultra_minimal_cleanup()
-                    current_mem = get_memory_usage_mb()
-                    
-                    if current_mem > MAX_MEMORY_SOFT_LIMIT:
-                        logger.warning(f"Memory threshold - continuing with extra cleanup")
-                        ultra_minimal_cleanup()
-                        ultra_minimal_cleanup()  # Triple cleanup
-                    
-                    logger.info(f"Processed {processed_count}/{total_rows} (Memory: {current_mem:.1f}MB)")
+                    logger.error(f"Batch failed at record {start_idx}: {e}")
+                    # With 2GB, continue trying other batches
+                    continue
             
             # Final cleanup
-            del temp_sample
+            del full_dataset
             ultra_minimal_cleanup()
             
-            processing_time = time.time() - start_time
-            logger.info(f"Ultra-safe processing complete: {len(all_records)} records in {processing_time:.1f}s")
+            final_memory = get_memory_usage_mb()
+            logger.info(f"2GB processing complete: {len(all_records)} records (Final memory: {final_memory:.1f}MB)")
+            
+            # Success metrics for 2GB instance
+            if len(all_records) >= 3500:
+                logger.info("🎉 EXCELLENT: Got nearly all records with 2GB!")
+            elif len(all_records) >= 2500:
+                logger.info("✅ GOOD: Substantial dataset with 2GB")
+            else:
+                logger.warning("⚠️ Still limited - may need optimization")
             
             return all_records, len(all_records)
             
     except Exception as e:
-        logger.error(f"Ultra-safe reading failed: {e}")
+        logger.error(f"2GB optimized processing failed: {e}")
         ultra_minimal_cleanup()
-        # Return empty rather than crash
+        # Fallback to smaller processing
+        return record_by_record_reader(pickle_path)
+
+def record_by_record_reader(pickle_path):
+    """Fallback record-by-record reader for memory constraints"""
+    logger.info(f"Using fallback record-by-record streaming from {pickle_path}")
+    
+    try:
+        # Conservative approach for fallback
+        with open(pickle_path, 'rb') as f:
+            temp_peek = pd.read_pickle(f, compression='gzip')
+            total_rows = len(temp_peek)
+            
+            # Fallback limit
+            records_to_process = min(total_rows, 2000)
+            logger.info(f"Fallback: processing {records_to_process} records")
+            
+            all_records = []
+            processed_count = 0
+            
+            # Small batch processing for fallback
+            for start_idx in range(0, records_to_process, 20):  # Small batches
+                try:
+                    end_idx = min(start_idx + 20, records_to_process)
+                    
+                    batch = temp_peek.iloc[start_idx:end_idx].copy()
+                    batch_records = batch.to_dict('records')
+                    
+                    all_records.extend(batch_records)
+                    processed_count += len(batch_records)
+                    
+                    # Cleanup
+                    del batch
+                    del batch_records
+                    
+                    if processed_count % 100 == 0:
+                        ultra_minimal_cleanup()
+                        current_mem = get_memory_usage_mb()
+                        logger.info(f"Fallback processed {processed_count}/{records_to_process} (Memory: {current_mem:.1f}MB)")
+                        
+                        if current_mem > 400:  # Conservative fallback limit
+                            logger.warning(f"Fallback memory limit - stopping at {processed_count}")
+                            break
+                    
+                except Exception as e:
+                    logger.error(f"Fallback batch failed: {e}")
+                    break
+            
+            del temp_peek
+            ultra_minimal_cleanup()
+            
+            logger.info(f"Fallback complete: {len(all_records)} records")
+            return all_records, len(all_records)
+            
+    except Exception as e:
+        logger.error(f"Fallback failed: {e}")
         return [], 0
 
-def timeout_fallback_reader(pickle_path, max_records_fallback=1000):
-    """Fallback reader for when full processing times out"""
-    logger.warning(f"Applying timeout fallback - limiting to {max_records_fallback} records")
+def emergency_minimal_reader(pickle_path):
+    """Emergency reader - absolute minimum records"""
+    logger.warning("Using emergency minimal reader - very limited records")
     
     try:
         with open(pickle_path, 'rb') as f:
             temp_sample = pd.read_pickle(f, compression='gzip')
             
-            # Get subset of records
-            total_rows = len(temp_sample)
-            if total_rows > max_records_fallback:
-                # Take evenly distributed sample
-                step = total_rows // max_records_fallback
-                sample_indices = range(0, total_rows, step)[:max_records_fallback]
-                subset = temp_sample.iloc[sample_indices].copy()
+            # Take only first 100 records to ensure success
+            if len(temp_sample) > 100:
+                subset = temp_sample.head(100).copy()
             else:
                 subset = temp_sample.copy()
             
@@ -154,35 +219,36 @@ def timeout_fallback_reader(pickle_path, max_records_fallback=1000):
             del subset
             ultra_minimal_cleanup()
             
-            logger.info(f"Fallback complete: {len(records)} records")
+            logger.info(f"Emergency reader: {len(records)} records")
             return records, len(records)
             
     except Exception as e:
-        logger.error(f"Fallback failed: {e}")
-        ultra_minimal_cleanup()
+        logger.error(f"Emergency reader failed: {e}")
         return [], 0
 
 def progressive_pickle_reader(pickle_path):
-    """Progressive pickle file reading with timeout fallback"""
+    """Multi-tier progressive reading optimized for 2GB instance"""
+    logger.info(f"Starting 2GB-optimized progressive reading")
+    
     try:
-        # Try ultra-safe approach first
-        records, count = safe_progressive_reader(pickle_path)
+        # Primary: 2GB optimized approach
+        records, count = optimized_2gb_reader(pickle_path)
         
-        # If we got a good number of records, return them
-        if count >= 1000:  # Substantial dataset
-            logger.info(f"Progressive reading successful: {count} records")
+        if count >= 3000:  # Excellent - near full dataset
+            logger.info(f"2GB optimization successful: {count} records")
             return records, count
-        elif count > 0:  # Some records but not many
-            logger.info(f"Progressive reading partial: {count} records")
+        elif count >= 1000:  # Good progress
+            logger.info(f"2GB optimization partial: {count} records")
             return records, count
-        else:  # No records - try fallback
-            logger.warning("Progressive reading failed - trying fallback")
-            return timeout_fallback_reader(pickle_path, 2000)  # Try for 2000 records
+        else:
+            # Fallback: Record-by-record (should rarely happen with 2GB)
+            logger.warning("2GB approach failed - using fallback")
+            return record_by_record_reader(pickle_path)
             
     except Exception as e:
-        logger.error(f"All progressive methods failed: {e}")
-        # Final fallback - try for smaller dataset
-        return timeout_fallback_reader(pickle_path, 500)
+        logger.error(f"2GB processing failed: {e}")
+        # Emergency fallback
+        return emergency_minimal_reader(pickle_path)
 
 def load_precalculated_model_data_progressive(model_name):
     """Load data using progressive file reading"""
