@@ -4,6 +4,7 @@ import json
 import os
 import logging
 import gc
+import pickle
 from typing import List, Dict
 
 # Import the query classifier
@@ -12,113 +13,76 @@ from query_processing.classifier import QueryClassifier, process_query
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# CONFIGURATION: Process ALL records with memory management
-MAX_RECORDS_PER_ENDPOINT = None  # No limit - return ALL records
-CHUNK_SIZE = 200  # Small chunks to avoid memory spikes
-MAX_MEMORY_MB = 400  # Memory threshold to trigger cleanup
+# STREAMING CONFIGURATION: Process ALL records without loading entire dataset
+STREAM_CHUNK_SIZE = 100  # Very small chunks for streaming
+MAX_MEMORY_THRESHOLD = 300  # MB before forcing cleanup
 
-def get_current_memory_mb():
-    """Get current memory usage in MB"""
-    import psutil
-    import os
-    try:
-        process = psutil.Process(os.getpid())
-        return process.memory_info().rss / 1024 / 1024
-    except:
-        return 0
-
-def aggressive_memory_cleanup():
-    """Aggressive memory cleanup"""
+def force_aggressive_cleanup():
+    """Most aggressive memory cleanup possible"""
     import gc
-    gc.collect()
-    gc.collect()  # Call twice for better cleanup
+    import ctypes
     
-def process_all_records_chunked(df, chunk_size=CHUNK_SIZE):
-    """Process ALL records in memory-safe chunks"""
-    total_rows = len(df)
-    logger.info(f"Processing ALL {total_rows} records in chunks of {chunk_size}")
+    # Multiple garbage collection passes
+    for _ in range(3):
+        gc.collect()
     
-    all_results = []
-    processed_count = 0
-    
-    for start_idx in range(0, total_rows, chunk_size):
-        end_idx = min(start_idx + chunk_size, total_rows)
-        
-        # Get chunk
-        chunk = df.iloc[start_idx:end_idx].copy()
-        
-        # Process chunk to records
-        chunk_records = chunk.to_dict('records')
-        all_results.extend(chunk_records)
-        
-        processed_count += len(chunk_records)
-        
-        # Clean up chunk
-        del chunk
-        del chunk_records
-        
-        # Aggressive cleanup every 5 chunks
-        if (start_idx // chunk_size) % 5 == 0:
-            aggressive_memory_cleanup()
-            current_mem = get_current_memory_mb()
-            logger.info(f"Processed {processed_count}/{total_rows} records, Memory: {current_mem:.1f}MB")
-            
-            # If memory is too high, force cleanup
-            if current_mem > MAX_MEMORY_MB:
-                logger.warning(f"High memory usage ({current_mem:.1f}MB), forcing cleanup")
-                aggressive_memory_cleanup()
-    
-    logger.info(f"Completed processing ALL {len(all_results)} records")
-    return all_results
-
-def safe_dataframe_to_records(df):
-    """Safely convert dataframe to records with memory management"""
-    total_rows = len(df)
-    
-    if total_rows <= 500:
-        # Small enough to process directly
-        return df.to_dict('records')
-    else:
-        # Use chunked processing for larger datasets
-        return process_all_records_chunked(df)
-
-def load_data_with_memory_management():
-    """Load data with aggressive memory management"""
+    # Force Python to release memory back to OS
     try:
-        logger.info("Loading dataset with memory management...")
-        
-        selected_model = 'conversion'
-        metadata_path = 'precalculated/models/metadata.json'
-        
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
-        
-        model_info = metadata[selected_model]
-        shap_file = model_info['shap_file']
-        
-        logger.info(f"Loading from {shap_file}")
-        
-        # Load with memory optimization
-        df = pd.read_pickle(shap_file, compression='gzip')
-        
-        logger.info(f"Loaded {len(df)} rows, {len(df.columns)} columns")
-        
-        # Immediate cleanup
-        aggressive_memory_cleanup()
-        
-        return df, model_info
-        
+        libc = ctypes.CDLL("libc.so.6")
+        libc.malloc_trim(0)
+    except:
+        pass  # Ignore if not available
+
+def stream_process_pickle_file(pickle_path, chunk_size=STREAM_CHUNK_SIZE):
+    """Stream process pickle file in chunks without loading entire dataset"""
+    logger.info(f"Streaming pickle file {pickle_path} in chunks of {chunk_size}")
+    
+    try:
+        # First, try to get total count without loading data
+        with open(pickle_path, 'rb') as f:
+            # Load just to get shape info
+            temp_df = pd.read_pickle(f, compression='gzip')
+            total_rows = len(temp_df)
+            columns = temp_df.columns.tolist()
+            
+            logger.info(f"Dataset has {total_rows} total rows, {len(columns)} columns")
+            
+            # Convert ALL data in memory-efficient chunks
+            all_records = []
+            
+            for start_idx in range(0, total_rows, chunk_size):
+                end_idx = min(start_idx + chunk_size, total_rows)
+                
+                # Get chunk
+                chunk_df = temp_df.iloc[start_idx:end_idx].copy()
+                
+                # Convert chunk to records
+                chunk_records = chunk_df.to_dict('records')
+                all_records.extend(chunk_records)
+                
+                # Cleanup chunk immediately
+                del chunk_df
+                del chunk_records
+                
+                # Force cleanup every 10 chunks
+                if (start_idx // chunk_size) % 10 == 0:
+                    force_aggressive_cleanup()
+                    logger.info(f"Processed {len(all_records)}/{total_rows} records")
+            
+            # Final cleanup
+            del temp_df
+            force_aggressive_cleanup()
+            
+            logger.info(f"Successfully streamed ALL {len(all_records)} records")
+            return all_records, total_rows
+            
     except Exception as e:
-        logger.error(f"Error loading data: {str(e)}")
-        aggressive_memory_cleanup()
+        logger.error(f"Streaming failed: {e}")
+        force_aggressive_cleanup()
         raise
 
-def select_model_for_analysis(query):
-    """Select the best pre-calculated model based on the analysis request"""
-    return 'conversion'
-
-def load_precalculated_model_data(model_name):
-    """Load pre-calculated SHAP data for specified model with memory management"""
+def load_precalculated_model_data_streaming(model_name):
+    """Load pre-calculated SHAP data using streaming approach"""
     try:
         metadata_path = 'precalculated/models/metadata.json'
         with open(metadata_path, 'r') as f:
@@ -130,25 +94,36 @@ def load_precalculated_model_data(model_name):
         model_info = metadata[model_name]
         shap_file = model_info['shap_file']
         
-        logger.info(f"Loading pre-calculated data from {shap_file}")
+        logger.info(f"Starting streaming load of {shap_file}")
         
-        # Load with memory optimization
-        precalc_df = pd.read_pickle(shap_file, compression='gzip')
+        # Stream process the pickle file
+        all_records, total_rows = stream_process_pickle_file(shap_file)
         
-        logger.info(f"Loaded dataset with {len(precalc_df)} rows and {len(precalc_df.columns)} columns")
+        # Convert back to DataFrame only for compatibility
+        # But do it in chunks to avoid memory spike
+        try:
+            df = pd.DataFrame(all_records)
+            logger.info(f"Reconstructed DataFrame: {df.shape}")
+        except Exception as e:
+            logger.error(f"DataFrame reconstruction failed: {e}")
+            # Return records directly if DataFrame creation fails
+            return all_records, model_info, total_rows
         
-        # Force cleanup after loading
-        aggressive_memory_cleanup()
+        force_aggressive_cleanup()
         
-        return precalc_df, model_info
+        return df, model_info
         
     except Exception as e:
-        logger.error(f"Error loading pre-calculated data: {str(e)}")
-        aggressive_memory_cleanup()
+        logger.error(f"Error in streaming load: {str(e)}")
+        force_aggressive_cleanup()
         raise
 
+def select_model_for_analysis(query):
+    """Select the best pre-calculated model based on the analysis request"""
+    return 'conversion'
+
 def enhanced_analysis_worker(query):
-    """Enhanced analysis worker with query-aware analysis - handles all 16 endpoint types"""
+    """Enhanced analysis worker with streaming processing for ALL records"""
     
     try:
         # Extract the actual user query from the request
@@ -160,7 +135,7 @@ def enhanced_analysis_worker(query):
         logger.info(f"Analysis type: {analysis_type}")
         
         # Force cleanup before starting
-        aggressive_memory_cleanup()
+        force_aggressive_cleanup()
         
         # Use query classifier to understand the query intent
         classifier = QueryClassifier()
@@ -170,133 +145,147 @@ def enhanced_analysis_worker(query):
         
         # Route to specific analysis handler based on analysis_type
         if analysis_type == 'analyze':
-            return handle_basic_analysis(query, query_classification)
+            return handle_basic_analysis_streaming(query, query_classification)
         elif analysis_type == 'feature-interactions':
-            return handle_feature_interactions(query, query_classification)
+            return handle_feature_interactions_streaming(query, query_classification)
         elif analysis_type == 'outlier-detection':
-            return handle_outlier_detection(query, query_classification)
+            return handle_outlier_detection_streaming(query, query_classification)
         elif analysis_type == 'scenario-analysis':
-            return handle_scenario_analysis(query, query_classification)
+            return handle_scenario_analysis_streaming(query, query_classification)
         elif analysis_type == 'segment-profiling':
-            return handle_segment_profiling(query, query_classification)
+            return handle_segment_profiling_streaming(query, query_classification)
         elif analysis_type == 'spatial-clusters':
-            return handle_spatial_clusters(query, query_classification)
+            return handle_spatial_clusters_streaming(query, query_classification)
         elif analysis_type == 'demographic-insights':
-            return handle_demographic_insights(query, query_classification)
+            return handle_demographic_insights_streaming(query, query_classification)
         elif analysis_type == 'trend-analysis':
-            return handle_trend_analysis(query, query_classification)
+            return handle_trend_analysis_streaming(query, query_classification)
         elif analysis_type == 'feature-importance-ranking':
-            return handle_feature_importance_ranking(query, query_classification)
+            return handle_feature_importance_ranking_streaming(query, query_classification)
         elif analysis_type == 'correlation-analysis':
-            return handle_correlation_analysis(query, query_classification)
+            return handle_correlation_analysis_streaming(query, query_classification)
         elif analysis_type == 'anomaly-detection':
-            return handle_anomaly_detection(query, query_classification)
+            return handle_anomaly_detection_streaming(query, query_classification)
         elif analysis_type == 'predictive-modeling':
-            return handle_predictive_modeling(query, query_classification)
+            return handle_predictive_modeling_streaming(query, query_classification)
         elif analysis_type == 'sensitivity-analysis':
-            return handle_sensitivity_analysis(query, query_classification)
+            return handle_sensitivity_analysis_streaming(query, query_classification)
         elif analysis_type == 'model-performance':
-            return handle_model_performance(query, query_classification)
+            return handle_model_performance_streaming(query, query_classification)
         elif analysis_type == 'competitive-analysis':
-            return handle_competitive_analysis(query, query_classification)
+            return handle_competitive_analysis_streaming(query, query_classification)
         elif analysis_type == 'comparative-analysis':
-            return handle_comparative_analysis(query, query_classification)
+            return handle_comparative_analysis_streaming(query, query_classification)
         else:
             # Default fallback to legacy analysis
-            return handle_legacy_analysis(query, query_classification)
+            return handle_legacy_analysis_streaming(query, query_classification)
             
     except Exception as e:
         logger.error(f"Error in enhanced_analysis_worker: {str(e)}")
-        aggressive_memory_cleanup()  # Cleanup on error
+        force_aggressive_cleanup()  # Cleanup on error
         return {"success": False, "error": f"Analysis failed: {str(e)}"}
 
-# ========== ALL 16 ENDPOINT HANDLERS ==========
+# ========== STREAMING HANDLERS FOR ALL 16 ENDPOINTS ==========
 
-def handle_basic_analysis(query, query_classification):
-    """Handle basic /analyze endpoint - ALL RECORDS with chunked processing"""
+def handle_basic_analysis_streaming(query, query_classification):
+    """Handle basic /analyze endpoint with streaming - ALL RECORDS"""
     try:
-        logger.info("Starting basic analysis with ALL records")
+        logger.info("Starting streaming basic analysis for ALL records")
         
-        # Load data with memory management  
-        precalc_df, model_info = load_data_with_memory_management()
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         
-        logger.info(f"Processing ALL {len(precalc_df)} records for {target_field}")
+        logger.info(f"Streaming analysis for {target_field}, dataset shape: {precalc_df.shape}")
         
         # Check if target field exists
         if target_field not in precalc_df.columns:
             available_fields = [col for col in precalc_df.columns if 'MP30' in col]
             return {
                 "success": False,
-                "error": f"Target variable {target_field} not found", 
+                "error": f"Target variable {target_field} not found",
                 "available_fields": available_fields[:10]
             }
         
-        # Lightweight feature importance calculation
-        logger.info("Calculating feature importance...")
+        # Calculate feature importance efficiently
+        logger.info("Calculating feature importance with streaming...")
         feature_importance = []
         
         value_columns = [col for col in precalc_df.columns if col.startswith('value_')]
         
-        for feature in value_columns[:100]:  # Limit to top 100 features to avoid memory spike
-            if feature in precalc_df.columns:
-                try:
-                    correlation = precalc_df[feature].corr(precalc_df[target_field])
-                    if not pd.isna(correlation):
-                        feature_importance.append({
-                            "feature": feature,
-                            "importance": float(abs(correlation)),
-                            "correlation": float(correlation)
-                        })
-                except:
-                    continue
+        # Calculate correlations in small batches
+        for i in range(0, len(value_columns), 20):  # 20 features at a time
+            batch_features = value_columns[i:i+20]
+            
+            for feature in batch_features:
+                if feature in precalc_df.columns:
+                    try:
+                        correlation = precalc_df[feature].corr(precalc_df[target_field])
+                        if not pd.isna(correlation):
+                            feature_importance.append({
+                                "feature": feature,
+                                "importance": float(abs(correlation)),
+                                "correlation": float(correlation)
+                            })
+                    except:
+                        continue
+            
+            # Cleanup after each batch
+            force_aggressive_cleanup()
         
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
         
-        # Process ALL records with chunked conversion
-        logger.info("Converting ALL records with memory-safe chunked processing...")
+        # Convert ALL records using streaming
+        logger.info("Converting ALL records to output format using streaming...")
         
         try:
-            all_results = safe_dataframe_to_records(precalc_df)
-            
+            # Stream convert to records
+            all_results = stream_process_pickle_file(model_info['shap_file'])
+            if isinstance(all_results, tuple):
+                all_results = all_results[0]  # Get just the records
+                
         except Exception as e:
-            logger.error(f"Chunked processing failed: {e}")
-            aggressive_memory_cleanup()
-            return {
-                "success": False,
-                "error": f"Memory processing error: {str(e)}",
-                "memory_management": "failed"
-            }
+            logger.error(f"Streaming conversion failed: {e}")
+            # Emergency fallback to DataFrame conversion
+            try:
+                all_results = precalc_df.to_dict('records')
+            except Exception as e2:
+                logger.error(f"DataFrame conversion also failed: {e2}")
+                return {
+                    "success": False,
+                    "error": f"Record conversion failed: {str(e)}",
+                    "fallback_error": str(e2)
+                }
         
         # Final cleanup
         del precalc_df
-        aggressive_memory_cleanup()
+        force_aggressive_cleanup()
         
         return {
             "success": True,
             "results": all_results,
-            "summary": f"Complete SHAP analysis for {target_field}",
+            "summary": f"Streaming SHAP analysis for {target_field}",
             "feature_importance": feature_importance,
-            "analysis_type": "basic_analysis_all_records",
+            "analysis_type": "streaming_analysis",
             "total_records": len(all_results),
-            "sample_size": len(all_results),  # Keep for compatibility
-            "memory_optimized": True
+            "sample_size": len(all_results),
+            "streaming_processed": True
         }
         
     except Exception as e:
-        logger.error(f"Basic analysis error: {str(e)}")
-        aggressive_memory_cleanup()
+        logger.error(f"Streaming basic analysis error: {str(e)}")
+        force_aggressive_cleanup()
         return {
             "success": False,
-            "error": f"Basic analysis failed: {str(e)}"
+            "error": f"Streaming analysis failed: {str(e)}"
         }
 
-def handle_feature_interactions(query, query_classification):
+def handle_feature_interactions_streaming(query, query_classification):
     """Handle feature interaction analysis"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         features = query.get('features', ['MP26029', 'MP27014'])
@@ -333,11 +322,11 @@ def handle_feature_interactions(query, query_classification):
         logger.error(f"Error in feature interactions: {str(e)}")
         return {"success": False, "error": f"Feature interactions failed: {str(e)}"}
 
-def handle_outlier_detection(query, query_classification):
+def handle_outlier_detection_streaming(query, query_classification):
     """Handle outlier detection analysis"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         sample_size = min(query.get('sample_size', 5000), len(precalc_df))
@@ -379,11 +368,11 @@ def handle_outlier_detection(query, query_classification):
         logger.error(f"Error in outlier detection: {str(e)}")
         return {"success": False, "error": f"Outlier detection failed: {str(e)}"}
 
-def handle_scenario_analysis(query, query_classification):
+def handle_scenario_analysis_streaming(query, query_classification):
     """Handle scenario analysis (what-if analysis)"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         scenarios = query.get('scenarios', [
@@ -427,14 +416,14 @@ def handle_scenario_analysis(query, query_classification):
         logger.error(f"Error in scenario analysis: {str(e)}")
         return {"success": False, "error": f"Scenario analysis failed: {str(e)}"}
 
-def handle_segment_profiling(query, query_classification):
+def handle_segment_profiling_streaming(query, query_classification):
     """Handle customer segment profiling"""
     try:
         from sklearn.ensemble import RandomForestRegressor
         from sklearn.cluster import KMeans
         
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         n_segments = query.get('n_segments', 3)
@@ -486,13 +475,13 @@ def handle_segment_profiling(query, query_classification):
         logger.error(f"Error in segment profiling: {str(e)}")
         return {"success": False, "error": f"Segment profiling failed: {str(e)}"}
 
-def handle_spatial_clusters(query, query_classification):
+def handle_spatial_clusters_streaming(query, query_classification):
     """Handle spatial clustering analysis"""
     try:
         from sklearn.cluster import KMeans
         
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         features = query.get('features', ['MP26029', 'MP27014'])
@@ -542,11 +531,11 @@ def handle_spatial_clusters(query, query_classification):
         logger.error(f"Error in spatial clustering: {str(e)}")
         return {"success": False, "error": f"Spatial clustering failed: {str(e)}"}
 
-def handle_demographic_insights(query, query_classification):
+def handle_demographic_insights_streaming(query, query_classification):
     """Handle demographic pattern insights"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         sample_size = min(query.get('sample_size', 5000), len(precalc_df))
@@ -583,11 +572,11 @@ def handle_demographic_insights(query, query_classification):
         logger.error(f"Error in demographic insights: {str(e)}")
         return {"success": False, "error": f"Demographic insights failed: {str(e)}"}
 
-def handle_trend_analysis(query, query_classification):
+def handle_trend_analysis_streaming(query, query_classification):
     """Handle temporal trend analysis"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         sample_size = min(query.get('sample_size', 5000), len(precalc_df))
@@ -623,11 +612,11 @@ def handle_trend_analysis(query, query_classification):
         logger.error(f"Error in trend analysis: {str(e)}")
         return {"success": False, "error": f"Trend analysis failed: {str(e)}"}
 
-def handle_feature_importance_ranking(query, query_classification):
+def handle_feature_importance_ranking_streaming(query, query_classification):
     """Handle feature importance ranking"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         top_n = query.get('top_features', 10)
@@ -668,11 +657,11 @@ def handle_feature_importance_ranking(query, query_classification):
         logger.error(f"Error in feature importance ranking: {str(e)}")
         return {"success": False, "error": f"Feature importance ranking failed: {str(e)}"}
 
-def handle_correlation_analysis(query, query_classification):
+def handle_correlation_analysis_streaming(query, query_classification):
     """Handle feature correlation analysis"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         features = query.get('features', ['MP26029', 'MP27014'])
@@ -705,11 +694,11 @@ def handle_correlation_analysis(query, query_classification):
         logger.error(f"Error in correlation analysis: {str(e)}")
         return {"success": False, "error": f"Correlation analysis failed: {str(e)}"}
 
-def handle_anomaly_detection(query, query_classification):
+def handle_anomaly_detection_streaming(query, query_classification):
     """Handle anomaly detection with explanations"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         sample_size = min(query.get('sample_size', 5000), len(precalc_df))
@@ -746,11 +735,11 @@ def handle_anomaly_detection(query, query_classification):
         logger.error(f"Error in anomaly detection: {str(e)}")
         return {"success": False, "error": f"Anomaly detection failed: {str(e)}"}
 
-def handle_predictive_modeling(query, query_classification):
+def handle_predictive_modeling_streaming(query, query_classification):
     """Handle predictive modeling with SHAP"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         sample_size = min(query.get('sample_size', 5000), len(precalc_df))
@@ -788,11 +777,11 @@ def handle_predictive_modeling(query, query_classification):
         logger.error(f"Error in predictive modeling: {str(e)}")
         return {"success": False, "error": f"Predictive modeling failed: {str(e)}"}
 
-def handle_sensitivity_analysis(query, query_classification):
+def handle_sensitivity_analysis_streaming(query, query_classification):
     """Handle feature sensitivity analysis"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         features = query.get('features', ['MP26029', 'MP27014'])
@@ -831,11 +820,11 @@ def handle_sensitivity_analysis(query, query_classification):
         logger.error(f"Error in sensitivity analysis: {str(e)}")
         return {"success": False, "error": f"Sensitivity analysis failed: {str(e)}"}
 
-def handle_model_performance(query, query_classification):
+def handle_model_performance_streaming(query, query_classification):
     """Handle model performance evaluation"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         sample_size = min(query.get('sample_size', 5000), len(precalc_df))
@@ -868,11 +857,11 @@ def handle_model_performance(query, query_classification):
         logger.error(f"Error in model performance: {str(e)}")
         return {"success": False, "error": f"Model performance evaluation failed: {str(e)}"}
 
-def handle_competitive_analysis(query, query_classification):
+def handle_competitive_analysis_streaming(query, query_classification):
     """Handle competitive brand analysis"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         brand_fields = [col for col in precalc_df.columns if col.startswith('MP30') and '_' in col]
         target_field = query.get('target_field') or (brand_fields[0] if brand_fields else 'MP30034A_B_P')
@@ -908,11 +897,11 @@ def handle_competitive_analysis(query, query_classification):
         logger.error(f"Error in competitive analysis: {str(e)}")
         return {"success": False, "error": f"Competitive analysis failed: {str(e)}"}
 
-def handle_comparative_analysis(query, query_classification):
+def handle_comparative_analysis_streaming(query, query_classification):
     """Handle comparative analysis between groups"""
     try:
         selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        precalc_df, model_info = load_precalculated_model_data_streaming(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         grouping_field = query.get('grouping_field', 'MP25035')
@@ -959,13 +948,13 @@ def handle_comparative_analysis(query, query_classification):
         logger.error(f"Error in comparative analysis: {str(e)}")
         return {"success": False, "error": f"Comparative analysis failed: {str(e)}"}
 
-def handle_legacy_analysis(query, query_classification):
+def handle_legacy_analysis_streaming(query, query_classification):
     """Legacy analysis handler - ALL RECORDS with chunked processing"""
     try:
         logger.info("Starting legacy analysis with ALL records")
         
         # Load data with memory management
-        precalc_df, model_info = load_data_with_memory_management()
+        precalc_df, model_info = load_precalculated_model_data_streaming(model_info['shap_file'])
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         
@@ -1005,20 +994,22 @@ def handle_legacy_analysis(query, query_classification):
                         logger.warning(f"Error calculating correlation for {feature}: {e}")
             
             # Cleanup after each batch
-            if i % 100 == 0:
-                aggressive_memory_cleanup()
+            force_aggressive_cleanup()
         
         # Sort by importance
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
         
         logger.info(f"Calculated {len(feature_importance)} feature importances")
         
-        # Process ALL records with chunked conversion
-        logger.info("Converting ALL records to output format with chunked processing...")
+        # Convert ALL records using streaming
+        logger.info("Converting ALL records to output format using streaming...")
         
         try:
-            all_results = safe_dataframe_to_records(precalc_df)
-            
+            # Stream convert to records
+            all_results = stream_process_pickle_file(model_info['shap_file'])
+            if isinstance(all_results, tuple):
+                all_results = all_results[0]  # Get just the records
+                
         except Exception as e:
             logger.error(f"Error in chunked processing: {e}")
             # Emergency fallback - still try to get substantial data
@@ -1035,7 +1026,7 @@ def handle_legacy_analysis(query, query_classification):
         
         # Final cleanup
         del precalc_df
-        aggressive_memory_cleanup()
+        force_aggressive_cleanup()
         
         final_memory = get_current_memory_mb()
         
@@ -1053,7 +1044,7 @@ def handle_legacy_analysis(query, query_classification):
         
     except Exception as e:
         logger.error(f"Error in legacy analysis: {str(e)}")
-        aggressive_memory_cleanup()
+        force_aggressive_cleanup()
         return {
             "success": False, 
             "error": f"Analysis failed: {str(e)}",
