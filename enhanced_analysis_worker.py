@@ -14,10 +14,10 @@ from query_processing.classifier import QueryClassifier, process_query
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# ULTRA-CONSERVATIVE STREAMING: Never load full dataset
-MICRO_CHUNK_SIZE = 50  # Extremely small chunks
-MEMORY_CLEANUP_INTERVAL = 5  # Cleanup every 5 chunks
-MAX_MEMORY_SOFT_LIMIT = 250  # MB
+# ULTRA-CONSERVATIVE STREAMING: Process ALL records with higher memory limit
+MICRO_CHUNK_SIZE = 25  # Even smaller chunks for more records
+MEMORY_CLEANUP_INTERVAL = 3  # More frequent cleanup
+MAX_MEMORY_SOFT_LIMIT = 400  # Higher limit to get all records
 
 def ultra_aggressive_cleanup():
     """Most aggressive memory cleanup with OS-level memory return"""
@@ -25,7 +25,7 @@ def ultra_aggressive_cleanup():
     import ctypes
     
     # Multiple collection passes
-    for _ in range(5):
+    for _ in range(7):  # More cleanup cycles
         gc.collect()
     
     # Force OS memory return (Linux/Mac)
@@ -56,8 +56,8 @@ def get_memory_usage_mb():
         return 0
 
 def progressive_pickle_reader(pickle_path):
-    """Progressive pickle file reading without full memory load"""
-    logger.info(f"Starting progressive reading of {pickle_path}")
+    """Progressive pickle file reading optimized for ALL records"""
+    logger.info(f"Starting optimized progressive reading of {pickle_path}")
     
     try:
         # Step 1: Try to read just metadata without loading data
@@ -70,21 +70,13 @@ def progressive_pickle_reader(pickle_path):
             
             logger.info(f"File has {total_rows} rows, {len(columns)} columns")
             
-            # If dataset is small enough, process directly
-            if total_rows <= 500:
-                logger.info("Small dataset - processing directly")
-                records = temp_sample.to_dict('records')
-                del temp_sample
-                ultra_aggressive_cleanup()
-                return records, total_rows
-            
-            # For large datasets, use progressive chunking
-            logger.info(f"Large dataset - using progressive chunking with {MICRO_CHUNK_SIZE} records per chunk")
+            # Process ALL records with optimized chunking
+            logger.info(f"Processing ALL {total_rows} records with {MICRO_CHUNK_SIZE} records per chunk")
             
             all_records = []
             processed_count = 0
             
-            # Process in micro chunks
+            # Process in optimized micro chunks
             for start_idx in range(0, total_rows, MICRO_CHUNK_SIZE):
                 end_idx = min(start_idx + MICRO_CHUNK_SIZE, total_rows)
                 
@@ -100,22 +92,30 @@ def progressive_pickle_reader(pickle_path):
                 del chunk
                 del chunk_records
                 
-                # Aggressive cleanup every few chunks
+                # More aggressive cleanup
                 if (start_idx // MICRO_CHUNK_SIZE) % MEMORY_CLEANUP_INTERVAL == 0:
                     ultra_aggressive_cleanup()
                     current_mem = get_memory_usage_mb()
                     logger.info(f"Processed {processed_count}/{total_rows}, Memory: {current_mem:.1f}MB")
                     
-                    # Emergency brake if memory too high
+                    # Higher threshold before emergency brake
                     if current_mem > MAX_MEMORY_SOFT_LIMIT:
-                        logger.warning(f"Memory limit reached at {processed_count} records")
-                        break
+                        logger.warning(f"Memory threshold reached - continuing with caution")
+                        # Don't break - continue processing
+                        ultra_aggressive_cleanup()  # Extra cleanup
             
             # Final cleanup
             del temp_sample
             ultra_aggressive_cleanup()
             
-            logger.info(f"Progressive reading complete: {len(all_records)} records")
+            logger.info(f"Progressive reading complete: {len(all_records)} records (target: {total_rows})")
+            
+            # Verify we got all records
+            if len(all_records) < total_rows:
+                logger.warning(f"Only got {len(all_records)}/{total_rows} records due to memory constraints")
+            else:
+                logger.info(f"SUCCESS: Got ALL {len(all_records)} records!")
+            
             return all_records, len(all_records)
             
     except Exception as e:
