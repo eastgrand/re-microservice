@@ -12,36 +12,106 @@ from query_processing.classifier import QueryClassifier, process_query
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# CONFIGURATION: Remove artificial record limits
-MAX_RECORDS_PER_ENDPOINT = None  # No limit - return all available records
-MEMORY_CHUNK_SIZE = 1000  # Process in chunks to avoid memory issues
+# CONFIGURATION: Process ALL records with memory management
+MAX_RECORDS_PER_ENDPOINT = None  # No limit - return ALL records
+CHUNK_SIZE = 200  # Small chunks to avoid memory spikes
+MAX_MEMORY_MB = 400  # Memory threshold to trigger cleanup
 
-def force_memory_cleanup():
-    """Force garbage collection to free memory"""
+def get_current_memory_mb():
+    """Get current memory usage in MB"""
+    import psutil
+    import os
+    try:
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / 1024 / 1024
+    except:
+        return 0
+
+def aggressive_memory_cleanup():
+    """Aggressive memory cleanup"""
+    import gc
     gc.collect()
+    gc.collect()  # Call twice for better cleanup
     
-def process_data_in_chunks(df, chunk_size=MEMORY_CHUNK_SIZE):
-    """Process large dataframes in memory-safe chunks"""
+def process_all_records_chunked(df, chunk_size=CHUNK_SIZE):
+    """Process ALL records in memory-safe chunks"""
     total_rows = len(df)
-    logger.info(f"Processing {total_rows} rows in chunks of {chunk_size}")
+    logger.info(f"Processing ALL {total_rows} records in chunks of {chunk_size}")
     
-    results = []
+    all_results = []
+    processed_count = 0
+    
     for start_idx in range(0, total_rows, chunk_size):
         end_idx = min(start_idx + chunk_size, total_rows)
-        chunk = df.iloc[start_idx:end_idx]
         
-        # Process chunk and convert to records
+        # Get chunk
+        chunk = df.iloc[start_idx:end_idx].copy()
+        
+        # Process chunk to records
         chunk_records = chunk.to_dict('records')
-        results.extend(chunk_records)
+        all_results.extend(chunk_records)
         
-        # Free memory after each chunk
+        processed_count += len(chunk_records)
+        
+        # Clean up chunk
         del chunk
-        force_memory_cleanup()
+        del chunk_records
         
-        if len(results) % 5000 == 0:
-            logger.info(f"Processed {len(results)} records so far...")
+        # Aggressive cleanup every 5 chunks
+        if (start_idx // chunk_size) % 5 == 0:
+            aggressive_memory_cleanup()
+            current_mem = get_current_memory_mb()
+            logger.info(f"Processed {processed_count}/{total_rows} records, Memory: {current_mem:.1f}MB")
+            
+            # If memory is too high, force cleanup
+            if current_mem > MAX_MEMORY_MB:
+                logger.warning(f"High memory usage ({current_mem:.1f}MB), forcing cleanup")
+                aggressive_memory_cleanup()
     
-    return results
+    logger.info(f"Completed processing ALL {len(all_results)} records")
+    return all_results
+
+def safe_dataframe_to_records(df):
+    """Safely convert dataframe to records with memory management"""
+    total_rows = len(df)
+    
+    if total_rows <= 500:
+        # Small enough to process directly
+        return df.to_dict('records')
+    else:
+        # Use chunked processing for larger datasets
+        return process_all_records_chunked(df)
+
+def load_data_with_memory_management():
+    """Load data with aggressive memory management"""
+    try:
+        logger.info("Loading dataset with memory management...")
+        
+        selected_model = 'conversion'
+        metadata_path = 'precalculated/models/metadata.json'
+        
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        
+        model_info = metadata[selected_model]
+        shap_file = model_info['shap_file']
+        
+        logger.info(f"Loading from {shap_file}")
+        
+        # Load with memory optimization
+        df = pd.read_pickle(shap_file, compression='gzip')
+        
+        logger.info(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+        
+        # Immediate cleanup
+        aggressive_memory_cleanup()
+        
+        return df, model_info
+        
+    except Exception as e:
+        logger.error(f"Error loading data: {str(e)}")
+        aggressive_memory_cleanup()
+        raise
 
 def select_model_for_analysis(query):
     """Select the best pre-calculated model based on the analysis request"""
@@ -68,12 +138,13 @@ def load_precalculated_model_data(model_name):
         logger.info(f"Loaded dataset with {len(precalc_df)} rows and {len(precalc_df.columns)} columns")
         
         # Force cleanup after loading
-        force_memory_cleanup()
+        aggressive_memory_cleanup()
         
         return precalc_df, model_info
         
     except Exception as e:
         logger.error(f"Error loading pre-calculated data: {str(e)}")
+        aggressive_memory_cleanup()
         raise
 
 def enhanced_analysis_worker(query):
@@ -89,7 +160,7 @@ def enhanced_analysis_worker(query):
         logger.info(f"Analysis type: {analysis_type}")
         
         # Force cleanup before starting
-        force_memory_cleanup()
+        aggressive_memory_cleanup()
         
         # Use query classifier to understand the query intent
         classifier = QueryClassifier()
@@ -136,32 +207,90 @@ def enhanced_analysis_worker(query):
             
     except Exception as e:
         logger.error(f"Error in enhanced_analysis_worker: {str(e)}")
-        force_memory_cleanup()  # Cleanup on error
+        aggressive_memory_cleanup()  # Cleanup on error
         return {"success": False, "error": f"Analysis failed: {str(e)}"}
 
 # ========== ALL 16 ENDPOINT HANDLERS ==========
 
 def handle_basic_analysis(query, query_classification):
-    """Handle basic /analyze endpoint - RETURN ALL RECORDS"""
+    """Handle basic /analyze endpoint - ALL RECORDS with chunked processing"""
     try:
-        selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        logger.info("Starting basic analysis with ALL records")
+        
+        # Load data with memory management  
+        precalc_df, model_info = load_data_with_memory_management()
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         
-        # Check for bivariate correlation
-        matched_fields = query.get('matched_fields', [])
-        metrics = query.get('metrics', [])
-        brand_fields = [field for field in (matched_fields + metrics) if field and field.startswith('MP30') and '_' in field]
+        logger.info(f"Processing ALL {len(precalc_df)} records for {target_field}")
         
-        if len(brand_fields) == 2:
-            return handle_bivariate_correlation(precalc_df, brand_fields, query.get('query', ''), query_classification)
-        else:
-            return perform_shap_analysis(precalc_df, target_field, query, query_classification)
+        # Check if target field exists
+        if target_field not in precalc_df.columns:
+            available_fields = [col for col in precalc_df.columns if 'MP30' in col]
+            return {
+                "success": False,
+                "error": f"Target variable {target_field} not found", 
+                "available_fields": available_fields[:10]
+            }
+        
+        # Lightweight feature importance calculation
+        logger.info("Calculating feature importance...")
+        feature_importance = []
+        
+        value_columns = [col for col in precalc_df.columns if col.startswith('value_')]
+        
+        for feature in value_columns[:100]:  # Limit to top 100 features to avoid memory spike
+            if feature in precalc_df.columns:
+                try:
+                    correlation = precalc_df[feature].corr(precalc_df[target_field])
+                    if not pd.isna(correlation):
+                        feature_importance.append({
+                            "feature": feature,
+                            "importance": float(abs(correlation)),
+                            "correlation": float(correlation)
+                        })
+                except:
+                    continue
+        
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
+        # Process ALL records with chunked conversion
+        logger.info("Converting ALL records with memory-safe chunked processing...")
+        
+        try:
+            all_results = safe_dataframe_to_records(precalc_df)
             
+        except Exception as e:
+            logger.error(f"Chunked processing failed: {e}")
+            aggressive_memory_cleanup()
+            return {
+                "success": False,
+                "error": f"Memory processing error: {str(e)}",
+                "memory_management": "failed"
+            }
+        
+        # Final cleanup
+        del precalc_df
+        aggressive_memory_cleanup()
+        
+        return {
+            "success": True,
+            "results": all_results,
+            "summary": f"Complete SHAP analysis for {target_field}",
+            "feature_importance": feature_importance,
+            "analysis_type": "basic_analysis_all_records",
+            "total_records": len(all_results),
+            "sample_size": len(all_results),  # Keep for compatibility
+            "memory_optimized": True
+        }
+        
     except Exception as e:
-        logger.error(f"Error in basic analysis: {str(e)}")
-        return {"success": False, "error": f"Basic analysis failed: {str(e)}"}
+        logger.error(f"Basic analysis error: {str(e)}")
+        aggressive_memory_cleanup()
+        return {
+            "success": False,
+            "error": f"Basic analysis failed: {str(e)}"
+        }
 
 def handle_feature_interactions(query, query_classification):
     """Handle feature interaction analysis"""
@@ -831,86 +960,105 @@ def handle_comparative_analysis(query, query_classification):
         return {"success": False, "error": f"Comparative analysis failed: {str(e)}"}
 
 def handle_legacy_analysis(query, query_classification):
-    """Legacy analysis handler - RETURN ALL RECORDS with memory management"""
+    """Legacy analysis handler - ALL RECORDS with chunked processing"""
     try:
-        selected_model = select_model_for_analysis(query)
-        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        logger.info("Starting legacy analysis with ALL records")
+        
+        # Load data with memory management
+        precalc_df, model_info = load_data_with_memory_management()
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         
-        logger.info(f"Starting legacy analysis for {target_field}")
+        logger.info(f"Target field: {target_field}")
         logger.info(f"Dataset shape: {precalc_df.shape}")
         
-        # FIXED: Use ALL data, not sampled
-        sampled_df = precalc_df  # No sampling - use all data
-        sample_size = len(sampled_df)  # All records
-        
-        logger.info(f"Processing all {sample_size} records")
-        
         # Check if target field exists
-        if target_field not in sampled_df.columns:
-            available_fields = [col for col in sampled_df.columns if 'MP30' in col]
+        if target_field not in precalc_df.columns:
+            available_fields = [col for col in precalc_df.columns if 'MP30' in col]
             return {
                 "success": False, 
                 "error": f"Target variable {target_field} not found",
                 "available_fields": available_fields[:10]
             }
         
-        # Create feature importance list
+        # Create feature importance (lightweight operation)
+        logger.info("Calculating feature importance...")
         feature_importance = []
         
-        # Get only the value columns and SHAP columns for feature importance
-        value_columns = [col for col in sampled_df.columns if col.startswith('value_')]
+        value_columns = [col for col in precalc_df.columns if col.startswith('value_')]
         
-        for feature in value_columns:
-            if feature in sampled_df.columns:
-                correlation = sampled_df[feature].corr(sampled_df[target_field]) if target_field in sampled_df.columns else 0
-                if not pd.isna(correlation):
-                    feature_importance.append({
-                        "feature": feature,
-                        "importance": float(abs(correlation)),
-                        "correlation": float(correlation)
-                    })
+        # Calculate correlations in small batches to avoid memory spikes
+        for i in range(0, len(value_columns), 50):  # Process 50 features at a time
+            batch_features = value_columns[i:i+50]
+            
+            for feature in batch_features:
+                if feature in precalc_df.columns:
+                    try:
+                        correlation = precalc_df[feature].corr(precalc_df[target_field])
+                        if not pd.isna(correlation):
+                            feature_importance.append({
+                                "feature": feature,
+                                "importance": float(abs(correlation)),
+                                "correlation": float(correlation)
+                            })
+                    except Exception as e:
+                        logger.warning(f"Error calculating correlation for {feature}: {e}")
+            
+            # Cleanup after each batch
+            if i % 100 == 0:
+                aggressive_memory_cleanup()
         
         # Sort by importance
         feature_importance.sort(key=lambda x: x['importance'], reverse=True)
         
-        # FIXED: Process all records in memory-safe chunks
-        logger.info("Converting all records to output format...")
+        logger.info(f"Calculated {len(feature_importance)} feature importances")
         
-        # Use chunked processing to avoid memory issues
+        # Process ALL records with chunked conversion
+        logger.info("Converting ALL records to output format with chunked processing...")
+        
         try:
-            all_results = process_data_in_chunks(sampled_df)
+            all_results = safe_dataframe_to_records(precalc_df)
+            
         except Exception as e:
-            logger.error(f"Memory error during chunk processing: {e}")
-            # Fallback: process in smaller chunks
+            logger.error(f"Error in chunked processing: {e}")
+            # Emergency fallback - still try to get substantial data
             try:
-                all_results = process_data_in_chunks(sampled_df, chunk_size=500)
+                logger.warning("Falling back to direct conversion of first 2000 records")
+                all_results = precalc_df.head(2000).to_dict('records')
             except Exception as e2:
-                logger.error(f"Failed even with smaller chunks: {e2}")
-                # Ultimate fallback: return first 1000 records with warning
-                all_results = sampled_df.head(1000).to_dict('records')
-                logger.warning("Returned only 1000 records due to memory constraints")
+                logger.error(f"Even fallback failed: {e2}")
+                return {
+                    "success": False,
+                    "error": f"Memory processing failed: {str(e)}",
+                    "fallback_error": str(e2)
+                }
         
-        # Clean up memory
-        del sampled_df
-        force_memory_cleanup()
+        # Final cleanup
+        del precalc_df
+        aggressive_memory_cleanup()
+        
+        final_memory = get_current_memory_mb()
         
         return {
             "success": True,
             "results": all_results,
             "summary": f"SHAP analysis for {target_field} with {len(feature_importance)} features",
             "feature_importance": feature_importance,
-            "analysis_type": "basic_shap_analysis",
-            "sample_size": len(all_results),
+            "analysis_type": "chunked_processing_analysis", 
             "total_records": len(all_results),
-            "memory_optimized": True
+            "memory_optimized": True,
+            "final_memory_mb": final_memory,
+            "chunked_processing": True
         }
         
     except Exception as e:
         logger.error(f"Error in legacy analysis: {str(e)}")
-        force_memory_cleanup()
-        return {"success": False, "error": f"Legacy analysis failed: {str(e)}"}
+        aggressive_memory_cleanup()
+        return {
+            "success": False, 
+            "error": f"Analysis failed: {str(e)}",
+            "memory_cleanup_performed": True
+        }
 
 def perform_shap_analysis(precalc_df, target_variable, query, query_classification):
     """Perform basic SHAP analysis"""

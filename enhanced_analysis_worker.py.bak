@@ -831,16 +831,85 @@ def handle_comparative_analysis(query, query_classification):
         return {"success": False, "error": f"Comparative analysis failed: {str(e)}"}
 
 def handle_legacy_analysis(query, query_classification):
-    """Handle legacy analysis flow"""
+    """Legacy analysis handler - RETURN ALL RECORDS with memory management"""
     try:
         selected_model = select_model_for_analysis(query)
         precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        target_field = query.get('target_variable') or query.get('target_field', 'MP30034A_B_P')
-        return perform_shap_analysis(precalc_df, target_field, query, query_classification)
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        
+        logger.info(f"Starting legacy analysis for {target_field}")
+        logger.info(f"Dataset shape: {precalc_df.shape}")
+        
+        # FIXED: Use ALL data, not sampled
+        sampled_df = precalc_df  # No sampling - use all data
+        sample_size = len(sampled_df)  # All records
+        
+        logger.info(f"Processing all {sample_size} records")
+        
+        # Check if target field exists
+        if target_field not in sampled_df.columns:
+            available_fields = [col for col in sampled_df.columns if 'MP30' in col]
+            return {
+                "success": False, 
+                "error": f"Target variable {target_field} not found",
+                "available_fields": available_fields[:10]
+            }
+        
+        # Create feature importance list
+        feature_importance = []
+        
+        # Get only the value columns and SHAP columns for feature importance
+        value_columns = [col for col in sampled_df.columns if col.startswith('value_')]
+        
+        for feature in value_columns:
+            if feature in sampled_df.columns:
+                correlation = sampled_df[feature].corr(sampled_df[target_field]) if target_field in sampled_df.columns else 0
+                if not pd.isna(correlation):
+                    feature_importance.append({
+                        "feature": feature,
+                        "importance": float(abs(correlation)),
+                        "correlation": float(correlation)
+                    })
+        
+        # Sort by importance
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
+        # FIXED: Process all records in memory-safe chunks
+        logger.info("Converting all records to output format...")
+        
+        # Use chunked processing to avoid memory issues
+        try:
+            all_results = process_data_in_chunks(sampled_df)
+        except Exception as e:
+            logger.error(f"Memory error during chunk processing: {e}")
+            # Fallback: process in smaller chunks
+            try:
+                all_results = process_data_in_chunks(sampled_df, chunk_size=500)
+            except Exception as e2:
+                logger.error(f"Failed even with smaller chunks: {e2}")
+                # Ultimate fallback: return first 1000 records with warning
+                all_results = sampled_df.head(1000).to_dict('records')
+                logger.warning("Returned only 1000 records due to memory constraints")
+        
+        # Clean up memory
+        del sampled_df
+        force_memory_cleanup()
+        
+        return {
+            "success": True,
+            "results": all_results,
+            "summary": f"SHAP analysis for {target_field} with {len(feature_importance)} features",
+            "feature_importance": feature_importance,
+            "analysis_type": "basic_shap_analysis",
+            "sample_size": len(all_results),
+            "total_records": len(all_results),
+            "memory_optimized": True
+        }
         
     except Exception as e:
         logger.error(f"Error in legacy analysis: {str(e)}")
+        force_memory_cleanup()
         return {"success": False, "error": f"Legacy analysis failed: {str(e)}"}
 
 def perform_shap_analysis(precalc_df, target_variable, query, query_classification):
@@ -893,7 +962,7 @@ def handle_bivariate_correlation(precalc_df, brand_fields, user_query, query_cla
         correlation_value = valid_data[col1].corr(valid_data[col2])
         
         results = []
-        for idx, row in valid_data.head(1000).iterrows():
+        for idx, row in valid_data.iterrows():
             results.append({
                 'record_id': int(idx),
                 col1: float(row[col1]),
