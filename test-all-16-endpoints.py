@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+"""
+Comprehensive Test Suite for All 16 SHAP Microservice Endpoints
+Tests production-scale processing with up to 5000 records
+"""
+
+import requests
+import json
+import time
+from datetime import datetime
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Microservice configuration
+MICROSERVICE_URL = "https://shap-demographic-analytics-v3.onrender.com"
+API_KEY = "HFqkccbN3LV5CaB"
+
+def test_endpoint(endpoint, payload, description, timeout=120):
+    """Test a single endpoint with proper error handling"""
+    try:
+        logger.info(f"🧪 Testing {endpoint}: {description}")
+        logger.info(f"📤 Payload: {json.dumps(payload, indent=2)}")
+        
+        start_time = time.time()
+        
+        response = requests.post(
+            f"{MICROSERVICE_URL}{endpoint}",
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {API_KEY}"
+            },
+            timeout=timeout
+        )
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        logger.info(f"📡 {endpoint} → Status: {response.status_code}, Duration: {duration:.2f}s")
+        
+        if response.status_code == 200:
+            try:
+                result = response.json()
+                success = result.get('success', False)
+                
+                if success:
+                    results_count = len(result.get('results', []))
+                    sample_size = result.get('sample_size', 'unknown')
+                    analysis_type = result.get('analysis_type', 'unknown')
+                    
+                    logger.info(f"✅ {endpoint} SUCCESS - {results_count} results, {sample_size} samples, type: {analysis_type}")
+                    return True, duration, results_count, sample_size
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    logger.error(f"❌ {endpoint} FAILED - Error: {error_msg}")
+                    return False, duration, 0, 0
+                    
+            except json.JSONDecodeError:
+                logger.error(f"❌ {endpoint} FAILED - Invalid JSON response")
+                return False, duration, 0, 0
+        else:
+            logger.error(f"❌ {endpoint} FAILED - HTTP {response.status_code}: {response.text[:200]}")
+            return False, duration, 0, 0
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"⏰ {endpoint} TIMEOUT after {timeout}s")
+        return False, timeout, 0, 0
+    except Exception as e:
+        logger.error(f"❌ {endpoint} ERROR: {str(e)}")
+        return False, 0, 0, 0
+
+def test_health_endpoint():
+    """Test health endpoint first"""
+    try:
+        response = requests.get(f"{MICROSERVICE_URL}/health", timeout=30)
+        if response.status_code == 200:
+            health_data = response.json()
+            logger.info(f"🏥 Health Check: {health_data.get('status', 'unknown')}")
+            logger.info(f"📊 Model Status: {health_data.get('model_status', 'unknown')}")
+            logger.info(f"🧮 Feature Count: {health_data.get('feature_count', 0)}")
+            logger.info(f"📈 Memory Usage: {health_data.get('memory_usage_mb', 0):.1f}MB")
+            return True
+        else:
+            logger.warning(f"⚠️ Health check failed: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.error(f"❌ Health check error: {str(e)}")
+        return False
+
+def main():
+    """Test all 16 endpoints comprehensively"""
+    
+    print("🎯 Comprehensive 16-Endpoint SHAP Microservice Test")
+    print("=" * 80)
+    print(f"🌐 URL: {MICROSERVICE_URL}")
+    print(f"🕒 Time: {datetime.now()}")
+    print(f"📊 Target: All 16 endpoints with 5000-record processing")
+    print("=" * 80)
+    
+    # Test health first
+    health_ok = test_health_endpoint()
+    if not health_ok:
+        print("\n⚠️ Health check failed, but proceeding with tests...")
+    
+    # All 16 endpoint test configurations
+    test_configs = [
+        # 1. Core Analysis
+        {
+            "endpoint": "/analyze",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "features": ["MP26029", "MP27014"], 
+                "max_features": 10,
+                "sample_size": 5000
+            },
+            "description": "Core SHAP analysis with 5000 records"
+        },
+        
+        # 2. Feature Interactions
+        {
+            "endpoint": "/feature-interactions",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "features": ["MP26029", "MP27014", "MP25035"],
+                "interaction_threshold": 0.1,
+                "sample_size": 5000
+            },
+            "description": "Feature interaction analysis with 5000 records"
+        },
+        
+        # 3. Outlier Detection
+        {
+            "endpoint": "/outlier-detection",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "outlier_threshold": 0.05,
+                "sample_size": 5000
+            },
+            "description": "Outlier detection with 5000 records"
+        },
+        
+        # 4. Scenario Analysis
+        {
+            "endpoint": "/scenario-analysis",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "scenarios": [
+                    {"feature": "MP26029", "change_percent": 15},
+                    {"feature": "MP27014", "change_percent": -10}
+                ],
+                "sample_size": 5000
+            },
+            "description": "What-if scenario analysis with 5000 records"
+        },
+        
+        # 5. Segment Profiling
+        {
+            "endpoint": "/segment-profiling",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "n_segments": 5,
+                "sample_size": 5000
+            },
+            "description": "Customer segment profiling with 5000 records"
+        },
+        
+        # 6. Spatial Clusters
+        {
+            "endpoint": "/spatial-clusters",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "features": ["MP26029", "MP27014"],
+                "n_clusters": 8,
+                "sample_size": 5000
+            },
+            "description": "Spatial clustering analysis with 5000 records"
+        },
+        
+        # 7. Demographic Insights
+        {
+            "endpoint": "/demographic-insights",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "sample_size": 5000
+            },
+            "description": "Demographic pattern insights with 5000 records"
+        },
+        
+        # 8. Trend Analysis
+        {
+            "endpoint": "/trend-analysis",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "sample_size": 5000
+            },
+            "description": "Temporal trend analysis with 5000 records"
+        },
+        
+        # 9. Feature Importance Ranking
+        {
+            "endpoint": "/feature-importance-ranking",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "top_features": 20,
+                "sample_size": 5000
+            },
+            "description": "Feature importance ranking with 5000 records"
+        },
+        
+        # 10. Correlation Analysis
+        {
+            "endpoint": "/correlation-analysis",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "features": ["MP26029", "MP27014", "MP25035", "MP30029A_B_P"],
+                "sample_size": 5000
+            },
+            "description": "Feature correlation analysis with 5000 records"
+        },
+        
+        # 11. Anomaly Detection
+        {
+            "endpoint": "/anomaly-detection",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "contamination": 0.05,
+                "sample_size": 5000
+            },
+            "description": "Anomaly detection with explanations, 5000 records"
+        },
+        
+        # 12. Predictive Modeling
+        {
+            "endpoint": "/predictive-modeling",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "features": ["MP26029", "MP27014"],
+                "sample_size": 5000
+            },
+            "description": "Predictive modeling with SHAP, 5000 records"
+        },
+        
+        # 13. Sensitivity Analysis
+        {
+            "endpoint": "/sensitivity-analysis",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "features": ["MP26029", "MP27014", "MP25035"],
+                "sample_size": 5000
+            },
+            "description": "Feature sensitivity analysis with 5000 records"
+        },
+        
+        # 14. Model Performance
+        {
+            "endpoint": "/model-performance",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "sample_size": 5000
+            },
+            "description": "Model performance evaluation with 5000 records"
+        },
+        
+        # 15. Competitive Analysis
+        {
+            "endpoint": "/competitive-analysis",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "sample_size": 5000
+            },
+            "description": "Competitive brand analysis with 5000 records"
+        },
+        
+        # 16. Comparative Analysis
+        {
+            "endpoint": "/comparative-analysis",
+            "payload": {
+                "target_variable": "MP30034A_B_P",
+                "grouping_field": "MP25035",
+                "sample_size": 5000
+            },
+            "description": "Comparative group analysis with 5000 records"
+        }
+    ]
+    
+    # Test results tracking
+    results = []
+    total_duration = 0
+    successful_tests = 0
+    
+    print(f"\n🚀 Starting tests for {len(test_configs)} endpoints...\n")
+    
+    # Run all tests
+    for i, config in enumerate(test_configs, 1):
+        print(f"\n{'='*60}")
+        print(f"Test {i:2d}/16: {config['endpoint']}")
+        print(f"{'='*60}")
+        
+        success, duration, result_count, sample_size = test_endpoint(
+            config["endpoint"],
+            config["payload"],
+            config["description"],
+            timeout=180  # 3 minutes timeout for large datasets
+        )
+        
+        results.append({
+            'endpoint': config['endpoint'],
+            'success': success,
+            'duration': duration,
+            'result_count': result_count,
+            'sample_size': sample_size,
+            'description': config['description']
+        })
+        
+        total_duration += duration
+        if success:
+            successful_tests += 1
+        
+        # Small delay between tests to prevent overload
+        time.sleep(2)
+    
+    # Final summary
+    print(f"\n{'='*80}")
+    print("🎯 FINAL TEST RESULTS SUMMARY")
+    print(f"{'='*80}")
+    
+    success_rate = (successful_tests / len(test_configs)) * 100
+    avg_duration = total_duration / len(test_configs)
+    
+    print(f"📊 Overall Success Rate: {successful_tests}/{len(test_configs)} ({success_rate:.1f}%)")
+    print(f"⏱️  Total Test Duration: {total_duration:.1f}s")
+    print(f"📈 Average Response Time: {avg_duration:.1f}s")
+    print(f"🎯 Target Achievement: {'✅ SUCCESS' if success_rate >= 80 else '❌ NEEDS WORK'}")
+    
+    print(f"\n📋 Detailed Results:")
+    print(f"{'Endpoint':<25} {'Status':<10} {'Duration':<10} {'Results':<10} {'Samples':<10}")
+    print("-" * 80)
+    
+    for result in results:
+        status = "✅ PASS" if result['success'] else "❌ FAIL"
+        endpoint = result['endpoint'][:24]
+        duration = f"{result['duration']:.1f}s"
+        result_count = str(result['result_count'])
+        sample_size = str(result['sample_size'])
+        
+        print(f"{endpoint:<25} {status:<10} {duration:<10} {result_count:<10} {sample_size:<10}")
+    
+    # Recommendations
+    print(f"\n🎯 RECOMMENDATIONS:")
+    if success_rate >= 90:
+        print("🎉 EXCELLENT! All endpoints working well with 5000-record processing")
+    elif success_rate >= 80:
+        print("✅ GOOD! Most endpoints working, minor optimizations needed")
+    elif success_rate >= 60:
+        print("⚠️  MODERATE! Some endpoints need attention for production use")
+    else:
+        print("❌ CRITICAL! Major issues need resolution before production")
+    
+    print(f"\n💡 Next Steps:")
+    print("1. Monitor memory usage during high-load periods")
+    print("2. Optimize slow endpoints (>60s response time)")
+    print("3. Implement endpoint-specific caching for frequently used analyses")
+    print("4. Consider load balancing for production deployment")
+    
+    return success_rate >= 80
+
+if __name__ == "__main__":
+    success = main()
+    exit(0 if success else 1) 

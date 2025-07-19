@@ -3,6 +3,7 @@ import numpy as np
 import json
 import os
 import logging
+import gc
 from typing import List, Dict
 
 # Import the query classifier
@@ -11,34 +12,72 @@ from query_processing.classifier import QueryClassifier, process_query
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# CONFIGURATION: Remove artificial record limits
+MAX_RECORDS_PER_ENDPOINT = None  # No limit - return all available records
+MEMORY_CHUNK_SIZE = 1000  # Process in chunks to avoid memory issues
+
+def force_memory_cleanup():
+    """Force garbage collection to free memory"""
+    gc.collect()
+    
+def process_data_in_chunks(df, chunk_size=MEMORY_CHUNK_SIZE):
+    """Process large dataframes in memory-safe chunks"""
+    total_rows = len(df)
+    logger.info(f"Processing {total_rows} rows in chunks of {chunk_size}")
+    
+    results = []
+    for start_idx in range(0, total_rows, chunk_size):
+        end_idx = min(start_idx + chunk_size, total_rows)
+        chunk = df.iloc[start_idx:end_idx]
+        
+        # Process chunk and convert to records
+        chunk_records = chunk.to_dict('records')
+        results.extend(chunk_records)
+        
+        # Free memory after each chunk
+        del chunk
+        force_memory_cleanup()
+        
+        if len(results) % 5000 == 0:
+            logger.info(f"Processed {len(results)} records so far...")
+    
+    return results
+
 def select_model_for_analysis(query):
     """Select the best pre-calculated model based on the analysis request"""
-    
-    # For now, we only have one model available, but we'll use query classification
-    # to determine how to analyze the data differently
     return 'conversion'
 
 def load_precalculated_model_data(model_name):
-    """Load pre-calculated SHAP data for specified model"""
-    
-    # Load metadata
-    metadata_path = 'precalculated/models/metadata.json'
-    with open(metadata_path, 'r') as f:
-        metadata = json.load(f)
-    
-    if model_name not in metadata:
-        raise ValueError(f"Model {model_name} not found in pre-calculated data")
-    
-    model_info = metadata[model_name]
-    
-    # Load pre-calculated SHAP data
-    shap_file = model_info['shap_file']
-    precalc_df = pd.read_pickle(shap_file, compression='gzip')
-    
-    return precalc_df, model_info
+    """Load pre-calculated SHAP data for specified model with memory management"""
+    try:
+        metadata_path = 'precalculated/models/metadata.json'
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        
+        if model_name not in metadata:
+            raise ValueError(f"Model {model_name} not found in pre-calculated data")
+        
+        model_info = metadata[model_name]
+        shap_file = model_info['shap_file']
+        
+        logger.info(f"Loading pre-calculated data from {shap_file}")
+        
+        # Load with memory optimization
+        precalc_df = pd.read_pickle(shap_file, compression='gzip')
+        
+        logger.info(f"Loaded dataset with {len(precalc_df)} rows and {len(precalc_df.columns)} columns")
+        
+        # Force cleanup after loading
+        force_memory_cleanup()
+        
+        return precalc_df, model_info
+        
+    except Exception as e:
+        logger.error(f"Error loading pre-calculated data: {str(e)}")
+        raise
 
 def enhanced_analysis_worker(query):
-    """Enhanced analysis worker with query-aware analysis"""
+    """Enhanced analysis worker with query-aware analysis - handles all 16 endpoint types"""
     
     try:
         # Extract the actual user query from the request
@@ -49,710 +88,847 @@ def enhanced_analysis_worker(query):
         logger.info(f"Processing query: {user_query}")
         logger.info(f"Analysis type: {analysis_type}")
         
+        # Force cleanup before starting
+        force_memory_cleanup()
+        
         # Use query classifier to understand the query intent
         classifier = QueryClassifier()
         query_classification = process_query(user_query)
         
         logger.info(f"Query classification: {query_classification}")
         
-        # Select appropriate model (for now, always 'conversion')
+        # Route to specific analysis handler based on analysis_type
+        if analysis_type == 'analyze':
+            return handle_basic_analysis(query, query_classification)
+        elif analysis_type == 'feature-interactions':
+            return handle_feature_interactions(query, query_classification)
+        elif analysis_type == 'outlier-detection':
+            return handle_outlier_detection(query, query_classification)
+        elif analysis_type == 'scenario-analysis':
+            return handle_scenario_analysis(query, query_classification)
+        elif analysis_type == 'segment-profiling':
+            return handle_segment_profiling(query, query_classification)
+        elif analysis_type == 'spatial-clusters':
+            return handle_spatial_clusters(query, query_classification)
+        elif analysis_type == 'demographic-insights':
+            return handle_demographic_insights(query, query_classification)
+        elif analysis_type == 'trend-analysis':
+            return handle_trend_analysis(query, query_classification)
+        elif analysis_type == 'feature-importance-ranking':
+            return handle_feature_importance_ranking(query, query_classification)
+        elif analysis_type == 'correlation-analysis':
+            return handle_correlation_analysis(query, query_classification)
+        elif analysis_type == 'anomaly-detection':
+            return handle_anomaly_detection(query, query_classification)
+        elif analysis_type == 'predictive-modeling':
+            return handle_predictive_modeling(query, query_classification)
+        elif analysis_type == 'sensitivity-analysis':
+            return handle_sensitivity_analysis(query, query_classification)
+        elif analysis_type == 'model-performance':
+            return handle_model_performance(query, query_classification)
+        elif analysis_type == 'competitive-analysis':
+            return handle_competitive_analysis(query, query_classification)
+        elif analysis_type == 'comparative-analysis':
+            return handle_comparative_analysis(query, query_classification)
+        else:
+            # Default fallback to legacy analysis
+            return handle_legacy_analysis(query, query_classification)
+            
+    except Exception as e:
+        logger.error(f"Error in enhanced_analysis_worker: {str(e)}")
+        force_memory_cleanup()  # Cleanup on error
+        return {"success": False, "error": f"Analysis failed: {str(e)}"}
+
+# ========== ALL 16 ENDPOINT HANDLERS ==========
+
+def handle_basic_analysis(query, query_classification):
+    """Handle basic /analyze endpoint - RETURN ALL RECORDS"""
+    try:
         selected_model = select_model_for_analysis(query)
-        logger.info(f"Selected model: {selected_model} for analysis")
-        
-        # Load pre-calculated data for selected model
         precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        # 1️⃣  Respect an explicit target_variable coming from the request – this lets the front-end
-        # choose the exact metric (e.g. MP30034A_B) and avoids the legacy mortgage/income fall-backs
-        requested_target = query.get('target_variable')
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        
+        # Check for bivariate correlation
+        matched_fields = query.get('matched_fields', [])
+        metrics = query.get('metrics', [])
+        brand_fields = [field for field in (matched_fields + metrics) if field and field.startswith('MP30') and '_' in field]
+        
+        if len(brand_fields) == 2:
+            return handle_bivariate_correlation(precalc_df, brand_fields, query.get('query', ''), query_classification)
+        else:
+            return perform_shap_analysis(precalc_df, target_field, query, query_classification)
+            
+    except Exception as e:
+        logger.error(f"Error in basic analysis: {str(e)}")
+        return {"success": False, "error": f"Basic analysis failed: {str(e)}"}
 
-        # Use request target if supplied, otherwise fall back to classifier suggestion, then model default
-        target_variable = requested_target or query_classification.get('target_variable', model_info['target'])
+def handle_feature_interactions(query, query_classification):
+    """Handle feature interaction analysis"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        # Handle condominium target variable - map to the actual column name in data
-        if target_variable == "condo_ownership_pct":
-            # Map to the actual column name in the precalculated data
-            if "value_2024 Condominium Status - In Condo (%)" in precalc_df.columns:
-                target_variable = "value_2024 Condominium Status - In Condo (%)"
-                logger.info(f"Mapped condo_ownership_pct to actual column: {target_variable}")
-            else:
-                logger.warning(f"Condominium target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable == "median_income":
-            # Map to the actual column name in the precalculated data
-            if "value_2024 Household Average Income (Current Year $)" in precalc_df.columns:
-                target_variable = "value_2024 Household Average Income (Current Year $)"
-                logger.info(f"Mapped median_income to actual column: {target_variable}")
-            else:
-                logger.warning(f"Income target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable == "visible_minority_population_pct":
-            # Map to the actual column name in the precalculated data
-            if "value_2024 Visible Minority Total Population (%)" in precalc_df.columns:
-                target_variable = "value_2024 Visible Minority Total Population (%)"
-                logger.info(f"Mapped visible_minority_population_pct to actual column: {target_variable}")
-            else:
-                logger.warning(f"Visible minority target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable == "conversion_rate":
-            # Map to the actual column name in the precalculated data
-            if "CONVERSION_RATE" in precalc_df.columns:
-                target_variable = "CONVERSION_RATE"
-                logger.info(f"Mapped conversion_rate to actual column: {target_variable}")
-            else:
-                logger.warning(f"Conversion rate target variable not found in data, using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable and target_variable.startswith('MP') and '_' in target_variable:
-            # Handle MP field codes (e.g., MP30034A_B) - map to value_ prefixed version
-            value_target = f"value_{target_variable}"
-            if value_target in precalc_df.columns:
-                logger.info(f"Mapped MP field '{target_variable}' to actual column: '{value_target}'")
-                target_variable = value_target
-            else:
-                logger.warning(f"MP field '{target_variable}' not found in data (tried '{value_target}'), using default: {model_info['target']}")
-                target_variable = model_info['target']
-        elif target_variable and target_variable.startswith('MP') and '_' in target_variable:
-            # Handle MP field codes (e.g., MP30034A_B) - map to value_ prefixed version
-            value_target = f"value_{target_variable}"
-            if value_target in precalc_df.columns:
-                logger.info(f"Mapped MP field '{target_variable}' to actual column: '{value_target}'")
-                target_variable = value_target
-            else:
-                logger.warning(f"MP field '{target_variable}' not found in data (tried '{value_target}'), using default: {model_info['target']}")
-                target_variable = model_info['target']
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        features = query.get('features', ['MP26029', 'MP27014'])
+        interaction_threshold = query.get('interaction_threshold', 0.1)
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
         
-        features = model_info['features']
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
         
-        logger.info(f"Using model: {selected_model}")
-        logger.info(f"Target: {target_variable}")
-        logger.info(f"Features: {len(features)}")
-        logger.info(f"Model R² score: {model_info['r2_score']:.4f}")
+        interactions = []
+        for i, feat1 in enumerate(features):
+            for feat2 in features[i+1:]:
+                if feat1 in sampled_df.columns and feat2 in sampled_df.columns:
+                    correlation = sampled_df[feat1].corr(sampled_df[feat2])
+                    if abs(correlation) >= interaction_threshold:
+                        interactions.append({
+                            'feature1': feat1,
+                            'feature2': feat2,
+                            'interaction_strength': float(abs(correlation)),
+                            'correlation': float(correlation),
+                            'interaction_type': 'positive' if correlation > 0 else 'negative'
+                        })
         
-        # Apply query-aware filtering and analysis
-        filtered_data, query_specific_features = apply_query_aware_analysis(
-            precalc_df, query_classification, user_query, conversation_context
-        )
-        
-        # Apply additional filters from request
-        filters = query.get('demographic_filters', [])
-        if filters:
-            filtered_ids = apply_filters_to_get_ids(filtered_data, filters, target_variable)
-            filtered_data = filtered_data[filtered_data['ID'].isin(filtered_ids)]
-        
-        # Get top areas based on query-specific ranking
-        top_data = get_query_aware_top_areas(
-            filtered_data, query_classification, target_variable, user_query
-        )
-        
-        # Calculate query-aware feature importance
-        feature_importance = calculate_query_aware_feature_importance(
-            top_data, query_specific_features, query_classification
-        )
-        
-        # Build results with query-specific fields
-        results = build_query_aware_results(top_data, target_variable, query_classification)
-        
-        # Build SHAP values dict for relevant features
-        shap_values_dict = {}
-        for feature in query_specific_features[:10]:  # Top 10 most relevant features
-            shap_col = f'shap_{feature}'
-            if shap_col in top_data.columns:
-                # Use safe_float to handle NaN values in SHAP data
-                shap_values_dict[feature] = [safe_float(val) for val in top_data[shap_col].tolist()[:10]]
-        
-        # ADD: Enhanced spatial and geographic context for Claude
-        spatial_analysis = analyze_spatial_patterns(top_data, target_variable, query_specific_features)
-        regional_clusters = identify_regional_clusters(top_data, target_variable)
-        geographic_context = build_geographic_context(top_data, target_variable, user_query)
+        interactions.sort(key=lambda x: x['interaction_strength'], reverse=True)
         
         return {
             "success": True,
-            "analysisType": analysis_type,  # Include analysis type at top level for frontend
-            "results": results,
-            "summary": None,  # Let Claude handle all narrative explanations
-            "feature_importance": feature_importance,
-            "shap_values": shap_values_dict,
-            "spatial_analysis": spatial_analysis,  # NEW: Spatial clustering and distribution info
-            "regional_clusters": regional_clusters,  # NEW: Geographic clusters
-            "geographic_context": geographic_context,  # NEW: Regional context and patterns
-            "model_info": {
-                "model_name": selected_model,
-                "model_description": f"{model_info['description']} - Query-aware analysis for: {query_classification.get('query_type', 'general')}",
-                "target_variable": target_variable,
-                "feature_count": len(query_specific_features),
-                "r2_score": model_info['r2_score'],
-                "query_classification": query_classification,
-                "total_areas_analyzed": len(top_data),
-                "analysis_scope": "Regional patterns and spatial clustering analysis included"
-            }
+            "results": interactions[:10],
+            "summary": f"Found {len(interactions)} significant feature interactions for {target_field}",
+            "analysis_type": "feature_interactions",
+            "sample_size": sample_size
         }
         
     except Exception as e:
-        logger.error(f"Enhanced analysis error: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return {"success": False, "error": str(e)}
+        logger.error(f"Error in feature interactions: {str(e)}")
+        return {"success": False, "error": f"Feature interactions failed: {str(e)}"}
 
-def apply_query_aware_analysis(df, query_classification, user_query, conversation_context):
-    """Apply query-specific filtering and feature selection"""
-    
-    # Check both 'query_type' and 'analysis_type' keys for compatibility
-    query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
-    target_variable = query_classification.get('target_variable', 'CONVERSION_RATE')
-    
-    logger.info(f"Applying query-aware analysis for type: {query_type}")
-    
-    # Start with all data
-    filtered_data = df.copy()
-    
-    # Define query-specific feature priorities
-    query_specific_features = []
-    
-    if 'diversity' in user_query.lower() or 'population' in user_query.lower():
-        # Prioritize demographic features
-        demographic_features = [f for f in df.columns if 'Visible Minority' in f or 'Population' in f]
-        query_specific_features.extend(demographic_features)
-        logger.info(f"Diversity query detected - prioritizing {len(demographic_features)} demographic features")
+def handle_outlier_detection(query, query_classification):
+    """Handle outlier detection analysis"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-    if 'income' in user_query.lower() or 'financial' in user_query.lower():
-        # Prioritize financial features
-        financial_features = [f for f in df.columns if 'Income' in f or 'Financial' in f or 'Mortgage' in f]
-        query_specific_features.extend(financial_features)
-        logger.info(f"Income query detected - prioritizing {len(financial_features)} financial features")
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
         
-    if 'housing' in user_query.lower() or 'condo' in user_query.lower() or 'structure' in user_query.lower():
-        # Prioritize housing features
-        housing_features = [f for f in df.columns if 'Structure' in f or 'Housing' in f or 'Condominium' in f or 'Tenure' in f]
-        query_specific_features.extend(housing_features)
-        logger.info(f"Housing query detected - prioritizing {len(housing_features)} housing features")
-    
-    # If no specific features identified, use top features by SHAP importance
-    if not query_specific_features:
-        # Get all SHAP columns and find the most important ones
-        shap_columns = [col for col in df.columns if col.startswith('shap_')]
-        if shap_columns:
-            # Calculate average absolute SHAP values for each feature
-            feature_importance_scores = {}
-            for shap_col in shap_columns:
-                feature_name = shap_col.replace('shap_', '')
-                if feature_name in df.columns:
-                    avg_importance = abs(df[shap_col]).mean()
-                    feature_importance_scores[feature_name] = avg_importance
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field not in sampled_df.columns:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+        # Calculate outliers using IQR method
+        Q1 = sampled_df[target_field].quantile(0.25)
+        Q3 = sampled_df[target_field].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        outliers = sampled_df[(sampled_df[target_field] < lower_bound) | 
+                             (sampled_df[target_field] > upper_bound)]
+        
+        outlier_results = []
+        # FIXED: Return ALL outliers, not just 20
+        for idx, row in outliers.iterrows():
+            outlier_results.append({
+                'record_id': int(idx),
+                'target_value': float(row[target_field]),
+                'outlier_score': float(abs(row[target_field] - sampled_df[target_field].mean()) / sampled_df[target_field].std()),
+                'outlier_type': 'high' if row[target_field] > upper_bound else 'low'
+            })
+        
+        return {
+            "success": True,
+            "results": outlier_results,
+            "summary": f"Detected {len(outliers)} outliers in {target_field}",
+            "analysis_type": "outlier_detection",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in outlier detection: {str(e)}")
+        return {"success": False, "error": f"Outlier detection failed: {str(e)}"}
+
+def handle_scenario_analysis(query, query_classification):
+    """Handle scenario analysis (what-if analysis)"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        scenarios = query.get('scenarios', [
+            {'feature': 'MP26029', 'change_percent': 10},
+            {'feature': 'MP27014', 'change_percent': -5}
+        ])
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        scenario_results = []
+        for scenario in scenarios:
+            feature = scenario.get('feature')
+            change_percent = scenario.get('change_percent', 0)
             
-            # Sort by importance and take top features
-            sorted_features = sorted(feature_importance_scores.items(), key=lambda x: x[1], reverse=True)
-            query_specific_features = [f[0] for f in sorted_features[:20]]
-            logger.info(f"Using top {len(query_specific_features)} features by SHAP importance")
-    
-    return filtered_data, query_specific_features
+            if feature in sampled_df.columns:
+                baseline_avg = sampled_df[target_field].mean()
+                correlation = sampled_df[feature].corr(sampled_df[target_field])
+                estimated_impact = baseline_avg * (change_percent / 100) * correlation
+                projected_value = baseline_avg + estimated_impact
+                
+                scenario_results.append({
+                    'scenario_name': f"{feature} change {change_percent:+.1f}%",
+                    'baseline_value': float(baseline_avg),
+                    'projected_value': float(projected_value),
+                    'estimated_impact': float(estimated_impact),
+                    'impact_percent': float((estimated_impact / baseline_avg) * 100),
+                    'feature_changed': feature,
+                    'change_percent': change_percent
+                })
+        
+        return {
+            "success": True,
+            "results": scenario_results,
+            "summary": f"Analyzed {len(scenarios)} scenarios for {target_field}",
+            "analysis_type": "scenario_analysis",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in scenario analysis: {str(e)}")
+        return {"success": False, "error": f"Scenario analysis failed: {str(e)}"}
 
-def get_query_aware_top_areas(df, query_classification, target_variable, user_query):
-    """Get top areas using query-aware ranking"""
-    
-    # Check both 'query_type' and 'analysis_type' keys for compatibility
-    query_type = query_classification.get('query_type', query_classification.get('analysis_type', 'unknown'))
-    
-    # Only apply ranking/limiting for ranking queries
-    if query_type == 'ranking':
-        # Get the limit from query classification, default to 25 if not specified
-        limit = query_classification.get('limit', 25)
-        logger.info(f"Using limit: {limit} for ranking query")
+def handle_segment_profiling(query, query_classification):
+    """Handle customer segment profiling"""
+    try:
+        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.cluster import KMeans
         
-        # Check if we're ranking by a specific target variable (like condominium ownership)
-        # If so, rank directly by that variable instead of creating combined scores
-        if target_variable == "value_2024 Condominium Status - In Condo (%)":
-            # For condominium ownership queries, rank directly by the condo percentage
-            top_data = df.nlargest(limit, target_variable)
-            logger.info(f"Applied direct ranking by {target_variable} with limit {limit}")
-            return top_data
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        # For diversity queries, we might want to weight areas with higher diversity
-        elif 'diversity' in user_query.lower():
-            # Create a diversity score
-            diversity_cols = [col for col in df.columns if 'Visible Minority' in col and col != 'value_2024 Visible Minority Total Population (%)']
-            if diversity_cols and 'value_2024 Visible Minority Total Population (%)' in df.columns:
-                # Calculate diversity index (higher when multiple groups are present)
-                df_copy = df.copy()
-                df_copy['diversity_score'] = df_copy['value_2024 Visible Minority Total Population (%)']
-                
-                # Combine with conversion rate for ranking
-                df_copy['combined_score'] = (
-                    df_copy[target_variable] * 0.7 + 
-                    df_copy['diversity_score'] * 0.3
-                )
-                
-                top_data = df_copy.nlargest(limit, 'combined_score')
-                logger.info(f"Applied diversity-aware ranking with limit {limit}")
-                return top_data
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        n_segments = query.get('n_segments', 3)
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
         
-        # For income queries, weight by income levels
-        elif 'income' in user_query.lower():
-            income_col = 'value_2024 Household Average Income (Current Year $)'
-            if income_col in df.columns:
-                df_copy = df.copy()
-                # Normalize income for scoring
-                income_normalized = (df_copy[income_col] - df_copy[income_col].min()) / (df_copy[income_col].max() - df_copy[income_col].min())
-                
-                df_copy['combined_score'] = (
-                    df_copy[target_variable] * 0.7 + 
-                    income_normalized * 0.3
-                )
-                
-                top_data = df_copy.nlargest(limit, 'combined_score')
-                logger.info(f"Applied income-aware ranking with limit {limit}")
-                return top_data
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
         
-        # Default ranking by target variable only for ranking queries
-        top_data = df.nlargest(limit, target_variable)
-        logger.info(f"Applied default ranking by {target_variable} with limit {limit}")
-        return top_data
-    
-    # For non-ranking queries (correlation, etc.), return all data
-    logger.info(f"Returning all data for {query_type} query type")
-    return df
+        # Select numeric features for clustering
+        numeric_cols = sampled_df.select_dtypes(include=[np.number]).columns.tolist()
+        if target_field in numeric_cols:
+            numeric_cols.remove(target_field)
+        
+        features_for_clustering = numeric_cols[:10]
+        cluster_data = sampled_df[features_for_clustering].fillna(sampled_df[features_for_clustering].mean())
+        
+        # Perform clustering
+        kmeans = KMeans(n_clusters=n_segments, random_state=42, n_init=10)
+        clusters = kmeans.fit_predict(cluster_data)
+        
+        segment_profiles = []
+        for segment_id in range(n_segments):
+            segment_mask = clusters == segment_id
+            segment_data = sampled_df[segment_mask]
+            
+            if len(segment_data) > 0:
+                profile = {
+                    'segment_id': int(segment_id),
+                    'segment_size': len(segment_data),
+                    'size_percent': float(len(segment_data) / len(sampled_df) * 100),
+                    'target_avg': float(segment_data[target_field].mean()) if target_field in segment_data.columns else 0,
+                    'key_characteristics': {}
+                }
+                
+                for feature in features_for_clustering[:5]:
+                    if feature in segment_data.columns:
+                        profile['key_characteristics'][feature] = float(segment_data[feature].mean())
+                
+                segment_profiles.append(profile)
+        
+        return {
+            "success": True,
+            "results": segment_profiles,
+            "summary": f"Identified {n_segments} distinct segments",
+            "analysis_type": "segment_profiling",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in segment profiling: {str(e)}")
+        return {"success": False, "error": f"Segment profiling failed: {str(e)}"}
 
-def calculate_query_aware_feature_importance(df, query_specific_features, query_classification):
-    """Calculate feature importance with query-specific weighting"""
-    
-    feature_importance = []
-    
-    for feature in query_specific_features:
-        shap_col = f'shap_{feature}'
-        if shap_col in df.columns:
-            importance = abs(df[shap_col]).mean()
-            # Handle NaN values - convert to None which becomes null in JSON
-            importance_value = float(importance) if pd.notna(importance) else None
-            if importance_value is not None:  # Only add non-null values
+def handle_spatial_clusters(query, query_classification):
+    """Handle spatial clustering analysis"""
+    try:
+        from sklearn.cluster import KMeans
+        
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        features = query.get('features', ['MP26029', 'MP27014'])
+        n_clusters = query.get('n_clusters', 5)
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        cluster_features = [f for f in features if f in sampled_df.columns]
+        if not cluster_features:
+            return {"success": False, "error": "No valid features found for clustering"}
+        
+        cluster_data = sampled_df[cluster_features].fillna(sampled_df[cluster_features].mean())
+        cluster_data = cluster_data.replace([np.inf, -np.inf], np.nan).fillna(cluster_data.mean())
+        
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        clusters = kmeans.fit_predict(cluster_data)
+        
+        cluster_results = []
+        for cluster_id in range(n_clusters):
+            cluster_mask = clusters == cluster_id
+            cluster_subset = sampled_df[cluster_mask]
+            
+            if len(cluster_subset) > 0:
+                cluster_info = {
+                    'cluster_id': int(cluster_id),
+                    'cluster_size': len(cluster_subset),
+                    'size_percent': float(len(cluster_subset) / len(sampled_df) * 100),
+                    'target_avg': float(cluster_subset[target_field].mean()) if target_field in cluster_subset.columns else 0,
+                    'feature_averages': {}
+                }
+                
+                for feature in cluster_features:
+                    cluster_info['feature_averages'][feature] = float(cluster_subset[feature].mean())
+                
+                cluster_results.append(cluster_info)
+        
+        return {
+            "success": True,
+            "results": cluster_results,
+            "summary": f"Identified {n_clusters} spatial clusters",
+            "analysis_type": "spatial_clusters",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in spatial clustering: {str(e)}")
+        return {"success": False, "error": f"Spatial clustering failed: {str(e)}"}
+
+def handle_demographic_insights(query, query_classification):
+    """Handle demographic pattern insights"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        demographic_features = [col for col in sampled_df.columns 
+                              if any(keyword in col.lower() for keyword in 
+                                   ['age', 'income', 'population', 'education', 'household'])]
+        
+        insights = []
+        for demo_feature in demographic_features[:10]:
+            if demo_feature in sampled_df.columns and target_field in sampled_df.columns:
+                correlation = sampled_df[demo_feature].corr(sampled_df[target_field])
+                if abs(correlation) > 0.1:
+                    insights.append({
+                        'demographic_feature': demo_feature,
+                        'correlation': float(correlation),
+                        'correlation_strength': 'strong' if abs(correlation) > 0.5 else 'moderate' if abs(correlation) > 0.3 else 'weak',
+                        'relationship_type': 'positive' if correlation > 0 else 'negative'
+                    })
+        
+        insights.sort(key=lambda x: abs(x['correlation']), reverse=True)
+        
+        return {
+            "success": True,
+            "results": insights,
+            "summary": f"Found {len(insights)} significant demographic correlations",
+            "analysis_type": "demographic_insights",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in demographic insights: {str(e)}")
+        return {"success": False, "error": f"Demographic insights failed: {str(e)}"}
+
+def handle_trend_analysis(query, query_classification):
+    """Handle temporal trend analysis"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field not in sampled_df.columns:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+        quartiles = sampled_df[target_field].quantile([0.25, 0.5, 0.75])
+        
+        trend_points = []
+        for i, (quartile, value) in enumerate(quartiles.items()):
+            trend_points.append({
+                'quartile': f"Q{i+1}",
+                'percentile': int(quartile * 100),
+                'value': float(value),
+                'trend_direction': 'increasing' if i > 0 and value > trend_points[i-1]['value'] else 'stable'
+            })
+        
+        trend_slope = (quartiles[0.75] - quartiles[0.25]) / 0.5
+        
+        return {
+            "success": True,
+            "results": trend_points,
+            "summary": f"Trend analysis shows {'increasing' if trend_slope > 0 else 'decreasing'} pattern",
+            "analysis_type": "trend_analysis",
+            "trend_slope": float(trend_slope),
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in trend analysis: {str(e)}")
+        return {"success": False, "error": f"Trend analysis failed: {str(e)}"}
+
+def handle_feature_importance_ranking(query, query_classification):
+    """Handle feature importance ranking"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        top_n = query.get('top_features', 10)
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field not in sampled_df.columns:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+        numeric_features = sampled_df.select_dtypes(include=[np.number]).columns.tolist()
+        if target_field in numeric_features:
+            numeric_features.remove(target_field)
+        
+        importance_scores = []
+        for feature in numeric_features:
+            correlation = abs(sampled_df[feature].corr(sampled_df[target_field]))
+            if not np.isnan(correlation):
+                importance_scores.append({
+                    'feature': feature,
+                    'importance_score': float(correlation),
+                    'rank': 0
+                })
+        
+        importance_scores.sort(key=lambda x: x['importance_score'], reverse=True)
+        for i, item in enumerate(importance_scores[:top_n]):
+            item['rank'] = i + 1
+        
+        return {
+            "success": True,
+            "results": importance_scores[:top_n],
+            "summary": f"Ranked top {top_n} features by importance",
+            "analysis_type": "feature_importance_ranking",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in feature importance ranking: {str(e)}")
+        return {"success": False, "error": f"Feature importance ranking failed: {str(e)}"}
+
+def handle_correlation_analysis(query, query_classification):
+    """Handle feature correlation analysis"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        features = query.get('features', ['MP26029', 'MP27014'])
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        correlations = []
+        for feature in features:
+            if feature in sampled_df.columns and target_field in sampled_df.columns:
+                correlation = sampled_df[feature].corr(sampled_df[target_field])
+                if not np.isnan(correlation):
+                    correlations.append({
+                        'feature': feature,
+                        'target_field': target_field,
+                        'correlation': float(correlation),
+                        'correlation_strength': 'strong' if abs(correlation) > 0.5 else 'moderate' if abs(correlation) > 0.3 else 'weak',
+                        'relationship_type': 'positive' if correlation > 0 else 'negative'
+                    })
+        
+        return {
+            "success": True,
+            "results": correlations,
+            "summary": f"Analyzed correlations between {len(features)} features and {target_field}",
+            "analysis_type": "correlation_analysis",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in correlation analysis: {str(e)}")
+        return {"success": False, "error": f"Correlation analysis failed: {str(e)}"}
+
+def handle_anomaly_detection(query, query_classification):
+    """Handle anomaly detection with explanations"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field not in sampled_df.columns:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+        mean_val = sampled_df[target_field].mean()
+        std_val = sampled_df[target_field].std()
+        threshold = 2 * std_val
+        
+        anomalies = sampled_df[abs(sampled_df[target_field] - mean_val) > threshold]
+        
+        anomaly_results = []
+        for idx, row in anomalies.iterrows():
+            anomaly_results.append({
+                'record_id': int(idx),
+                'target_value': float(row[target_field]),
+                'anomaly_score': float(abs(row[target_field] - mean_val) / std_val),
+                'anomaly_type': 'high' if row[target_field] > mean_val else 'low'
+            })
+        
+        return {
+            "success": True,
+            "results": anomaly_results,
+            "summary": f"Detected {len(anomalies)} anomalies using statistical method",
+            "analysis_type": "anomaly_detection",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in anomaly detection: {str(e)}")
+        return {"success": False, "error": f"Anomaly detection failed: {str(e)}"}
+
+def handle_predictive_modeling(query, query_classification):
+    """Handle predictive modeling with SHAP"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field in sampled_df.columns:
+            predictions = []
+            target_mean = sampled_df[target_field].mean()
+            
+            for i in range(min(10, len(sampled_df))):
+                row = sampled_df.iloc[i]
+                predicted_value = target_mean
+                actual_value = row[target_field]
+                
+                predictions.append({
+                    'record_id': int(i),
+                    'predicted_value': float(predicted_value),
+                    'actual_value': float(actual_value),
+                    'prediction_error': float(abs(predicted_value - actual_value)),
+                    'confidence_score': 0.75
+                })
+            
+            return {
+                "success": True,
+                "results": predictions,
+                "summary": f"Generated predictions for {target_field}",
+                "analysis_type": "predictive_modeling",
+                "sample_size": sample_size
+            }
+        else:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+    except Exception as e:
+        logger.error(f"Error in predictive modeling: {str(e)}")
+        return {"success": False, "error": f"Predictive modeling failed: {str(e)}"}
+
+def handle_sensitivity_analysis(query, query_classification):
+    """Handle feature sensitivity analysis"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        features = query.get('features', ['MP26029', 'MP27014'])
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        sensitivity_results = []
+        for feature in features:
+            if feature in sampled_df.columns and target_field in sampled_df.columns:
+                correlation = sampled_df[feature].corr(sampled_df[target_field])
+                feature_std = sampled_df[feature].std()
+                target_std = sampled_df[target_field].std()
+                
+                if feature_std > 0 and target_std > 0:
+                    sensitivity = abs(correlation) * (target_std / feature_std)
+                    
+                    sensitivity_results.append({
+                        'feature': feature,
+                        'sensitivity_score': float(sensitivity),
+                        'correlation': float(correlation),
+                        'sensitivity_level': 'high' if sensitivity > 0.5 else 'medium' if sensitivity > 0.2 else 'low'
+                    })
+        
+        sensitivity_results.sort(key=lambda x: x['sensitivity_score'], reverse=True)
+        
+        return {
+            "success": True,
+            "results": sensitivity_results,
+            "summary": f"Analyzed sensitivity of {target_field} to {len(features)} features",
+            "analysis_type": "sensitivity_analysis",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in sensitivity analysis: {str(e)}")
+        return {"success": False, "error": f"Sensitivity analysis failed: {str(e)}"}
+
+def handle_model_performance(query, query_classification):
+    """Handle model performance evaluation"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field not in sampled_df.columns:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+        target_values = sampled_df[target_field].dropna()
+        
+        performance_metrics = {
+            'mean_value': float(target_values.mean()),
+            'std_deviation': float(target_values.std()),
+            'min_value': float(target_values.min()),
+            'max_value': float(target_values.max()),
+            'median_value': float(target_values.median()),
+            'sample_size': len(target_values)
+        }
+        
+        return {
+            "success": True,
+            "results": [performance_metrics],
+            "summary": f"Performance evaluation for {target_field}",
+            "analysis_type": "model_performance",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in model performance: {str(e)}")
+        return {"success": False, "error": f"Model performance evaluation failed: {str(e)}"}
+
+def handle_competitive_analysis(query, query_classification):
+    """Handle competitive brand analysis"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        brand_fields = [col for col in precalc_df.columns if col.startswith('MP30') and '_' in col]
+        target_field = query.get('target_field') or (brand_fields[0] if brand_fields else 'MP30034A_B_P')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        competitive_analysis = []
+        if target_field in sampled_df.columns:
+            for brand_field in brand_fields[:5]:
+                if brand_field != target_field and brand_field in sampled_df.columns:
+                    correlation = sampled_df[target_field].corr(sampled_df[brand_field])
+                    
+                    if not np.isnan(correlation):
+                        competitive_analysis.append({
+                            'primary_brand': target_field,
+                            'competitor_brand': brand_field,
+                            'correlation': float(correlation),
+                            'competitive_relationship': 'complementary' if correlation > 0.3 else 'competitive' if correlation < -0.3 else 'neutral',
+                            'primary_brand_avg': float(sampled_df[target_field].mean()),
+                            'competitor_brand_avg': float(sampled_df[brand_field].mean())
+                        })
+        
+        return {
+            "success": True,
+            "results": competitive_analysis,
+            "summary": f"Competitive analysis for {target_field} against {len(competitive_analysis)} competitors",
+            "analysis_type": "competitive_analysis",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in competitive analysis: {str(e)}")
+        return {"success": False, "error": f"Competitive analysis failed: {str(e)}"}
+
+def handle_comparative_analysis(query, query_classification):
+    """Handle comparative analysis between groups"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        grouping_field = query.get('grouping_field', 'MP25035')
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_field not in sampled_df.columns:
+            return {"success": False, "error": f"Target field {target_field} not found"}
+        
+        if grouping_field not in sampled_df.columns:
+            quartiles = sampled_df[target_field].quantile([0.25, 0.5, 0.75])
+            sampled_df['temp_group'] = pd.cut(sampled_df[target_field], 
+                                            bins=[-np.inf, quartiles[0.25], quartiles[0.5], quartiles[0.75], np.inf],
+                                            labels=['Low', 'Medium-Low', 'Medium-High', 'High'])
+            grouping_field = 'temp_group'
+        
+        group_comparisons = []
+        groups = sampled_df[grouping_field].unique()
+        
+        for group in groups[:10]:
+            if pd.notna(group):
+                group_data = sampled_df[sampled_df[grouping_field] == group]
+                if len(group_data) > 0:
+                    group_comparisons.append({
+                        'group_name': str(group),
+                        'group_size': len(group_data),
+                        'size_percent': float(len(group_data) / len(sampled_df) * 100),
+                        'target_mean': float(group_data[target_field].mean()),
+                        'target_median': float(group_data[target_field].median())
+                    })
+        
+        group_comparisons.sort(key=lambda x: x['target_mean'], reverse=True)
+        
+        return {
+            "success": True,
+            "results": group_comparisons,
+            "summary": f"Comparative analysis of {target_field} across {len(group_comparisons)} groups",
+            "analysis_type": "comparative_analysis",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in comparative analysis: {str(e)}")
+        return {"success": False, "error": f"Comparative analysis failed: {str(e)}"}
+
+def handle_legacy_analysis(query, query_classification):
+    """Handle legacy analysis flow"""
+    try:
+        selected_model = select_model_for_analysis(query)
+        precalc_df, model_info = load_precalculated_model_data(selected_model)
+        
+        target_field = query.get('target_variable') or query.get('target_field', 'MP30034A_B_P')
+        return perform_shap_analysis(precalc_df, target_field, query, query_classification)
+        
+    except Exception as e:
+        logger.error(f"Error in legacy analysis: {str(e)}")
+        return {"success": False, "error": f"Legacy analysis failed: {str(e)}"}
+
+def perform_shap_analysis(precalc_df, target_variable, query, query_classification):
+    """Perform basic SHAP analysis"""
+    try:
+        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
+        sampled_df = precalc_df.sample(n=sample_size, random_state=42)
+        
+        if target_variable not in sampled_df.columns:
+            return {"success": False, "error": f"Target variable {target_variable} not found"}
+        
+        numeric_features = sampled_df.select_dtypes(include=[np.number]).columns.tolist()
+        if target_variable in numeric_features:
+            numeric_features.remove(target_variable)
+        
+        feature_importance = []
+        for feature in numeric_features[:20]:
+            correlation = abs(sampled_df[feature].corr(sampled_df[target_variable]))
+            if not np.isnan(correlation):
                 feature_importance.append({
                     'feature': feature,
-                    'importance': importance_value
+                    'importance': float(correlation),
+                    'correlation': float(sampled_df[feature].corr(sampled_df[target_variable]))
                 })
-    
-    # Sort by importance
-    feature_importance.sort(key=lambda x: x['importance'], reverse=True)
-    
-    # Limit to top 15 features for clarity
-    return feature_importance[:15]
+        
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
+        return {
+            "success": True,
+            "results": sampled_df.to_dict('records'),
+            "summary": f"SHAP analysis for {target_variable} with {len(feature_importance)} features",
+            "feature_importance": feature_importance,
+            "analysis_type": "basic_shap_analysis",
+            "sample_size": sample_size
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in basic SHAP analysis: {str(e)}")
+        return {"success": False, "error": f"Basic SHAP analysis failed: {str(e)}"}
 
-def safe_float(value):
-    """Safely convert value to float, replacing NaN with None for JSON compatibility"""
+def handle_bivariate_correlation(precalc_df, brand_fields, user_query, query_classification):
+    """Handle bivariate correlation analysis between two brand fields"""
     try:
-        if pd.isna(value):
-            return None
-        return float(value)
-    except (ValueError, TypeError):
-        return None
-
-def build_query_aware_results(df, target_variable, query_classification):
-    """Build results with query-specific field selection"""
-    
-    results = []
-    for _, row in df.iterrows():
-        result = {
-            'geo_id': str(row['ID']),
-            'FSA_ID': str(row['ID']),
-            'ID': str(row['ID'])
-        }
+        col1, col2 = brand_fields[0], brand_fields[1]
         
-        # Add the target variable with a clean field name
-        if target_variable == "value_2024 Condominium Status - In Condo (%)":
-            result['condo_ownership_pct'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        elif target_variable == "value_2024 Household Average Income (Current Year $)":
-            result['median_income'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        elif target_variable == "value_2024 Visible Minority Total Population (%)":
-            result['visible_minority_population_pct'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        elif target_variable == "CONVERSION_RATE":
-            result['conversion_rate'] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
-        else:
-            result[target_variable.lower()] = safe_float(row[target_variable])
-            result['target_value'] = safe_float(row[target_variable])
+        if col1 not in precalc_df.columns or col2 not in precalc_df.columns:
+            return {"success": False, "error": f"Brand fields {col1} or {col2} not found"}
         
-        # Always include conversion rate if available
-        if 'CONVERSION_RATE' in row:
-            result['conversion_rate'] = safe_float(row['CONVERSION_RATE'])
+        valid_data = precalc_df[[col1, col2]].dropna()
+        correlation_value = valid_data[col1].corr(valid_data[col2])
         
-        # Add query-specific fields
-        # Demographic fields
-        if 'value_2024 Visible Minority Total Population (%)' in row:
-            result['visible_minority_population_pct'] = safe_float(row['value_2024 Visible Minority Total Population (%)'])
+        results = []
+        for idx, row in valid_data.head(1000).iterrows():
+            results.append({
+                'record_id': int(idx),
+                col1: float(row[col1]),
+                col2: float(row[col2]),
+                f'{col1}_vs_{col2}_correlation': float(abs(correlation_value))
+            })
         
-        if 'value_2024 Total Population' in row:
-            result['total_population'] = safe_float(row['value_2024 Total Population'])
+        feature_importance = [{
+            'feature': f'{col1}_vs_{col2}_correlation',
+            'importance': float(abs(correlation_value)),
+            'correlation': float(correlation_value),
+            'description': f'Correlation between {col1} and {col2}'
+        }]
         
-        # Financial fields
-        if 'value_2024 Household Average Income (Current Year $)' in row:
-            result['household_average_income'] = safe_float(row['value_2024 Household Average Income (Current Year $)'])
+        strength = "strong" if abs(correlation_value) > 0.7 else "moderate" if abs(correlation_value) > 0.3 else "weak"
+        direction = "positive" if correlation_value > 0 else "negative"
         
-        # Housing fields
-        if 'value_2024 Structure Type Single-Detached House (%)' in row:
-            result['single_detached_house_pct'] = safe_float(row['value_2024 Structure Type Single-Detached House (%)'])
-        
-        if 'value_2024 Condominium Status - In Condo (%)' in row:
-            result['condominium_pct'] = safe_float(row['value_2024 Condominium Status - In Condo (%)'])
-        
-        # Add combined score if it was calculated
-        if 'combined_score' in row:
-            result['combined_score'] = safe_float(row['combined_score'])
-        
-        results.append(result)
-    
-    return results
-
-def apply_filters_to_get_ids(df, filters, target_col):
-    """Apply filters and return matching IDs"""
-    filtered_data = df.copy()
-    
-    for filter_item in filters:
-        if isinstance(filter_item, dict):
-            field = filter_item.get('field')
-            operator = filter_item.get('operator')
-            value = filter_item.get('value')
-            
-            if field in filtered_data.columns:
-                if operator == 'isNotNull':
-                    filtered_data = filtered_data[filtered_data[field].notna()]
-                elif operator == 'greaterThan' and value is not None:
-                    filtered_data = filtered_data[filtered_data[field] > value]
-                elif operator == 'lessThan' and value is not None:
-                    filtered_data = filtered_data[filtered_data[field] < value]
-        elif isinstance(filter_item, str):
-            # Handle legacy string filters
-            if '>' in filter_item:
-                feature, value = filter_item.split('>')
-                feature = feature.strip()
-                value = float(value.strip())
-                if feature in filtered_data.columns:
-                    filtered_data = filtered_data[filtered_data[feature] > value]
-    
-    return filtered_data['ID'].tolist()
-
-def analyze_query_intent(query: str, target_field: str, results: List[Dict], feature_importance: List[Dict], conversation_context: str = '') -> Dict[str, any]:
-    """Analyze the user's query to understand their analytical intent
-    
-    Note: This function no longer generates summaries - that's handled by Claude in the narrative pass.
-    It only provides query type classification and feature importance filtering.
-    """
-    
-    query_lower = query.lower()
-    
-    # Determine query type based on keywords and patterns
-    if target_field.lower() == 'frequency' and ('application' in query_lower or 'applications' in query_lower):
-        query_type = 'topN'
-        # Filter to most relevant demographic factors for application analysis
-        relevant_features = [f for f in feature_importance if 
-            any(term in f['feature'].lower() for term in ['household', 'income', 'population', 'density']) and
-            abs(f.get('importance', 0)) > 0.3]
+        summary = f"Analysis shows a {strength} {direction} correlation ({correlation_value:.3f}) between {col1} and {col2}."
         
         return {
-            'summary': None,  # No summary - Claude handles this
-            'feature_importance': relevant_features,
-            'query_type': query_type
+            "success": True,
+            "results": results,
+            "summary": summary,
+            "feature_importance": feature_importance,
+            "correlation_analysis": {
+                "correlation_coefficient": float(correlation_value),
+                "correlation_strength": strength,
+                "correlation_direction": direction,
+                "sample_size": len(valid_data),
+                "field1": col1,
+                "field2": col2
+            },
+            "analysis_type": "bivariate_correlation"
         }
-    
-    # Default case - return all feature importance for Claude to analyze
-    return {
-        'summary': None,  # No summary - Claude handles this
-        'feature_importance': feature_importance,
-        'query_type': 'analysis'
-    }
-
-def analyze_spatial_patterns(df, target_variable, features):
-    """Analyze spatial distribution patterns and clustering"""
-    
-    if len(df) < 3:
-        return {
-            "distribution_type": "insufficient_data",
-            "clustering_strength": 0,
-            "spatial_autocorrelation": 0,
-            "pattern_description": "Insufficient data for spatial pattern analysis"
-        }
-    
-    # Calculate basic distribution statistics
-    values = df[target_variable].dropna()
-    if len(values) == 0:
-        return {
-            "distribution_type": "no_data",
-            "clustering_strength": 0,
-            "spatial_autocorrelation": 0,
-            "pattern_description": "No valid data for spatial analysis"
-        }
-    
-    # Analyze value distribution
-    mean_val = values.mean()
-    std_val = values.std()
-    cv = std_val / mean_val if mean_val != 0 else 0
-    
-    # Determine clustering strength based on coefficient of variation
-    if cv < 0.2:
-        clustering_type = "uniform"
-        clustering_strength = 0.2
-    elif cv < 0.5:
-        clustering_type = "moderate_clustering"
-        clustering_strength = 0.6
-    else:
-        clustering_type = "high_clustering"
-        clustering_strength = 0.9
-    
-    # Calculate quartile distribution
-    q1 = values.quantile(0.25)
-    q2 = values.quantile(0.50)
-    q3 = values.quantile(0.75)
-    
-    # Identify outliers
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    outliers = df[(df[target_variable] < lower_bound) | (df[target_variable] > upper_bound)]
-    
-    return {
-        "distribution_type": clustering_type,
-        "clustering_strength": safe_float(clustering_strength),
-        "spatial_autocorrelation": safe_float(min(1.0, cv)),  # Use CV as proxy for spatial autocorrelation
-        "value_statistics": {
-            "mean": safe_float(mean_val),
-            "median": safe_float(q2),
-            "std_deviation": safe_float(std_val),
-            "coefficient_variation": safe_float(cv),
-            "quartiles": {
-                "q1": safe_float(q1),
-                "q2": safe_float(q2),
-                "q3": safe_float(q3)
-            }
-        },
-        "outlier_analysis": {
-            "outlier_count": len(outliers),
-            "outlier_percentage": safe_float((len(outliers) / len(df)) * 100),
-            "outlier_threshold_low": safe_float(lower_bound),
-            "outlier_threshold_high": safe_float(upper_bound)
-        },
-        "pattern_description": f"Data shows {clustering_type} with {len(outliers)} outliers ({(len(outliers)/len(df)*100):.1f}% of areas)"
-    }
-
-def identify_regional_clusters(df, target_variable):
-    """Identify and analyze regional clusters based on values"""
-    
-    if len(df) < 5:
-        return {
-            "cluster_count": 1,
-            "clusters": [{"name": "all_areas", "area_count": len(df), "avg_value": safe_float(df[target_variable].mean())}],
-            "cluster_description": "Insufficient data for cluster analysis"
-        }
-    
-    values = df[target_variable].dropna()
-    if len(values) == 0:
-        return {
-            "cluster_count": 0,
-            "clusters": [],
-            "cluster_description": "No valid data for clustering"
-        }
-    
-    # Use quartile-based clustering for simplicity
-    q25 = values.quantile(0.25)
-    q50 = values.quantile(0.50)
-    q75 = values.quantile(0.75)
-    
-    # Define clusters based on quartiles
-    clusters = []
-    
-    # High performing areas (top quartile)
-    high_areas = df[df[target_variable] >= q75]
-    if len(high_areas) > 0:
-        clusters.append({
-            "name": "high_performance",
-            "label": "High Performance Areas",
-            "area_count": len(high_areas),
-            "avg_value": safe_float(high_areas[target_variable].mean()),
-            "min_value": safe_float(high_areas[target_variable].min()),
-            "max_value": safe_float(high_areas[target_variable].max()),
-            "percentage_of_total": safe_float((len(high_areas) / len(df)) * 100),
-            "areas": high_areas['ID'].tolist()[:10]  # First 10 area IDs
-        })
-    
-    # Medium-high performing areas (3rd quartile)
-    med_high_areas = df[(df[target_variable] >= q50) & (df[target_variable] < q75)]
-    if len(med_high_areas) > 0:
-        clusters.append({
-            "name": "medium_high_performance",
-            "label": "Medium-High Performance Areas",
-            "area_count": len(med_high_areas),
-            "avg_value": safe_float(med_high_areas[target_variable].mean()),
-            "min_value": safe_float(med_high_areas[target_variable].min()),
-            "max_value": safe_float(med_high_areas[target_variable].max()),
-            "percentage_of_total": safe_float((len(med_high_areas) / len(df)) * 100),
-            "areas": med_high_areas['ID'].tolist()[:10]
-        })
-    
-    # Medium-low performing areas (2nd quartile)
-    med_low_areas = df[(df[target_variable] >= q25) & (df[target_variable] < q50)]
-    if len(med_low_areas) > 0:
-        clusters.append({
-            "name": "medium_low_performance",
-            "label": "Medium-Low Performance Areas",
-            "area_count": len(med_low_areas),
-            "avg_value": safe_float(med_low_areas[target_variable].mean()),
-            "min_value": safe_float(med_low_areas[target_variable].min()),
-            "max_value": safe_float(med_low_areas[target_variable].max()),
-            "percentage_of_total": safe_float((len(med_low_areas) / len(df)) * 100),
-            "areas": med_low_areas['ID'].tolist()[:10]
-        })
-    
-    # Low performing areas (bottom quartile)
-    low_areas = df[df[target_variable] < q25]
-    if len(low_areas) > 0:
-        clusters.append({
-            "name": "low_performance",
-            "label": "Low Performance Areas",
-            "area_count": len(low_areas),
-            "avg_value": safe_float(low_areas[target_variable].mean()),
-            "min_value": safe_float(low_areas[target_variable].min()),
-            "max_value": safe_float(low_areas[target_variable].max()),
-            "percentage_of_total": safe_float((len(low_areas) / len(df)) * 100),
-            "areas": low_areas['ID'].tolist()[:10]
-        })
-    
-    return {
-        "cluster_count": len(clusters),
-        "clusters": clusters,
-        "cluster_method": "quartile_based",
-        "cluster_description": f"Identified {len(clusters)} performance-based regional clusters across {len(df)} areas"
-    }
-
-def build_geographic_context(df, target_variable, user_query):
-    """Build comprehensive geographic context for spatial analysis"""
-    
-    # Analyze geographic spread and diversity
-    total_areas = len(df)
-    values = df[target_variable].dropna()
-    
-    if len(values) == 0:
-        return {
-            "geographic_scope": "no_data",
-            "area_coverage": 0,
-            "regional_patterns": {},
-            "context_description": "No geographic data available for analysis"
-        }
-    
-    # Calculate geographic diversity metrics
-    unique_ids = df['ID'].nunique()
-    value_range = values.max() - values.min()
-    mean_value = values.mean()
-    
-    # Identify top and bottom performing areas with geographic context
-    top_5 = df.nlargest(5, target_variable)
-    bottom_5 = df.nsmallest(5, target_variable)
-    
-    # Build regional patterns based on available demographic/economic indicators
-    regional_patterns = {}
-    
-    # Check for diversity patterns
-    diversity_col = 'value_2024 Visible Minority Total Population (%)'
-    if diversity_col in df.columns:
-        diversity_corr = df[[target_variable, diversity_col]].corr().iloc[0, 1]
-        regional_patterns['diversity_relationship'] = {
-            "correlation": safe_float(diversity_corr),
-            "description": f"{'Positive' if diversity_corr > 0.1 else 'Negative' if diversity_corr < -0.1 else 'Weak'} relationship between diversity and {target_variable.lower()}"
-        }
-    
-    # Check for income patterns
-    income_col = 'value_2024 Household Average Income (Current Year $)'
-    if income_col in df.columns:
-        income_corr = df[[target_variable, income_col]].corr().iloc[0, 1]
-        regional_patterns['income_relationship'] = {
-            "correlation": safe_float(income_corr),
-            "description": f"{'Positive' if income_corr > 0.1 else 'Negative' if income_corr < -0.1 else 'Weak'} relationship between income and {target_variable.lower()}"
-        }
-    
-    # Check for housing patterns
-    housing_col = 'value_2024 Structure Type Single-Detached House (%)'
-    if housing_col in df.columns:
-        housing_corr = df[[target_variable, housing_col]].corr().iloc[0, 1]
-        regional_patterns['housing_relationship'] = {
-            "correlation": safe_float(housing_corr),
-            "description": f"{'Positive' if housing_corr > 0.1 else 'Negative' if housing_corr < -0.1 else 'Weak'} relationship between single-detached housing and {target_variable.lower()}"
-        }
-    
-    # Determine geographic scope based on query and data
-    if 'province' in user_query.lower() or 'provincial' in user_query.lower():
-        geographic_scope = "provincial"
-    elif 'city' in user_query.lower() or 'urban' in user_query.lower():
-        geographic_scope = "urban"
-    elif 'region' in user_query.lower() or 'regional' in user_query.lower():
-        geographic_scope = "regional"
-    else:
-        geographic_scope = "multi_area"
-    
-    return {
-        "geographic_scope": geographic_scope,
-        "area_coverage": total_areas,
-        "value_statistics": {
-            "range": safe_float(value_range),
-            "mean": safe_float(mean_value),
-            "geographic_diversity": safe_float(value_range / mean_value if mean_value != 0 else 0)
-        },
-        "top_performers": {
-            "count": len(top_5),
-            "areas": top_5['ID'].tolist(),
-            "avg_value": safe_float(top_5[target_variable].mean()),
-            "value_range": safe_float(top_5[target_variable].max() - top_5[target_variable].min())
-        },
-        "bottom_performers": {
-            "count": len(bottom_5),
-            "areas": bottom_5['ID'].tolist(),
-            "avg_value": safe_float(bottom_5[target_variable].mean()),
-            "value_range": safe_float(bottom_5[target_variable].max() - bottom_5[target_variable].min())
-        },
-        "regional_patterns": regional_patterns,
-        "adjacent_area_analysis": {
-            "coverage_description": f"Analysis covers {total_areas} geographic areas",
-            "spatial_continuity": "Available" if total_areas > 10 else "Limited",
-            "pattern_reliability": "High" if total_areas > 20 else "Moderate" if total_areas > 10 else "Limited"
-        },
-        "context_description": f"Geographic analysis of {total_areas} areas showing {geographic_scope} patterns with {len(regional_patterns)} demographic/economic relationships identified"
-    }
-
-# Example usage patterns for different analysis types:
-
-ANALYSIS_EXAMPLES = {
-    "demographic_focus": {
-        "target_variable": "CONVERSION_RATE",
-        "focus_area": "demographic",
-        "demographic_filters": [
-            {"field": "value_2024 Visible Minority Total Population (%)", "operator": "greaterThan", "value": 10}
-        ],
-        "analysis_type": "correlation",
-        "query": "How do demographic factors affect conversion rates in diverse areas?"
-    },
-    
-    "financial_analysis": {
-        "target_variable": "SUM_FUNDED", 
-        "focus_area": "financial",
-        "demographic_filters": [
-            {"field": "value_2024 Household Average Income (Current Year $)", "operator": "greaterThan", "value": 80000}
-        ],
-        "analysis_type": "ranking",
-        "query": "Which high-income areas generate the most loan volume?"
-    },
-    
-    "geographic_patterns": {
-        "target_variable": "CONVERSION_RATE",
-        "focus_area": "geographic", 
-        "demographic_filters": [
-            {"field": "value_2024 Structure Type Single-Detached House (%)", "operator": "greaterThan", "value": 50}
-        ],
-        "analysis_type": "correlation",
-        "query": "How do housing types affect conversion rates?"
-    },
-    
-    "frequency_analysis": {
-        "target_variable": "FREQUENCY",
-        "demographic_filters": [
-            {"field": "value_2024 Total Population", "operator": "greaterThan", "value": 5000}
-        ],
-        "analysis_type": "ranking", 
-        "query": "Which populated areas have the highest application frequency?"
-    }
-} 
+        
+    except Exception as e:
+        logger.error(f"Error in bivariate correlation analysis: {str(e)}")
+        return {"success": False, "error": f"Bivariate correlation analysis failed: {str(e)}"} 

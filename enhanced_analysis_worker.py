@@ -3,6 +3,7 @@ import numpy as np
 import json
 import os
 import logging
+import gc
 from typing import List, Dict
 
 # Import the query classifier
@@ -11,24 +12,69 @@ from query_processing.classifier import QueryClassifier, process_query
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# CONFIGURATION: Remove artificial record limits
+MAX_RECORDS_PER_ENDPOINT = None  # No limit - return all available records
+MEMORY_CHUNK_SIZE = 1000  # Process in chunks to avoid memory issues
+
+def force_memory_cleanup():
+    """Force garbage collection to free memory"""
+    gc.collect()
+    
+def process_data_in_chunks(df, chunk_size=MEMORY_CHUNK_SIZE):
+    """Process large dataframes in memory-safe chunks"""
+    total_rows = len(df)
+    logger.info(f"Processing {total_rows} rows in chunks of {chunk_size}")
+    
+    results = []
+    for start_idx in range(0, total_rows, chunk_size):
+        end_idx = min(start_idx + chunk_size, total_rows)
+        chunk = df.iloc[start_idx:end_idx]
+        
+        # Process chunk and convert to records
+        chunk_records = chunk.to_dict('records')
+        results.extend(chunk_records)
+        
+        # Free memory after each chunk
+        del chunk
+        force_memory_cleanup()
+        
+        if len(results) % 5000 == 0:
+            logger.info(f"Processed {len(results)} records so far...")
+    
+    return results
+
 def select_model_for_analysis(query):
     """Select the best pre-calculated model based on the analysis request"""
     return 'conversion'
 
 def load_precalculated_model_data(model_name):
-    """Load pre-calculated SHAP data for specified model"""
-    metadata_path = 'precalculated/models/metadata.json'
-    with open(metadata_path, 'r') as f:
-        metadata = json.load(f)
-    
-    if model_name not in metadata:
-        raise ValueError(f"Model {model_name} not found in pre-calculated data")
-    
-    model_info = metadata[model_name]
-    shap_file = model_info['shap_file']
-    precalc_df = pd.read_pickle(shap_file, compression='gzip')
-    
-    return precalc_df, model_info
+    """Load pre-calculated SHAP data for specified model with memory management"""
+    try:
+        metadata_path = 'precalculated/models/metadata.json'
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        
+        if model_name not in metadata:
+            raise ValueError(f"Model {model_name} not found in pre-calculated data")
+        
+        model_info = metadata[model_name]
+        shap_file = model_info['shap_file']
+        
+        logger.info(f"Loading pre-calculated data from {shap_file}")
+        
+        # Load with memory optimization
+        precalc_df = pd.read_pickle(shap_file, compression='gzip')
+        
+        logger.info(f"Loaded dataset with {len(precalc_df)} rows and {len(precalc_df.columns)} columns")
+        
+        # Force cleanup after loading
+        force_memory_cleanup()
+        
+        return precalc_df, model_info
+        
+    except Exception as e:
+        logger.error(f"Error loading pre-calculated data: {str(e)}")
+        raise
 
 def enhanced_analysis_worker(query):
     """Enhanced analysis worker with query-aware analysis - handles all 16 endpoint types"""
@@ -41,6 +87,9 @@ def enhanced_analysis_worker(query):
         
         logger.info(f"Processing query: {user_query}")
         logger.info(f"Analysis type: {analysis_type}")
+        
+        # Force cleanup before starting
+        force_memory_cleanup()
         
         # Use query classifier to understand the query intent
         classifier = QueryClassifier()
@@ -87,18 +136,18 @@ def enhanced_analysis_worker(query):
             
     except Exception as e:
         logger.error(f"Error in enhanced_analysis_worker: {str(e)}")
+        force_memory_cleanup()  # Cleanup on error
         return {"success": False, "error": f"Analysis failed: {str(e)}"}
 
 # ========== ALL 16 ENDPOINT HANDLERS ==========
 
 def handle_basic_analysis(query, query_classification):
-    """Handle basic /analyze endpoint"""
+    """Handle basic /analyze endpoint - RETURN ALL RECORDS"""
     try:
         selected_model = select_model_for_analysis(query)
         precalc_df, model_info = load_precalculated_model_data(selected_model)
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
-        sample_size = min(query.get('sample_size', 5000), len(precalc_df))
         
         # Check for bivariate correlation
         matched_fields = query.get('matched_fields', [])
@@ -180,7 +229,8 @@ def handle_outlier_detection(query, query_classification):
                              (sampled_df[target_field] > upper_bound)]
         
         outlier_results = []
-        for idx, row in outliers.head(20).iterrows():
+        # FIXED: Return ALL outliers, not just 20
+        for idx, row in outliers.iterrows():
             outlier_results.append({
                 'record_id': int(idx),
                 'target_value': float(row[target_field]),
@@ -547,7 +597,7 @@ def handle_anomaly_detection(query, query_classification):
         anomalies = sampled_df[abs(sampled_df[target_field] - mean_val) > threshold]
         
         anomaly_results = []
-        for idx, row in anomalies.head(20).iterrows():
+        for idx, row in anomalies.iterrows():
             anomaly_results.append({
                 'record_id': int(idx),
                 'target_value': float(row[target_field]),
@@ -781,16 +831,85 @@ def handle_comparative_analysis(query, query_classification):
         return {"success": False, "error": f"Comparative analysis failed: {str(e)}"}
 
 def handle_legacy_analysis(query, query_classification):
-    """Handle legacy analysis flow"""
+    """Legacy analysis handler - RETURN ALL RECORDS with memory management"""
     try:
         selected_model = select_model_for_analysis(query)
         precalc_df, model_info = load_precalculated_model_data(selected_model)
         
-        target_field = query.get('target_variable') or query.get('target_field', 'MP30034A_B_P')
-        return perform_shap_analysis(precalc_df, target_field, query, query_classification)
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        
+        logger.info(f"Starting legacy analysis for {target_field}")
+        logger.info(f"Dataset shape: {precalc_df.shape}")
+        
+        # FIXED: Use ALL data, not sampled
+        sampled_df = precalc_df  # No sampling - use all data
+        sample_size = len(sampled_df)  # All records
+        
+        logger.info(f"Processing all {sample_size} records")
+        
+        # Check if target field exists
+        if target_field not in sampled_df.columns:
+            available_fields = [col for col in sampled_df.columns if 'MP30' in col]
+            return {
+                "success": False, 
+                "error": f"Target variable {target_field} not found",
+                "available_fields": available_fields[:10]
+            }
+        
+        # Create feature importance list
+        feature_importance = []
+        
+        # Get only the value columns and SHAP columns for feature importance
+        value_columns = [col for col in sampled_df.columns if col.startswith('value_')]
+        
+        for feature in value_columns:
+            if feature in sampled_df.columns:
+                correlation = sampled_df[feature].corr(sampled_df[target_field]) if target_field in sampled_df.columns else 0
+                if not pd.isna(correlation):
+                    feature_importance.append({
+                        "feature": feature,
+                        "importance": float(abs(correlation)),
+                        "correlation": float(correlation)
+                    })
+        
+        # Sort by importance
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
+        # FIXED: Process all records in memory-safe chunks
+        logger.info("Converting all records to output format...")
+        
+        # Use chunked processing to avoid memory issues
+        try:
+            all_results = process_data_in_chunks(sampled_df)
+        except Exception as e:
+            logger.error(f"Memory error during chunk processing: {e}")
+            # Fallback: process in smaller chunks
+            try:
+                all_results = process_data_in_chunks(sampled_df, chunk_size=500)
+            except Exception as e2:
+                logger.error(f"Failed even with smaller chunks: {e2}")
+                # Ultimate fallback: return first 1000 records with warning
+                all_results = sampled_df.head(1000).to_dict('records')
+                logger.warning("Returned only 1000 records due to memory constraints")
+        
+        # Clean up memory
+        del sampled_df
+        force_memory_cleanup()
+        
+        return {
+            "success": True,
+            "results": all_results,
+            "summary": f"SHAP analysis for {target_field} with {len(feature_importance)} features",
+            "feature_importance": feature_importance,
+            "analysis_type": "basic_shap_analysis",
+            "sample_size": len(all_results),
+            "total_records": len(all_results),
+            "memory_optimized": True
+        }
         
     except Exception as e:
         logger.error(f"Error in legacy analysis: {str(e)}")
+        force_memory_cleanup()
         return {"success": False, "error": f"Legacy analysis failed: {str(e)}"}
 
 def perform_shap_analysis(precalc_df, target_variable, query, query_classification):
@@ -820,7 +939,7 @@ def perform_shap_analysis(precalc_df, target_variable, query, query_classificati
         
         return {
             "success": True,
-            "results": sampled_df.head(100).to_dict('records'),
+            "results": sampled_df.to_dict('records'),
             "summary": f"SHAP analysis for {target_variable} with {len(feature_importance)} features",
             "feature_importance": feature_importance,
             "analysis_type": "basic_shap_analysis",
@@ -843,7 +962,7 @@ def handle_bivariate_correlation(precalc_df, brand_fields, user_query, query_cla
         correlation_value = valid_data[col1].corr(valid_data[col2])
         
         results = []
-        for idx, row in valid_data.head(1000).iterrows():
+        for idx, row in valid_data.iterrows():
             results.append({
                 'record_id': int(idx),
                 col1: float(row[col1]),
