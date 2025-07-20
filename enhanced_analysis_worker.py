@@ -11,8 +11,171 @@ from typing import List, Dict
 # Import the query classifier
 from query_processing.classifier import QueryClassifier, process_query
 
+# SHAP CALCULATION INFRASTRUCTURE - PHASE 1
+import shap
+
 # Set up logging
 logger = logging.getLogger(__name__)
+
+# Global SHAP explainer (initialized once)
+_shap_explainer = None
+_model_features = None
+_xgb_model = None
+
+def initialize_shap_explainer():
+    """Initialize SHAP explainer with loaded XGBoost model"""
+    global _shap_explainer, _model_features, _xgb_model
+    
+    try:
+        logger.info("Initializing SHAP explainer...")
+        
+        # Import model from main app module
+        from app import model, feature_names
+        
+        # Check if model and features are loaded
+        if model is None:
+            logger.error("❌ XGBoost model not loaded in main app")
+            return False
+            
+        if not feature_names:
+            logger.error("❌ Feature names not loaded in main app")
+            return False
+            
+        # Store references
+        _xgb_model = model
+        _model_features = feature_names
+        
+        # Create SHAP explainer
+        _shap_explainer = shap.TreeExplainer(model)
+        
+        logger.info(f"✅ SHAP explainer initialized with {len(_model_features)} features")
+        logger.info(f"📊 Model type: {type(model)}")
+        logger.info(f"🎯 Sample features: {_model_features[:5]}...")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ SHAP explainer initialization failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+
+def calculate_shap_values_batch(data_batch, target_variable):
+    """Calculate SHAP values for a batch of records"""
+    global _shap_explainer, _model_features, _xgb_model
+    
+    try:
+        # Initialize SHAP if not already done
+        if _shap_explainer is None:
+            if not initialize_shap_explainer():
+                logger.warning("SHAP initialization failed, using correlation fallback")
+                return None, None
+        
+        logger.info(f"🧠 Calculating SHAP values for {len(data_batch)} records...")
+        
+        # Prepare data for SHAP calculation
+        df_batch = pd.DataFrame(data_batch)
+        
+        # Ensure all model features are present
+        missing_features = set(_model_features) - set(df_batch.columns)
+        for feature in missing_features:
+            df_batch[feature] = 0  # Fill missing features with 0
+            
+        # Select only model features in correct order
+        model_data = df_batch[_model_features].fillna(0)
+        
+        # Replace inf values with 0
+        model_data = model_data.replace([np.inf, -np.inf], 0)
+        
+        logger.info(f"📋 Model data shape: {model_data.shape}")
+        logger.info(f"🎯 Target variable: {target_variable}")
+        
+        # Calculate SHAP values (memory efficient)
+        shap_values = _shap_explainer.shap_values(model_data)
+        
+        logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
+        
+        # Convert to feature importance format
+        feature_importance = []
+        mean_abs_shap = np.abs(shap_values).mean(axis=0)
+        
+        for i, feature in enumerate(_model_features):
+            if i < len(mean_abs_shap):
+                importance_score = float(mean_abs_shap[i])
+                correlation = 0.0
+                
+                # Calculate correlation if target variable exists
+                if target_variable in df_batch.columns:
+                    try:
+                        correlation = float(df_batch[feature].corr(df_batch[target_variable]))
+                        if pd.isna(correlation):
+                            correlation = 0.0
+                    except:
+                        correlation = 0.0
+                
+                feature_importance.append({
+                    "feature": feature,
+                    "importance": importance_score,
+                    "correlation": correlation,
+                    "shap_mean_abs": importance_score
+                })
+        
+        # Add SHAP values to records
+        enhanced_records = []
+        for idx, record in enumerate(data_batch):
+            enhanced_record = record.copy()
+            # Add SHAP values for this record
+            for i, feature in enumerate(_model_features):
+                if i < len(shap_values[idx]):
+                    enhanced_record[f'shap_{feature}'] = float(shap_values[idx][i])
+            enhanced_records.append(enhanced_record)
+        
+        logger.info(f"✅ Enhanced {len(enhanced_records)} records with SHAP values")
+        logger.info(f"📊 Feature importance calculated for {len(feature_importance)} features")
+        
+        return enhanced_records, feature_importance
+        
+    except Exception as e:
+        logger.error(f"❌ SHAP calculation failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return data_batch, []  # Return original data if SHAP fails
+
+def calculate_correlation_importance(records, target_field):
+    """Fallback correlation-based importance when SHAP fails"""
+    try:
+        logger.info(f"🔄 Using correlation fallback for {len(records)} records")
+        
+        df = pd.DataFrame(records)
+        feature_importance = []
+        
+        if target_field not in df.columns:
+            logger.warning(f"Target field {target_field} not found for correlation fallback")
+            return []
+        
+        # Focus on value fields for correlation
+        value_fields = [k for k in df.columns if k.startswith('value_')]
+        
+        for feature in value_fields:
+            try:
+                correlation = df[feature].corr(df[target_field])
+                if not pd.isna(correlation):
+                    feature_importance.append({
+                        "feature": feature,
+                        "importance": abs(correlation),
+                        "correlation": correlation,
+                        "method": "correlation_fallback"
+                    })
+            except Exception as e:
+                logger.warning(f"Correlation calculation failed for {feature}: {e}")
+                continue
+        
+        logger.info(f"✅ Correlation fallback calculated for {len(feature_importance)} features")
+        return feature_importance
+        
+    except Exception as e:
+        logger.error(f"❌ Correlation fallback failed: {e}")
+        return []
 
 # ULTRA-MINIMAL STREAMING: Prevent 502s while getting ALL records
 MICRO_CHUNK_SIZE = 10  # Tiny chunks to prevent memory issues
@@ -343,25 +506,68 @@ def handle_basic_analysis_progressive(query, query_classification):
             all_records = df.to_dict('records')
             logger.info(f"Converting DataFrame: {len(all_records)} records")
         
-        # Quick feature importance (lightweight)
+        # ✅ REAL SHAP CALCULATION - PHASE 1 IMPLEMENTATION
+        logger.info(f"🧠 Starting SHAP-enabled analysis for {len(all_records)} records with target: {target_field}")
+        
+        enhanced_records = []
         feature_importance = []
         
         if len(all_records) > 0:
-            sample_record = all_records[0]
-            value_fields = [k for k in sample_record.keys() if k.startswith('value_')]
-            
-            # Calculate importance for subset to avoid memory issues
-            for feature in value_fields[:50]:  # Limit to avoid memory spike
-                try:
-                    if feature in sample_record:
-                        # Simple placeholder importance
-                        feature_importance.append({
-                            "feature": feature,
-                            "importance": 0.5,  # Placeholder
-                            "correlation": 0.0
-                        })
-                except:
-                    continue
+            try:
+                # Process in batches to manage memory (start with 500 records)
+                batch_size = 500
+                total_batches = (len(all_records) + batch_size - 1) // batch_size
+                
+                logger.info(f"📊 Processing {total_batches} batches of {batch_size} records each")
+                
+                for batch_idx in range(total_batches):
+                    start_idx = batch_idx * batch_size
+                    end_idx = min(start_idx + batch_size, len(all_records))
+                    batch = all_records[start_idx:end_idx]
+                    
+                    logger.info(f"🔄 Processing batch {batch_idx + 1}/{total_batches} ({len(batch)} records)")
+                    
+                    # Calculate SHAP values for this batch
+                    batch_enhanced, batch_importance = calculate_shap_values_batch(batch, target_field)
+                    
+                    if batch_enhanced is not None:
+                        # SHAP calculation succeeded
+                        enhanced_records.extend(batch_enhanced)
+                        if batch_importance and not feature_importance:  # Use first successful batch for importance
+                            feature_importance = batch_importance
+                        logger.info(f"✅ Batch {batch_idx + 1} SHAP calculation successful")
+                    else:
+                        # SHAP failed, use original batch
+                        enhanced_records.extend(batch)
+                        logger.warning(f"⚠️ Batch {batch_idx + 1} SHAP calculation failed, using original data")
+                    
+                    # Memory cleanup after each batch
+                    ultra_minimal_cleanup()
+                
+                # If no SHAP calculations succeeded, use correlation fallback
+                if not feature_importance:
+                    logger.warning("🔄 All SHAP calculations failed, using correlation fallback")
+                    feature_importance = calculate_correlation_importance(all_records, target_field)
+                
+                # Sort feature importance by actual importance scores
+                feature_importance.sort(key=lambda x: x.get('importance', 0), reverse=True)
+                
+                logger.info(f"✅ SHAP processing complete: {len(enhanced_records)} records, {len(feature_importance)} features")
+                
+                # Log some sample SHAP values to verify they're non-zero
+                if enhanced_records:
+                    sample_record = enhanced_records[0]
+                    shap_fields = [k for k in sample_record.keys() if k.startswith('shap_')]
+                    sample_shap_values = [sample_record[k] for k in shap_fields[:5]]
+                    non_zero_shap = [v for v in sample_shap_values if v != 0.0]
+                    logger.info(f"🎯 Sample SHAP values: {sample_shap_values}")
+                    logger.info(f"✅ Non-zero SHAP count: {len(non_zero_shap)}/{len(sample_shap_values)}")
+                
+            except Exception as shap_error:
+                logger.error(f"❌ SHAP processing failed completely: {shap_error}")
+                # Complete fallback - use original records with correlation importance
+                enhanced_records = all_records
+                feature_importance = calculate_correlation_importance(all_records, target_field)
         
         # Final cleanup
         del df
@@ -369,14 +575,20 @@ def handle_basic_analysis_progressive(query, query_classification):
         
         final_memory = get_memory_usage_mb()
         
+        # Determine if SHAP was successful
+        shap_success = any(k.startswith('shap_') for k in enhanced_records[0].keys()) if enhanced_records else False
+        analysis_method = "shap_analysis" if shap_success else "correlation_fallback"
+        
         return {
             "success": True,
-            "results": all_records,
-            "summary": f"Progressive analysis for {target_field}",
+            "results": enhanced_records,
+            "summary": f"SHAP-enhanced analysis for {target_field} using {analysis_method}",
             "feature_importance": feature_importance,
-            "analysis_type": "progressive_analysis",
-            "total_records": len(all_records),
-            "sample_size": len(all_records),
+            "analysis_type": analysis_method,
+            "total_records": len(enhanced_records),
+            "sample_size": len(enhanced_records),
+            "shap_enabled": shap_success,
+            "target_variable": target_field,
             "progressive_processed": True,
             "final_memory_mb": final_memory
         }
