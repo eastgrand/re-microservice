@@ -6,10 +6,44 @@ import logging
 import gc
 import pickle
 import tempfile
-from typing import List, Dict
+from typing import List, Dict, Any
 
 # Import the query classifier
 from query_processing.classifier import QueryClassifier, process_query
+
+# --- FIELD FILTERING FUNCTIONS ---
+def filter_results_fields(results: List[Dict[str, Any]], query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Filter result fields based on query parameters"""
+    
+    # Check if field filtering is requested
+    include_all_fields = query_params.get('include_all_fields', True)
+    matched_fields = query_params.get('matched_fields', [])
+    
+    # If include_all_fields is True or no matched_fields specified, return as-is
+    if include_all_fields or not matched_fields:
+        logger.info(f"🔓 Field filtering disabled - returning all {len(results[0].keys()) if results else 0} fields")
+        return results
+    
+    # Filter fields for each result record
+    filtered_results = []
+    for record in results:
+        # Keep only matched fields that exist in the record
+        filtered_record = {key: value for key, value in record.items() if key in matched_fields}
+        filtered_results.append(filtered_record)
+    
+    original_field_count = len(results[0].keys()) if results else 0
+    filtered_field_count = len(filtered_results[0].keys()) if filtered_results else 0
+    
+    logger.info(f"🔒 Field filtering applied: {original_field_count} → {filtered_field_count} fields")
+    logger.info(f"📋 Requested fields: {len(matched_fields)}, Found: {filtered_field_count}")
+    
+    return filtered_results
+
+def apply_field_filtering_to_response(response: Dict[str, Any], query_params: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply field filtering to a complete response object"""
+    if 'results' in response and isinstance(response['results'], list) and response['results']:
+        response['results'] = filter_results_fields(response['results'], query_params)
+    return response
 
 # SHAP CALCULATION INFRASTRUCTURE - PHASE 1
 import shap
@@ -579,7 +613,7 @@ def handle_basic_analysis_progressive(query, query_classification):
         shap_success = any(k.startswith('shap_') for k in enhanced_records[0].keys()) if enhanced_records else False
         analysis_method = "shap_analysis" if shap_success else "correlation_fallback"
         
-        return {
+        response = {
             "success": True,
             "results": enhanced_records,
             "summary": f"SHAP-enhanced analysis for {target_field} using {analysis_method}",
@@ -592,6 +626,9 @@ def handle_basic_analysis_progressive(query, query_classification):
             "progressive_processed": True,
             "final_memory_mb": final_memory
         }
+        
+        # Apply field filtering to response
+        return apply_field_filtering_to_response(response, query)
         
     except Exception as e:
         logger.error(f"Progressive analysis error: {str(e)}")
