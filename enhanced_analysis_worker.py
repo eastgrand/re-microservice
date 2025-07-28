@@ -586,18 +586,14 @@ def handle_fresh_shap_analysis(query, query_classification):
         all_records = data_source.to_dict('records')
         logger.info(f"Loaded {len(all_records)} raw demographic records")
         
-        # Apply field filtering early if requested
+        # Store field filtering parameters for later
         include_all_fields = query.get('include_all_fields', True)
         matched_fields = query.get('matched_fields', [])
         
+        # IMPORTANT: Don't filter fields before SHAP calculation!
+        # SHAP needs all model features to calculate properly
         if not include_all_fields and matched_fields:
-            # Filter records to only requested fields
-            filtered_records = []
-            for record in all_records:
-                filtered_record = {key: value for key, value in record.items() if key in matched_fields}
-                filtered_records.append(filtered_record)
-            all_records = filtered_records
-            logger.info(f"Field filtering applied: {len(all_records[0].keys()) if all_records else 0} fields kept")
+            logger.info(f"Field filtering requested with {len(matched_fields)} fields, but will apply AFTER SHAP calculation")
         
         # Process in batches with fresh SHAP calculation
         enhanced_records = []
@@ -656,6 +652,22 @@ def handle_fresh_shap_analysis(query, query_classification):
                 logger.error(f"❌ Fresh SHAP processing failed: {shap_error}")
                 enhanced_records = all_records
                 feature_importance = []
+        
+        # Apply field filtering AFTER SHAP calculation if requested
+        if not include_all_fields and matched_fields and enhanced_records:
+            logger.info(f"Applying field filtering to {len(enhanced_records)} records with SHAP values")
+            filtered_enhanced_records = []
+            
+            # Always include SHAP fields in the filter
+            shap_fields = [k for k in enhanced_records[0].keys() if k.startswith('shap_')]
+            all_fields_to_keep = set(matched_fields) | set(shap_fields)
+            
+            for record in enhanced_records:
+                filtered_record = {k: v for k, v in record.items() if k in all_fields_to_keep}
+                filtered_enhanced_records.append(filtered_record)
+            
+            enhanced_records = filtered_enhanced_records
+            logger.info(f"Field filtering complete: {len(enhanced_records[0].keys()) if enhanced_records else 0} fields kept (including SHAP)")
         
         # Final cleanup
         ultra_minimal_cleanup()
