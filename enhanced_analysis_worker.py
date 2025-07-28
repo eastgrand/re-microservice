@@ -565,18 +565,25 @@ def handle_fresh_shap_analysis(query, query_classification):
     try:
         logger.info("Starting fresh SHAP analysis with raw demographic data")
         
-        # Load raw demographic data from the joined dataset instead of pre-calculated
+        # Load raw demographic data from training dataset 
         from app import joined_data, training_data
         
-        if joined_data is None:
-            logger.error("Raw demographic data not loaded")
+        # Use training_data if joined_data is not available
+        if joined_data is not None:
+            data_source = joined_data
+            logger.info("Using joined_data for fresh SHAP calculation")
+        elif training_data is not None:
+            data_source = training_data
+            logger.info("Using training_data for fresh SHAP calculation")
+        else:
+            logger.error("No raw demographic data available")
             return {"success": False, "error": "Raw demographic data not available"}
         
         target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
         logger.info(f"Fresh SHAP analysis for {target_field}")
         
         # Use raw data for location-specific SHAP calculation
-        all_records = joined_data.to_dict('records')
+        all_records = data_source.to_dict('records')
         logger.info(f"Loaded {len(all_records)} raw demographic records")
         
         # Apply field filtering early if requested
