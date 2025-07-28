@@ -552,17 +552,135 @@ def enhanced_analysis_worker(query):
         classifier = QueryClassifier()
         query_classification = process_query(user_query)
         
-        # Route to progressive handlers
-        if analysis_type == 'analyze':
-            return handle_basic_analysis_progressive(query, query_classification)
-        else:
-            # For now, all other endpoints use the same progressive approach
-            return handle_basic_analysis_progressive(query, query_classification)
+        # Route to fresh SHAP calculation for ALL analyses
+        return handle_fresh_shap_analysis(query, query_classification)
             
     except Exception as e:
         logger.error(f"Error in progressive analysis: {str(e)}")
         ultra_minimal_cleanup()
         return {"success": False, "error": f"Progressive analysis failed: {str(e)}"}
+
+def handle_fresh_shap_analysis(query, query_classification):
+    """Handle analysis with fresh SHAP calculation using raw demographic data"""
+    try:
+        logger.info("Starting fresh SHAP analysis with raw demographic data")
+        
+        # Load raw demographic data from the joined dataset instead of pre-calculated
+        from app import joined_data, training_data
+        
+        if joined_data is None:
+            logger.error("Raw demographic data not loaded")
+            return {"success": False, "error": "Raw demographic data not available"}
+        
+        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
+        logger.info(f"Fresh SHAP analysis for {target_field}")
+        
+        # Use raw data for location-specific SHAP calculation
+        all_records = joined_data.to_dict('records')
+        logger.info(f"Loaded {len(all_records)} raw demographic records")
+        
+        # Apply field filtering early if requested
+        include_all_fields = query.get('include_all_fields', True)
+        matched_fields = query.get('matched_fields', [])
+        
+        if not include_all_fields and matched_fields:
+            # Filter records to only requested fields
+            filtered_records = []
+            for record in all_records:
+                filtered_record = {key: value for key, value in record.items() if key in matched_fields}
+                filtered_records.append(filtered_record)
+            all_records = filtered_records
+            logger.info(f"Field filtering applied: {len(all_records[0].keys()) if all_records else 0} fields kept")
+        
+        # Process in batches with fresh SHAP calculation
+        enhanced_records = []
+        feature_importance = []
+        
+        if len(all_records) > 0:
+            try:
+                # Process in smaller batches for memory efficiency
+                batch_size = 200  # Smaller batches for fresh calculation
+                total_batches = (len(all_records) + batch_size - 1) // batch_size
+                
+                logger.info(f"📊 Processing {total_batches} batches of {batch_size} records each with fresh SHAP")
+                
+                for batch_idx in range(total_batches):
+                    start_idx = batch_idx * batch_size
+                    end_idx = min(start_idx + batch_size, len(all_records))
+                    batch = all_records[start_idx:end_idx]
+                    
+                    logger.info(f"🔄 Fresh SHAP batch {batch_idx + 1}/{total_batches} ({len(batch)} records)")
+                    
+                    # Calculate fresh SHAP values for this batch
+                    batch_enhanced, batch_importance = calculate_shap_values_batch(batch, target_field)
+                    
+                    if batch_enhanced is not None:
+                        enhanced_records.extend(batch_enhanced)
+                        if batch_importance and not feature_importance:
+                            feature_importance = batch_importance
+                        logger.info(f"✅ Fresh SHAP batch {batch_idx + 1} successful")
+                    else:
+                        enhanced_records.extend(batch)
+                        logger.warning(f"⚠️ Fresh SHAP batch {batch_idx + 1} failed, using original data")
+                    
+                    # Memory cleanup after each batch
+                    ultra_minimal_cleanup()
+                
+                # Sort feature importance by actual importance scores
+                if feature_importance:
+                    feature_importance.sort(key=lambda x: x.get('importance', 0), reverse=True)
+                
+                logger.info(f"✅ Fresh SHAP processing complete: {len(enhanced_records)} records, {len(feature_importance)} features")
+                
+                # Log sample values to verify location-specific calculation
+                if enhanced_records:
+                    sample_record = enhanced_records[0]
+                    shap_fields = [k for k in sample_record.keys() if k.startswith('shap_')]
+                    if len(enhanced_records) > 1:
+                        second_record = enhanced_records[1]
+                        sample_shap1 = [sample_record.get(k, 0) for k in shap_fields[:3]]
+                        sample_shap2 = [second_record.get(k, 0) for k in shap_fields[:3]]
+                        logger.info(f"🎯 Record 1 SHAP sample: {sample_shap1}")
+                        logger.info(f"🎯 Record 2 SHAP sample: {sample_shap2}")
+                        different_values = sum(1 for i in range(len(sample_shap1)) if sample_shap1[i] != sample_shap2[i])
+                        logger.info(f"✅ Location variation: {different_values}/{len(sample_shap1)} SHAP values differ")
+                
+            except Exception as shap_error:
+                logger.error(f"❌ Fresh SHAP processing failed: {shap_error}")
+                enhanced_records = all_records
+                feature_importance = []
+        
+        # Final cleanup
+        ultra_minimal_cleanup()
+        final_memory = get_memory_usage_mb()
+        
+        # Determine if SHAP was successful
+        shap_success = any(k.startswith('shap_') for k in enhanced_records[0].keys()) if enhanced_records else False
+        analysis_method = "fresh_shap_analysis" if shap_success else "raw_data_fallback"
+        
+        response = {
+            "success": True,
+            "results": enhanced_records,
+            "summary": f"Fresh SHAP analysis for {target_field} using {analysis_method}",
+            "feature_importance": feature_importance,
+            "analysis_type": analysis_method,
+            "total_records": len(enhanced_records),
+            "sample_size": len(enhanced_records),
+            "shap_enabled": shap_success,
+            "target_variable": target_field,
+            "fresh_calculation": True,
+            "final_memory_mb": final_memory
+        }
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Fresh SHAP analysis error: {str(e)}")
+        ultra_minimal_cleanup()
+        return {
+            "success": False,
+            "error": f"Fresh SHAP analysis failed: {str(e)}"
+        }
 
 def handle_basic_analysis_progressive(query, query_classification):
     """Handle analysis with progressive loading - ALL RECORDS"""
