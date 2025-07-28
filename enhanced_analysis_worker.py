@@ -6,131 +6,13 @@ import logging
 import gc
 import pickle
 import tempfile
-from typing import List, Dict, Any
+from typing import List, Dict
 
 # Import the query classifier
 from query_processing.classifier import QueryClassifier, process_query
 
-# --- FIELD FILTERING FUNCTIONS ---
-def filter_results_fields(results: List[Dict[str, Any]], query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Filter result fields based on query parameters"""
-    
-    # Check if field filtering is requested
-    include_all_fields = query_params.get('include_all_fields', True)
-    matched_fields = query_params.get('matched_fields', [])
-    
-    # If include_all_fields is True or no matched_fields specified, return as-is
-    if include_all_fields or not matched_fields:
-        logger.info(f"🔓 Field filtering disabled - returning all {len(results[0].keys()) if results else 0} fields")
-        return results
-    
-    # Filter fields for each result record
-    filtered_results = []
-    for record in results:
-        # Keep only matched fields that exist in the record
-        filtered_record = {key: value for key, value in record.items() if key in matched_fields}
-        filtered_results.append(filtered_record)
-    
-    original_field_count = len(results[0].keys()) if results else 0
-    filtered_field_count = len(filtered_results[0].keys()) if filtered_results else 0
-    
-    logger.info(f"🔒 Field filtering applied: {original_field_count} → {filtered_field_count} fields")
-    logger.info(f"📋 Requested fields: {len(matched_fields)}, Found: {filtered_field_count}")
-    
-    return filtered_results
-
-def apply_field_filtering_to_response(response: Dict[str, Any], query_params: Dict[str, Any]) -> Dict[str, Any]:
-    """Apply field filtering to a complete response object"""
-    if 'results' in response and isinstance(response['results'], list) and response['results']:
-        response['results'] = filter_results_fields(response['results'], query_params)
-    return response
-
 # SHAP CALCULATION INFRASTRUCTURE - PHASE 1
 import shap
-
-
-def preprocess_features_for_shap(data_batch, model_features):
-    """Preprocess features to be compatible with SHAP/XGBoost"""
-    try:
-        df_batch = pd.DataFrame(data_batch)
-        
-        # Add missing features with default values
-        for feature in model_features:
-            if feature not in df_batch.columns:
-                if feature in ['Age', 'Income']:
-                    df_batch[feature] = 0  # Demographic defaults
-                else:
-                    df_batch[feature] = 0
-        
-        # Select only model features in correct order
-        model_data = df_batch[model_features]
-        
-        # Handle different data types
-        for col in model_data.columns:
-            if model_data[col].dtype == 'object':
-                # Convert string columns to numeric or encode them
-                try:
-                    model_data[col] = pd.to_numeric(model_data[col], errors='coerce')
-                except:
-                    from sklearn.preprocessing import LabelEncoder
-                    le = LabelEncoder()
-                    model_data[col] = le.fit_transform(model_data[col].astype(str))
-        
-        # Fill NaN and inf values
-        model_data = model_data.fillna(0)
-        model_data = model_data.replace([np.inf, -np.inf], 0)
-        
-        # Ensure all data is numeric
-        model_data = model_data.astype(float)
-        
-        return model_data
-        
-    except Exception as e:
-        logger.error(f"Data preprocessing failed: {e}")
-        # Return original data as fallback
-        df_batch = pd.DataFrame(data_batch)
-        for feature in model_features:
-            if feature not in df_batch.columns:
-                df_batch[feature] = 0
-        return df_batch[model_features].fillna(0).replace([np.inf, -np.inf], 0)
-
-
-# Add this debugging function to help identify issues
-def debug_shap_calculation(data_sample):
-    """Debug SHAP calculation issues"""
-    logger.info("=== SHAP Debug Information ===")
-    
-    try:
-        from app import model, feature_names
-        
-        logger.info(f"🔍 Model loaded: {model is not None}")
-        logger.info(f"🔍 Feature names loaded: {len(feature_names) if feature_names else 0}")
-        
-        if model and feature_names:
-            logger.info(f"🔍 Model type: {type(model)}")
-            logger.info(f"🔍 Model features expected: {getattr(model, 'n_features_in_', 'Unknown')}")
-            logger.info(f"🔍 Feature names count: {len(feature_names)}")
-            
-            # Test preprocessing
-            if data_sample:
-                logger.info(f"🔍 Sample data keys: {list(data_sample[0].keys())[:10]}")
-                processed = preprocess_features_for_shap(data_sample[:1], feature_names)
-                logger.info(f"🔍 Processed data shape: {processed.shape}")
-                logger.info(f"🔍 Processed data types: {processed.dtypes.value_counts().to_dict()}")
-                
-                # Test SHAP explainer creation
-                import shap
-                explainer = shap.TreeExplainer(model)
-                logger.info(f"🔍 SHAP explainer created: {type(explainer)}")
-                
-                # Test SHAP calculation
-                shap_test = explainer.shap_values(processed)
-                logger.info(f"🔍 SHAP test successful: {shap_test.shape}")
-                
-    except Exception as e:
-        logger.error(f"❌ SHAP debug failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -158,42 +40,17 @@ def initialize_shap_explainer():
         if not feature_names:
             logger.error("❌ Feature names not loaded in main app")
             return False
-        
-        # Validate feature count match
-        expected_features = len(feature_names)
-        if hasattr(model, 'n_features_in_'):
-            model_features = model.n_features_in_
-            if model_features != expected_features:
-                logger.error(f"❌ Feature count mismatch: model expects {model_features}, got {expected_features}")
-                return False
             
         # Store references
         _xgb_model = model
         _model_features = feature_names
         
-        logger.info(f"🔧 Creating SHAP TreeExplainer with {len(_model_features)} features...")
-        logger.info(f"📊 Model type: {type(model)}")
-        logger.info(f"🎯 Feature count validation: {len(_model_features)} features")
-        
         # Create SHAP explainer
         _shap_explainer = shap.TreeExplainer(model)
         
-        logger.info(f"✅ SHAP explainer initialized successfully")
-        
-        # Test SHAP with sample data to verify it works
-        try:
-            from app import training_data
-            if training_data is not None:
-                logger.info("🧪 Testing SHAP with sample data...")
-                sample_data = training_data.head(2).to_dict('records')
-                test_processed = preprocess_features_for_shap(sample_data, _model_features)
-                test_shap = _shap_explainer.shap_values(test_processed)
-                logger.info(f"✅ SHAP test successful: {test_shap.shape}")
-            else:
-                logger.warning("⚠️ No training data available for SHAP test")
-        except Exception as test_error:
-            logger.error(f"❌ SHAP test failed: {test_error}")
-            return False
+        logger.info(f"✅ SHAP explainer initialized with {len(_model_features)} features")
+        logger.info(f"📊 Model type: {type(model)}")
+        logger.info(f"🎯 Sample features: {_model_features[:5]}...")
         
         return True
         
@@ -202,6 +59,7 @@ def initialize_shap_explainer():
         import traceback
         logger.error(traceback.format_exc())
         return False
+
 def calculate_shap_values_batch(data_batch, target_variable):
     """Calculate SHAP values for a batch of records"""
     global _shap_explainer, _model_features, _xgb_model
@@ -215,118 +73,61 @@ def calculate_shap_values_batch(data_batch, target_variable):
         
         logger.info(f"🧠 Calculating SHAP values for {len(data_batch)} records...")
         
-        # Prepare data for SHAP calculation using enhanced preprocessing
-        model_data = preprocess_features_for_shap(data_batch, _model_features)
+        # Prepare data for SHAP calculation
+        df_batch = pd.DataFrame(data_batch)
+        
+        # Ensure all model features are present
+        missing_features = set(_model_features) - set(df_batch.columns)
+        for feature in missing_features:
+            df_batch[feature] = 0  # Fill missing features with 0
+            
+        # Select only model features in correct order
+        model_data = df_batch[_model_features].fillna(0)
+        
+        # Replace inf values with 0
+        model_data = model_data.replace([np.inf, -np.inf], 0)
         
         logger.info(f"📋 Model data shape: {model_data.shape}")
         logger.info(f"🎯 Target variable: {target_variable}")
         
         # Calculate SHAP values (memory efficient)
-        try:
-            logger.info(f"⚡ Starting SHAP values calculation...")
-            logger.info(f"🔍 Model data dtypes: {model_data.dtypes.value_counts().to_dict()}")
-            
-            # Ensure data is properly formatted for SHAP
-            if model_data.isnull().any().any():
-                logger.warning("⚠️ Found NaN values in model data, filling with 0")
-                model_data = model_data.fillna(0)
-            
-            # Check for infinite values
-            if np.isinf(model_data).any().any():
-                logger.warning("⚠️ Found infinite values in model data, replacing with 0")
-                model_data = model_data.replace([np.inf, -np.inf], 0)
-            
-            shap_values = _shap_explainer.shap_values(model_data)
-            logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
-            
-        except Exception as shap_error:
-            logger.error(f"❌ SHAP calculation failed: {shap_error}")
-            logger.error(f"🔍 Model data sample:\n{model_data.head()}")
-            logger.error(f"🔍 Model data info: shape={model_data.shape}, dtypes={model_data.dtypes.nunique()} unique types")
-            import traceback
-            logger.error(traceback.format_exc())
-            return None, None
+        shap_values = _shap_explainer.shap_values(model_data)
         
-        # Convert to feature importance format - LOCATION-SPECIFIC VERSION
+        logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
+        
+        # Convert to feature importance format
         feature_importance = []
+        mean_abs_shap = np.abs(shap_values).mean(axis=0)
         
-        # FIXED: For TRUE location-specific analysis, don't average SHAP values globally
-        # Instead, use the first record's SHAP values as representative feature importance
-        # This ensures feature importance reflects location-specific patterns
-        if len(shap_values) > 0:
-            # Use median absolute SHAP across all locations for more stable importance ranking
-            median_abs_shap = np.median(np.abs(shap_values), axis=0)
-            
-            for i, feature in enumerate(_model_features):
-                if i < len(median_abs_shap):
-                    importance_score = float(median_abs_shap[i])
-                    correlation = 0.0
-                    
-                    # Calculate correlation if target variable exists
-                    # Recreate df_batch from original data for correlation calculation
-                    df_batch_for_corr = pd.DataFrame(data_batch)
-                    if target_variable in df_batch_for_corr.columns:
-                        try:
-                            correlation = float(df_batch_for_corr[feature].corr(df_batch_for_corr[target_variable]))
-                            if pd.isna(correlation):
-                                correlation = 0.0
-                        except:
+        for i, feature in enumerate(_model_features):
+            if i < len(mean_abs_shap):
+                importance_score = float(mean_abs_shap[i])
+                correlation = 0.0
+                
+                # Calculate correlation if target variable exists
+                if target_variable in df_batch.columns:
+                    try:
+                        correlation = float(df_batch[feature].corr(df_batch[target_variable]))
+                        if pd.isna(correlation):
                             correlation = 0.0
-                    
-                    feature_importance.append({
-                        "feature": feature,
-                        "importance": importance_score,
-                        "correlation": correlation,
-                        "shap_mean_abs": importance_score
-                    })
+                    except:
+                        correlation = 0.0
+                
+                feature_importance.append({
+                    "feature": feature,
+                    "importance": importance_score,
+                    "correlation": correlation,
+                    "shap_mean_abs": importance_score
+                })
         
-        # Add SHAP values to records WITH LOCATION-SPECIFIC FEATURE IMPORTANCE
+        # Add SHAP values to records
         enhanced_records = []
         for idx, record in enumerate(data_batch):
             enhanced_record = record.copy()
-            
-            # Add individual SHAP values for this record
-            record_shap_values = []
+            # Add SHAP values for this record
             for i, feature in enumerate(_model_features):
                 if i < len(shap_values[idx]):
-                    shap_value = float(shap_values[idx][i])
-                    enhanced_record[f'shap_{feature}'] = shap_value
-                    record_shap_values.append(abs(shap_value))
-            
-            # LOCATION-SPECIFIC: Calculate feature importance score for THIS record
-            # This gives each location its own feature importance profile
-            if record_shap_values:
-                # Calculate this record's total SHAP impact
-                total_shap_impact = sum(record_shap_values)
-                positive_shap = sum(shap_values[idx][shap_values[idx] > 0]) if len(shap_values[idx]) > 0 else 0
-                
-                # Feature importance score based on this record's SHAP distribution
-                max_shap = max(record_shap_values) if record_shap_values else 0
-                diversity_score = 1 - (max_shap / total_shap_impact) if total_shap_impact > 0 else 0
-                
-                # IMPROVED: Dynamic scaling based on actual data distribution
-                # Calculate scaling factors from the current batch for better location sensitivity
-                batch_shap_impacts = [sum(abs(shap_values[i])) for i in range(len(shap_values))]
-                batch_median_impact = np.median(batch_shap_impacts) if batch_shap_impacts else 1
-                batch_positive_shaps = [sum(shap_values[i][shap_values[i] > 0]) for i in range(len(shap_values))]
-                batch_median_positive = np.median([p for p in batch_positive_shaps if p > 0]) if batch_positive_shaps else 1
-                
-                # Location-specific scaling (0-100) based on position relative to batch
-                impact_component = min(40, (total_shap_impact / max(batch_median_impact, 1)) * 20)
-                positive_component = min(30, (positive_shap / max(batch_median_positive, 1)) * 15) if positive_shap > 0 else 0
-                diversity_component = diversity_score * 20
-                consistency_component = 10  # Base consistency score
-                
-                location_feature_importance_score = impact_component + positive_component + diversity_component + consistency_component
-                enhanced_record['feature_importance_score'] = round(location_feature_importance_score, 1)
-                
-                # Add debugging info for location-specific calculation
-                enhanced_record['_debug_total_shap'] = round(total_shap_impact, 2)
-                enhanced_record['_debug_positive_shap'] = round(positive_shap, 2)
-                enhanced_record['_debug_diversity'] = round(diversity_score, 3)
-            else:
-                enhanced_record['feature_importance_score'] = 50.0  # Default score
-                
+                    enhanced_record[f'shap_{feature}'] = float(shap_values[idx][i])
             enhanced_records.append(enhanced_record)
         
         logger.info(f"✅ Enhanced {len(enhanced_records)} records with SHAP values")
@@ -672,154 +473,17 @@ def enhanced_analysis_worker(query):
         classifier = QueryClassifier()
         query_classification = process_query(user_query)
         
-        # Route to fresh SHAP calculation for ALL analyses
-        return handle_fresh_shap_analysis(query, query_classification)
+        # Route to progressive handlers
+        if analysis_type == 'analyze':
+            return handle_basic_analysis_progressive(query, query_classification)
+        else:
+            # For now, all other endpoints use the same progressive approach
+            return handle_basic_analysis_progressive(query, query_classification)
             
     except Exception as e:
         logger.error(f"Error in progressive analysis: {str(e)}")
         ultra_minimal_cleanup()
         return {"success": False, "error": f"Progressive analysis failed: {str(e)}"}
-
-def handle_fresh_shap_analysis(query, query_classification):
-    """Handle analysis with fresh SHAP calculation using raw demographic data"""
-    try:
-        logger.info("Starting fresh SHAP analysis with raw demographic data")
-        
-        # Load raw demographic data from training dataset 
-        from app import joined_data, training_data
-        
-        # Use training_data if joined_data is not available
-        if joined_data is not None:
-            data_source = joined_data
-            logger.info("Using joined_data for fresh SHAP calculation")
-        elif training_data is not None:
-            data_source = training_data
-            logger.info("Using training_data for fresh SHAP calculation")
-        else:
-            logger.error("No raw demographic data available")
-            return {"success": False, "error": "Raw demographic data not available"}
-        
-        target_field = query.get('target_field') or query.get('target_variable', 'MP30034A_B_P')
-        logger.info(f"Fresh SHAP analysis for {target_field}")
-        
-        # Use raw data for location-specific SHAP calculation
-        all_records = data_source.to_dict('records')
-        logger.info(f"Loaded {len(all_records)} raw demographic records")
-        
-        # Store field filtering parameters for later
-        include_all_fields = query.get('include_all_fields', True)
-        matched_fields = query.get('matched_fields', [])
-        
-        # IMPORTANT: Don't filter fields before SHAP calculation!
-        # SHAP needs all model features to calculate properly
-        if not include_all_fields and matched_fields:
-            logger.info(f"Field filtering requested with {len(matched_fields)} fields, but will apply AFTER SHAP calculation")
-        
-        # Process in batches with fresh SHAP calculation
-        enhanced_records = []
-        feature_importance = []
-        
-        if len(all_records) > 0:
-            try:
-                # Process in smaller batches for memory efficiency
-                batch_size = 200  # Smaller batches for fresh calculation
-                total_batches = (len(all_records) + batch_size - 1) // batch_size
-                
-                logger.info(f"📊 Processing {total_batches} batches of {batch_size} records each with fresh SHAP")
-                
-                for batch_idx in range(total_batches):
-                    start_idx = batch_idx * batch_size
-                    end_idx = min(start_idx + batch_size, len(all_records))
-                    batch = all_records[start_idx:end_idx]
-                    
-                    logger.info(f"🔄 Fresh SHAP batch {batch_idx + 1}/{total_batches} ({len(batch)} records)")
-                    
-                    # Calculate fresh SHAP values for this batch
-                    batch_enhanced, batch_importance = calculate_shap_values_batch(batch, target_field)
-                    
-                    if batch_enhanced is not None:
-                        enhanced_records.extend(batch_enhanced)
-                        if batch_importance and not feature_importance:
-                            feature_importance = batch_importance
-                        logger.info(f"✅ Fresh SHAP batch {batch_idx + 1} successful")
-                    else:
-                        enhanced_records.extend(batch)
-                        logger.warning(f"⚠️ Fresh SHAP batch {batch_idx + 1} failed, using original data")
-                    
-                    # Memory cleanup after each batch
-                    ultra_minimal_cleanup()
-                
-                # Sort feature importance by actual importance scores
-                if feature_importance:
-                    feature_importance.sort(key=lambda x: x.get('importance', 0), reverse=True)
-                
-                logger.info(f"✅ Fresh SHAP processing complete: {len(enhanced_records)} records, {len(feature_importance)} features")
-                
-                # Log sample values to verify location-specific calculation
-                if enhanced_records:
-                    sample_record = enhanced_records[0]
-                    shap_fields = [k for k in sample_record.keys() if k.startswith('shap_')]
-                    if len(enhanced_records) > 1:
-                        second_record = enhanced_records[1]
-                        sample_shap1 = [sample_record.get(k, 0) for k in shap_fields[:3]]
-                        sample_shap2 = [second_record.get(k, 0) for k in shap_fields[:3]]
-                        logger.info(f"🎯 Record 1 SHAP sample: {sample_shap1}")
-                        logger.info(f"🎯 Record 2 SHAP sample: {sample_shap2}")
-                        different_values = sum(1 for i in range(len(sample_shap1)) if sample_shap1[i] != sample_shap2[i])
-                        logger.info(f"✅ Location variation: {different_values}/{len(sample_shap1)} SHAP values differ")
-                
-            except Exception as shap_error:
-                logger.error(f"❌ Fresh SHAP processing failed: {shap_error}")
-                enhanced_records = all_records
-                feature_importance = []
-        
-        # Apply field filtering AFTER SHAP calculation if requested
-        if not include_all_fields and matched_fields and enhanced_records:
-            logger.info(f"Applying field filtering to {len(enhanced_records)} records with SHAP values")
-            filtered_enhanced_records = []
-            
-            # Always include SHAP fields in the filter
-            shap_fields = [k for k in enhanced_records[0].keys() if k.startswith('shap_')]
-            all_fields_to_keep = set(matched_fields) | set(shap_fields)
-            
-            for record in enhanced_records:
-                filtered_record = {k: v for k, v in record.items() if k in all_fields_to_keep}
-                filtered_enhanced_records.append(filtered_record)
-            
-            enhanced_records = filtered_enhanced_records
-            logger.info(f"Field filtering complete: {len(enhanced_records[0].keys()) if enhanced_records else 0} fields kept (including SHAP)")
-        
-        # Final cleanup
-        ultra_minimal_cleanup()
-        final_memory = get_memory_usage_mb()
-        
-        # Determine if SHAP was successful
-        shap_success = any(k.startswith('shap_') for k in enhanced_records[0].keys()) if enhanced_records else False
-        analysis_method = "fresh_shap_analysis" if shap_success else "raw_data_fallback"
-        
-        response = {
-            "success": True,
-            "results": enhanced_records,
-            "summary": f"Fresh SHAP analysis for {target_field} using {analysis_method}",
-            "feature_importance": feature_importance,
-            "analysis_type": analysis_method,
-            "total_records": len(enhanced_records),
-            "sample_size": len(enhanced_records),
-            "shap_enabled": shap_success,
-            "target_variable": target_field,
-            "fresh_calculation": True,
-            "final_memory_mb": final_memory
-        }
-        
-        return response
-        
-    except Exception as e:
-        logger.error(f"Fresh SHAP analysis error: {str(e)}")
-        ultra_minimal_cleanup()
-        return {
-            "success": False,
-            "error": f"Fresh SHAP analysis failed: {str(e)}"
-        }
 
 def handle_basic_analysis_progressive(query, query_classification):
     """Handle analysis with progressive loading - ALL RECORDS"""
@@ -915,7 +579,7 @@ def handle_basic_analysis_progressive(query, query_classification):
         shap_success = any(k.startswith('shap_') for k in enhanced_records[0].keys()) if enhanced_records else False
         analysis_method = "shap_analysis" if shap_success else "correlation_fallback"
         
-        response = {
+        return {
             "success": True,
             "results": enhanced_records,
             "summary": f"SHAP-enhanced analysis for {target_field} using {analysis_method}",
@@ -928,9 +592,6 @@ def handle_basic_analysis_progressive(query, query_classification):
             "progressive_processed": True,
             "final_memory_mb": final_memory
         }
-        
-        # Apply field filtering to response
-        return apply_field_filtering_to_response(response, query)
         
     except Exception as e:
         logger.error(f"Progressive analysis error: {str(e)}")
