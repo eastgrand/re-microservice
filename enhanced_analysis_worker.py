@@ -94,6 +94,44 @@ def preprocess_features_for_shap(data_batch, model_features):
                 df_batch[feature] = 0
         return df_batch[model_features].fillna(0).replace([np.inf, -np.inf], 0)
 
+
+# Add this debugging function to help identify issues
+def debug_shap_calculation(data_sample):
+    """Debug SHAP calculation issues"""
+    logger.info("=== SHAP Debug Information ===")
+    
+    try:
+        from app import model, feature_names
+        
+        logger.info(f"🔍 Model loaded: {model is not None}")
+        logger.info(f"🔍 Feature names loaded: {len(feature_names) if feature_names else 0}")
+        
+        if model and feature_names:
+            logger.info(f"🔍 Model type: {type(model)}")
+            logger.info(f"🔍 Model features expected: {getattr(model, 'n_features_in_', 'Unknown')}")
+            logger.info(f"🔍 Feature names count: {len(feature_names)}")
+            
+            # Test preprocessing
+            if data_sample:
+                logger.info(f"🔍 Sample data keys: {list(data_sample[0].keys())[:10]}")
+                processed = preprocess_features_for_shap(data_sample[:1], feature_names)
+                logger.info(f"🔍 Processed data shape: {processed.shape}")
+                logger.info(f"🔍 Processed data types: {processed.dtypes.value_counts().to_dict()}")
+                
+                # Test SHAP explainer creation
+                import shap
+                explainer = shap.TreeExplainer(model)
+                logger.info(f"🔍 SHAP explainer created: {type(explainer)}")
+                
+                # Test SHAP calculation
+                shap_test = explainer.shap_values(processed)
+                logger.info(f"🔍 SHAP test successful: {shap_test.shape}")
+                
+    except Exception as e:
+        logger.error(f"❌ SHAP debug failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -120,17 +158,42 @@ def initialize_shap_explainer():
         if not feature_names:
             logger.error("❌ Feature names not loaded in main app")
             return False
+        
+        # Validate feature count match
+        expected_features = len(feature_names)
+        if hasattr(model, 'n_features_in_'):
+            model_features = model.n_features_in_
+            if model_features != expected_features:
+                logger.error(f"❌ Feature count mismatch: model expects {model_features}, got {expected_features}")
+                return False
             
         # Store references
         _xgb_model = model
         _model_features = feature_names
         
+        logger.info(f"🔧 Creating SHAP TreeExplainer with {len(_model_features)} features...")
+        logger.info(f"📊 Model type: {type(model)}")
+        logger.info(f"🎯 Feature count validation: {len(_model_features)} features")
+        
         # Create SHAP explainer
         _shap_explainer = shap.TreeExplainer(model)
         
-        logger.info(f"✅ SHAP explainer initialized with {len(_model_features)} features")
-        logger.info(f"📊 Model type: {type(model)}")
-        logger.info(f"🎯 Sample features: {_model_features[:5]}...")
+        logger.info(f"✅ SHAP explainer initialized successfully")
+        
+        # Test SHAP with sample data to verify it works
+        try:
+            from app import training_data
+            if training_data is not None:
+                logger.info("🧪 Testing SHAP with sample data...")
+                sample_data = training_data.head(2).to_dict('records')
+                test_processed = preprocess_features_for_shap(sample_data, _model_features)
+                test_shap = _shap_explainer.shap_values(test_processed)
+                logger.info(f"✅ SHAP test successful: {test_shap.shape}")
+            else:
+                logger.warning("⚠️ No training data available for SHAP test")
+        except Exception as test_error:
+            logger.error(f"❌ SHAP test failed: {test_error}")
+            return False
         
         return True
         
@@ -139,7 +202,6 @@ def initialize_shap_explainer():
         import traceback
         logger.error(traceback.format_exc())
         return False
-
 def calculate_shap_values_batch(data_batch, target_variable):
     """Calculate SHAP values for a batch of records"""
     global _shap_explainer, _model_features, _xgb_model
@@ -160,9 +222,30 @@ def calculate_shap_values_batch(data_batch, target_variable):
         logger.info(f"🎯 Target variable: {target_variable}")
         
         # Calculate SHAP values (memory efficient)
-        shap_values = _shap_explainer.shap_values(model_data)
-        
-        logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
+        try:
+            logger.info(f"⚡ Starting SHAP values calculation...")
+            logger.info(f"🔍 Model data dtypes: {model_data.dtypes.value_counts().to_dict()}")
+            
+            # Ensure data is properly formatted for SHAP
+            if model_data.isnull().any().any():
+                logger.warning("⚠️ Found NaN values in model data, filling with 0")
+                model_data = model_data.fillna(0)
+            
+            # Check for infinite values
+            if np.isinf(model_data).any().any():
+                logger.warning("⚠️ Found infinite values in model data, replacing with 0")
+                model_data = model_data.replace([np.inf, -np.inf], 0)
+            
+            shap_values = _shap_explainer.shap_values(model_data)
+            logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
+            
+        except Exception as shap_error:
+            logger.error(f"❌ SHAP calculation failed: {shap_error}")
+            logger.error(f"🔍 Model data sample:\n{model_data.head()}")
+            logger.error(f"🔍 Model data info: shape={model_data.shape}, dtypes={model_data.dtypes.nunique()} unique types")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None, None
         
         # Convert to feature importance format - LOCATION-SPECIFIC VERSION
         feature_importance = []
@@ -180,9 +263,11 @@ def calculate_shap_values_batch(data_batch, target_variable):
                     correlation = 0.0
                     
                     # Calculate correlation if target variable exists
-                    if target_variable in df_batch.columns:
+                    # Recreate df_batch from original data for correlation calculation
+                    df_batch_for_corr = pd.DataFrame(data_batch)
+                    if target_variable in df_batch_for_corr.columns:
                         try:
-                            correlation = float(df_batch[feature].corr(df_batch[target_variable]))
+                            correlation = float(df_batch_for_corr[feature].corr(df_batch_for_corr[target_variable]))
                             if pd.isna(correlation):
                                 correlation = 0.0
                         except:
