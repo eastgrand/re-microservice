@@ -22,6 +22,10 @@ _shap_explainer = None
 _model_features = None
 _xgb_model = None
 
+# SHAP result caching for identical records (optimization)
+_shap_cache = {}
+_cache_hits = 0
+
 def initialize_shap_explainer():
     """Initialize SHAP explainer with loaded XGBoost model"""
     global _shap_explainer, _model_features, _xgb_model
@@ -84,6 +88,10 @@ def calculate_shap_values_batch(data_batch, target_variable):
         # Select only model features in correct order
         model_data = df_batch[_model_features].fillna(0)
         
+        # Optional: Reduce features for faster SHAP calculation
+        # For performance, we could select top N most important features
+        # But for now, keep all features for accuracy
+        
         # Replace inf values with 0
         model_data = model_data.replace([np.inf, -np.inf], 0)
         
@@ -91,7 +99,18 @@ def calculate_shap_values_batch(data_batch, target_variable):
         logger.info(f"🎯 Target variable: {target_variable}")
         
         # Calculate SHAP values (memory efficient)
-        shap_values = _shap_explainer.shap_values(model_data)
+        # Use smaller chunks to prevent memory issues
+        if len(model_data) > 50:
+            # Process in sub-batches for large datasets
+            shap_values_list = []
+            chunk_size = 25
+            for i in range(0, len(model_data), chunk_size):
+                chunk = model_data.iloc[i:i+chunk_size]
+                chunk_shap = _shap_explainer.shap_values(chunk)
+                shap_values_list.append(chunk_shap)
+            shap_values = np.vstack(shap_values_list)
+        else:
+            shap_values = _shap_explainer.shap_values(model_data)
         
         logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
         
@@ -132,6 +151,11 @@ def calculate_shap_values_batch(data_batch, target_variable):
         
         logger.info(f"✅ Enhanced {len(enhanced_records)} records with SHAP values")
         logger.info(f"📊 Feature importance calculated for {len(feature_importance)} features")
+        
+        # Cleanup memory after SHAP calculation
+        del model_data, shap_values
+        import gc
+        gc.collect()
         
         return enhanced_records, feature_importance
         
@@ -190,7 +214,7 @@ MEMORY_CHECK_INTERVAL = 200  # Less frequent checks with more memory
 MAX_MEMORY_THRESHOLD = 1500  # Use 1.5GB of 2GB available
 
 # RECORD-BY-RECORD STREAMING: Never load full dataset
-RECORD_BATCH_SIZE = 5  # Process 5 records at a time
+RECORD_BATCH_SIZE = 50  # Optimized batch size for SHAP
 MAX_RECORDS_LIMIT = 2000  # Hard limit to prevent memory issues
 MEMORY_CHECK_INTERVAL = 25  # Check memory every 25 records
 
@@ -515,7 +539,7 @@ def handle_basic_analysis_progressive(query, query_classification):
         if len(all_records) > 0:
             try:
                 # Process in batches to manage memory (start with 500 records)
-                batch_size = 500
+                batch_size = 100  # Smaller SHAP batches for memory efficiency
                 total_batches = (len(all_records) + batch_size - 1) // batch_size
                 
                 logger.info(f"📊 Processing {total_batches} batches of {batch_size} records each")
@@ -523,6 +547,11 @@ def handle_basic_analysis_progressive(query, query_classification):
                 for batch_idx in range(total_batches):
                     start_idx = batch_idx * batch_size
                     end_idx = min(start_idx + batch_size, len(all_records))
+                    
+                    # Progress logging every 10 batches
+                    if batch_idx % 10 == 0:
+                        progress = (batch_idx / total_batches) * 100
+                        logger.info(f"🔄 SHAP Progress: {progress:.1f}% ({batch_idx}/{total_batches} batches)")
                     batch = all_records[start_idx:end_idx]
                     
                     logger.info(f"🔄 Processing batch {batch_idx + 1}/{total_batches} ({len(batch)} records)")
