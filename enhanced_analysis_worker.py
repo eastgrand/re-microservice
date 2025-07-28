@@ -48,6 +48,52 @@ def apply_field_filtering_to_response(response: Dict[str, Any], query_params: Di
 # SHAP CALCULATION INFRASTRUCTURE - PHASE 1
 import shap
 
+
+def preprocess_features_for_shap(data_batch, model_features):
+    """Preprocess features to be compatible with SHAP/XGBoost"""
+    try:
+        df_batch = pd.DataFrame(data_batch)
+        
+        # Add missing features with default values
+        for feature in model_features:
+            if feature not in df_batch.columns:
+                if feature in ['Age', 'Income']:
+                    df_batch[feature] = 0  # Demographic defaults
+                else:
+                    df_batch[feature] = 0
+        
+        # Select only model features in correct order
+        model_data = df_batch[model_features]
+        
+        # Handle different data types
+        for col in model_data.columns:
+            if model_data[col].dtype == 'object':
+                # Convert string columns to numeric or encode them
+                try:
+                    model_data[col] = pd.to_numeric(model_data[col], errors='coerce')
+                except:
+                    from sklearn.preprocessing import LabelEncoder
+                    le = LabelEncoder()
+                    model_data[col] = le.fit_transform(model_data[col].astype(str))
+        
+        # Fill NaN and inf values
+        model_data = model_data.fillna(0)
+        model_data = model_data.replace([np.inf, -np.inf], 0)
+        
+        # Ensure all data is numeric
+        model_data = model_data.astype(float)
+        
+        return model_data
+        
+    except Exception as e:
+        logger.error(f"Data preprocessing failed: {e}")
+        # Return original data as fallback
+        df_batch = pd.DataFrame(data_batch)
+        for feature in model_features:
+            if feature not in df_batch.columns:
+                df_batch[feature] = 0
+        return df_batch[model_features].fillna(0).replace([np.inf, -np.inf], 0)
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -107,19 +153,8 @@ def calculate_shap_values_batch(data_batch, target_variable):
         
         logger.info(f"🧠 Calculating SHAP values for {len(data_batch)} records...")
         
-        # Prepare data for SHAP calculation
-        df_batch = pd.DataFrame(data_batch)
-        
-        # Ensure all model features are present
-        missing_features = set(_model_features) - set(df_batch.columns)
-        for feature in missing_features:
-            df_batch[feature] = 0  # Fill missing features with 0
-            
-        # Select only model features in correct order
-        model_data = df_batch[_model_features].fillna(0)
-        
-        # Replace inf values with 0
-        model_data = model_data.replace([np.inf, -np.inf], 0)
+        # Prepare data for SHAP calculation using enhanced preprocessing
+        model_data = preprocess_features_for_shap(data_batch, _model_features)
         
         logger.info(f"📋 Model data shape: {model_data.shape}")
         logger.info(f"🎯 Target variable: {target_variable}")

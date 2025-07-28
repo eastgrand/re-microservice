@@ -539,5 +539,3 @@ CreationDate_57
 Creator_57
 EditDate_57
 Editor_57
-Income
-Age
