@@ -129,8 +129,11 @@ def calculate_shap_values_batch(data_batch, target_variable):
         
         logger.info(f"✅ SHAP calculation complete. Shape: {shap_values.shape}")
         
-        # Convert to feature importance format
+        # Convert to feature importance format - LOCATION-SPECIFIC VERSION
         feature_importance = []
+        
+        # For location-specific feature importance, calculate mean absolute SHAP per feature
+        # but keep this for compatibility with existing endpoints that expect global importance
         mean_abs_shap = np.abs(shap_values).mean(axis=0)
         
         for i, feature in enumerate(_model_features):
@@ -154,14 +157,46 @@ def calculate_shap_values_batch(data_batch, target_variable):
                     "shap_mean_abs": importance_score
                 })
         
-        # Add SHAP values to records
+        # Add SHAP values to records WITH LOCATION-SPECIFIC FEATURE IMPORTANCE
         enhanced_records = []
         for idx, record in enumerate(data_batch):
             enhanced_record = record.copy()
-            # Add SHAP values for this record
+            
+            # Add individual SHAP values for this record
+            record_shap_values = []
             for i, feature in enumerate(_model_features):
                 if i < len(shap_values[idx]):
-                    enhanced_record[f'shap_{feature}'] = float(shap_values[idx][i])
+                    shap_value = float(shap_values[idx][i])
+                    enhanced_record[f'shap_{feature}'] = shap_value
+                    record_shap_values.append(abs(shap_value))
+            
+            # LOCATION-SPECIFIC: Calculate feature importance score for THIS record
+            # This gives each location its own feature importance profile
+            if record_shap_values:
+                # Calculate this record's total SHAP impact
+                total_shap_impact = sum(record_shap_values)
+                positive_shap = sum(shap_values[idx][shap_values[idx] > 0]) if len(shap_values[idx]) > 0 else 0
+                
+                # Feature importance score based on this record's SHAP distribution
+                max_shap = max(record_shap_values) if record_shap_values else 0
+                diversity_score = 1 - (max_shap / total_shap_impact) if total_shap_impact > 0 else 0
+                
+                # Calculate location-specific feature importance score (0-100)
+                impact_component = min(40, (total_shap_impact / 50) * 40)  # Scale for location variation
+                positive_component = min(30, (positive_shap / 25) * 30) if positive_shap > 0 else 0
+                diversity_component = diversity_score * 20
+                consistency_component = 10  # Base consistency score
+                
+                location_feature_importance_score = impact_component + positive_component + diversity_component + consistency_component
+                enhanced_record['feature_importance_score'] = round(location_feature_importance_score, 1)
+                
+                # Add debugging info for location-specific calculation
+                enhanced_record['_debug_total_shap'] = round(total_shap_impact, 2)
+                enhanced_record['_debug_positive_shap'] = round(positive_shap, 2)
+                enhanced_record['_debug_diversity'] = round(diversity_score, 3)
+            else:
+                enhanced_record['feature_importance_score'] = 50.0  # Default score
+                
             enhanced_records.append(enhanced_record)
         
         logger.info(f"✅ Enhanced {len(enhanced_records)} records with SHAP values")
