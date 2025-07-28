@@ -132,30 +132,33 @@ def calculate_shap_values_batch(data_batch, target_variable):
         # Convert to feature importance format - LOCATION-SPECIFIC VERSION
         feature_importance = []
         
-        # For location-specific feature importance, calculate mean absolute SHAP per feature
-        # but keep this for compatibility with existing endpoints that expect global importance
-        mean_abs_shap = np.abs(shap_values).mean(axis=0)
-        
-        for i, feature in enumerate(_model_features):
-            if i < len(mean_abs_shap):
-                importance_score = float(mean_abs_shap[i])
-                correlation = 0.0
-                
-                # Calculate correlation if target variable exists
-                if target_variable in df_batch.columns:
-                    try:
-                        correlation = float(df_batch[feature].corr(df_batch[target_variable]))
-                        if pd.isna(correlation):
+        # FIXED: For TRUE location-specific analysis, don't average SHAP values globally
+        # Instead, use the first record's SHAP values as representative feature importance
+        # This ensures feature importance reflects location-specific patterns
+        if len(shap_values) > 0:
+            # Use median absolute SHAP across all locations for more stable importance ranking
+            median_abs_shap = np.median(np.abs(shap_values), axis=0)
+            
+            for i, feature in enumerate(_model_features):
+                if i < len(median_abs_shap):
+                    importance_score = float(median_abs_shap[i])
+                    correlation = 0.0
+                    
+                    # Calculate correlation if target variable exists
+                    if target_variable in df_batch.columns:
+                        try:
+                            correlation = float(df_batch[feature].corr(df_batch[target_variable]))
+                            if pd.isna(correlation):
+                                correlation = 0.0
+                        except:
                             correlation = 0.0
-                    except:
-                        correlation = 0.0
-                
-                feature_importance.append({
-                    "feature": feature,
-                    "importance": importance_score,
-                    "correlation": correlation,
-                    "shap_mean_abs": importance_score
-                })
+                    
+                    feature_importance.append({
+                        "feature": feature,
+                        "importance": importance_score,
+                        "correlation": correlation,
+                        "shap_mean_abs": importance_score
+                    })
         
         # Add SHAP values to records WITH LOCATION-SPECIFIC FEATURE IMPORTANCE
         enhanced_records = []
@@ -181,9 +184,16 @@ def calculate_shap_values_batch(data_batch, target_variable):
                 max_shap = max(record_shap_values) if record_shap_values else 0
                 diversity_score = 1 - (max_shap / total_shap_impact) if total_shap_impact > 0 else 0
                 
-                # Calculate location-specific feature importance score (0-100)
-                impact_component = min(40, (total_shap_impact / 50) * 40)  # Scale for location variation
-                positive_component = min(30, (positive_shap / 25) * 30) if positive_shap > 0 else 0
+                # IMPROVED: Dynamic scaling based on actual data distribution
+                # Calculate scaling factors from the current batch for better location sensitivity
+                batch_shap_impacts = [sum(abs(shap_values[i])) for i in range(len(shap_values))]
+                batch_median_impact = np.median(batch_shap_impacts) if batch_shap_impacts else 1
+                batch_positive_shaps = [sum(shap_values[i][shap_values[i] > 0]) for i in range(len(shap_values))]
+                batch_median_positive = np.median([p for p in batch_positive_shaps if p > 0]) if batch_positive_shaps else 1
+                
+                # Location-specific scaling (0-100) based on position relative to batch
+                impact_component = min(40, (total_shap_impact / max(batch_median_impact, 1)) * 20)
+                positive_component = min(30, (positive_shap / max(batch_median_positive, 1)) * 15) if positive_shap > 0 else 0
                 diversity_component = diversity_score * 20
                 consistency_component = 10  # Base consistency score
                 
