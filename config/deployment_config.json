@@ -1,0 +1,812 @@
+{
+  "project_name": "HRB",
+  "model_info": {
+    "passed": true,
+    "models_trained": 2,
+    "successful_models": [
+      "general_analysis",
+      "ensemble_models"
+    ],
+    "metrics": {
+      "general_analysis": {
+        "success": true,
+        "analysis_type": "general_analysis",
+        "target_column": "thematic_value",
+        "training_duration_seconds": 16.179076,
+        "data_info": {
+          "total_records": 984,
+          "features_used": 44,
+          "train_records": 590,
+          "test_records": 197
+        },
+        "best_hyperparameters": {
+          "colsample_bytree": 0.8,
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "n_estimators": 300,
+          "subsample": 0.8
+        },
+        "performance": {
+          "r2_score": 0.9594257906126984,
+          "rmse": 0.22341891325114221,
+          "mae": 0.053167503085838286,
+          "mape": 0.4366362255506377,
+          "train_r2": 0.9999699123518941,
+          "train_rmse": 0.008949922402336297,
+          "overfitting_ratio": 1.042258736565028
+        },
+        "feature_importance": [
+          {
+            "feature": "MP10020A_B",
+            "importance": 0.5224863886833191,
+            "rank": 1
+          },
+          {
+            "feature": "MP10104A_B_P",
+            "importance": 0.1301208734512329,
+            "rank": 2
+          },
+          {
+            "feature": "X14060_X",
+            "importance": 0.11591073870658875,
+            "rank": 3
+          },
+          {
+            "feature": "MP10110A_B_P",
+            "importance": 0.06364218145608902,
+            "rank": 4
+          },
+          {
+            "feature": "X14068_X",
+            "importance": 0.05366271361708641,
+            "rank": 5
+          },
+          {
+            "feature": "MP10104A_B",
+            "importance": 0.04609169811010361,
+            "rank": 6
+          },
+          {
+            "feature": "MP10128A_B_P",
+            "importance": 0.044811103492975235,
+            "rank": 7
+          },
+          {
+            "feature": "MP10116A_B_P",
+            "importance": 0.007755969185382128,
+            "rank": 8
+          },
+          {
+            "feature": "GENZ_CY_P",
+            "importance": 0.003479049541056156,
+            "rank": 9
+          },
+          {
+            "feature": "MP10002A_B_P",
+            "importance": 0.002988465828821063,
+            "rank": 10
+          },
+          {
+            "feature": "MP10128A_B",
+            "importance": 0.0020377226173877716,
+            "rank": 11
+          },
+          {
+            "feature": "MP10138A_B",
+            "importance": 0.0017172707011923194,
+            "rank": 12
+          },
+          {
+            "feature": "MP10116A_B",
+            "importance": 0.0013299555284902453,
+            "rank": 13
+          },
+          {
+            "feature": "MP10110A_B",
+            "importance": 0.0009925118647515774,
+            "rank": 14
+          },
+          {
+            "feature": "X14060_X_A",
+            "importance": 0.0007983356481418014,
+            "rank": 15
+          },
+          {
+            "feature": "X14058_X",
+            "importance": 0.0006215595058165491,
+            "rank": 16
+          },
+          {
+            "feature": "MP10138A_B_P",
+            "importance": 0.0003055791894439608,
+            "rank": 17
+          },
+          {
+            "feature": "MP10028A_B_P",
+            "importance": 0.00024221616331487894,
+            "rank": 18
+          },
+          {
+            "feature": "MP10002A_B",
+            "importance": 0.00021760468371212482,
+            "rank": 19
+          },
+          {
+            "feature": "MP10120A_B_P",
+            "importance": 0.00017209946236107498,
+            "rank": 20
+          },
+          {
+            "feature": "X14058_X_A",
+            "importance": 9.627798135625198e-05,
+            "rank": 21
+          },
+          {
+            "feature": "MP10020A_B_P",
+            "importance": 8.290737605420873e-05,
+            "rank": 22
+          },
+          {
+            "feature": "X14068_X_A",
+            "importance": 5.041583426645957e-05,
+            "rank": 23
+          },
+          {
+            "feature": "MP10028A_B",
+            "importance": 3.855129762087017e-05,
+            "rank": 24
+          },
+          {
+            "feature": "GENALPHACY",
+            "importance": 3.223631210858002e-05,
+            "rank": 25
+          },
+          {
+            "feature": "GENZ_CY",
+            "importance": 3.0828781746095046e-05,
+            "rank": 26
+          },
+          {
+            "feature": "MP10120A_B",
+            "importance": 3.012743400176987e-05,
+            "rank": 27
+          },
+          {
+            "feature": "Shape__Area",
+            "importance": 2.8576232580235228e-05,
+            "rank": 28
+          },
+          {
+            "feature": "LONGITUDE",
+            "importance": 2.5307432224508375e-05,
+            "rank": 29
+          },
+          {
+            "feature": "GENALPHACY_P",
+            "importance": 2.2472644559456967e-05,
+            "rank": 30
+          },
+          {
+            "feature": "LATITUDE",
+            "importance": 2.0032473912579007e-05,
+            "rank": 31
+          },
+          {
+            "feature": "Shape__Length",
+            "importance": 1.9889743271050975e-05,
+            "rank": 32
+          },
+          {
+            "feature": "postcode",
+            "importance": 1.905646058730781e-05,
+            "rank": 33
+          },
+          {
+            "feature": "pointCount",
+            "importance": 1.34923075165716e-05,
+            "rank": 34
+          },
+          {
+            "feature": "CreationDate",
+            "importance": 0.0,
+            "rank": 35
+          },
+          {
+            "feature": "Creator",
+            "importance": 0.0,
+            "rank": 36
+          },
+          {
+            "feature": "EditDate",
+            "importance": 0.0,
+            "rank": 37
+          },
+          {
+            "feature": "Editor",
+            "importance": 0.0,
+            "rank": 38
+          },
+          {
+            "feature": "region",
+            "importance": 0.0,
+            "rank": 39
+          },
+          {
+            "feature": "country",
+            "importance": 0.0,
+            "rank": 40
+          },
+          {
+            "feature": "fsq_category",
+            "importance": 0.0,
+            "rank": 41
+          },
+          {
+            "feature": "fsq_category_all",
+            "importance": 0.0,
+            "rank": 42
+          },
+          {
+            "feature": "INDUSTRY_DESC",
+            "importance": 0.0,
+            "rank": 43
+          },
+          {
+            "feature": "source",
+            "importance": 0.0,
+            "rank": 44
+          }
+        ],
+        "shap_analysis": {
+          "shap_importance": [
+            {
+              "feature": "MP10104A_B_P",
+              "mean_shap_value": 0.7194575667381287,
+              "rank": 1
+            },
+            {
+              "feature": "X14068_X",
+              "mean_shap_value": 0.03561609610915184,
+              "rank": 2
+            },
+            {
+              "feature": "MP10128A_B_P",
+              "mean_shap_value": 0.025182750076055527,
+              "rank": 3
+            },
+            {
+              "feature": "MP10020A_B",
+              "mean_shap_value": 0.023584477603435516,
+              "rank": 4
+            },
+            {
+              "feature": "MP10104A_B",
+              "mean_shap_value": 0.017795097082853317,
+              "rank": 5
+            },
+            {
+              "feature": "X14058_X",
+              "mean_shap_value": 0.012475498951971531,
+              "rank": 6
+            },
+            {
+              "feature": "MP10110A_B_P",
+              "mean_shap_value": 0.012105602771043777,
+              "rank": 7
+            },
+            {
+              "feature": "MP10116A_B_P",
+              "mean_shap_value": 0.011889815330505371,
+              "rank": 8
+            },
+            {
+              "feature": "X14060_X",
+              "mean_shap_value": 0.008216958492994308,
+              "rank": 9
+            },
+            {
+              "feature": "X14060_X_A",
+              "mean_shap_value": 0.003360958304256201,
+              "rank": 10
+            },
+            {
+              "feature": "GENZ_CY_P",
+              "mean_shap_value": 0.003087152261286974,
+              "rank": 11
+            },
+            {
+              "feature": "MP10002A_B_P",
+              "mean_shap_value": 0.0030193058773875237,
+              "rank": 12
+            },
+            {
+              "feature": "MP10120A_B_P",
+              "mean_shap_value": 0.0029876562766730785,
+              "rank": 13
+            },
+            {
+              "feature": "Shape__Area",
+              "mean_shap_value": 0.002726602600887418,
+              "rank": 14
+            },
+            {
+              "feature": "MP10028A_B_P",
+              "mean_shap_value": 0.002387257991358638,
+              "rank": 15
+            },
+            {
+              "feature": "MP10020A_B_P",
+              "mean_shap_value": 0.002171942964196205,
+              "rank": 16
+            },
+            {
+              "feature": "X14058_X_A",
+              "mean_shap_value": 0.0013285878812894225,
+              "rank": 17
+            },
+            {
+              "feature": "GENALPHACY_P",
+              "mean_shap_value": 0.0012929774820804596,
+              "rank": 18
+            },
+            {
+              "feature": "GENALPHACY",
+              "mean_shap_value": 0.0012607155367732048,
+              "rank": 19
+            },
+            {
+              "feature": "MP10138A_B_P",
+              "mean_shap_value": 0.0012532767141237855,
+              "rank": 20
+            },
+            {
+              "feature": "MP10110A_B",
+              "mean_shap_value": 0.001228234963491559,
+              "rank": 21
+            },
+            {
+              "feature": "LONGITUDE",
+              "mean_shap_value": 0.0012201294302940369,
+              "rank": 22
+            },
+            {
+              "feature": "GENZ_CY",
+              "mean_shap_value": 0.0012025751639157534,
+              "rank": 23
+            },
+            {
+              "feature": "MP10128A_B",
+              "mean_shap_value": 0.001058744266629219,
+              "rank": 24
+            },
+            {
+              "feature": "X14068_X_A",
+              "mean_shap_value": 0.001006892416626215,
+              "rank": 25
+            },
+            {
+              "feature": "LATITUDE",
+              "mean_shap_value": 0.000901226419955492,
+              "rank": 26
+            },
+            {
+              "feature": "postcode",
+              "mean_shap_value": 0.0008844248950481415,
+              "rank": 27
+            },
+            {
+              "feature": "MP10002A_B",
+              "mean_shap_value": 0.0008197094430215657,
+              "rank": 28
+            },
+            {
+              "feature": "Shape__Length",
+              "mean_shap_value": 0.0007692750077694654,
+              "rank": 29
+            },
+            {
+              "feature": "MP10116A_B",
+              "mean_shap_value": 0.0007511986186727881,
+              "rank": 30
+            },
+            {
+              "feature": "MP10028A_B",
+              "mean_shap_value": 0.0007359207957051694,
+              "rank": 31
+            },
+            {
+              "feature": "MP10138A_B",
+              "mean_shap_value": 0.0005818436038680375,
+              "rank": 32
+            },
+            {
+              "feature": "MP10120A_B",
+              "mean_shap_value": 0.0005611225496977568,
+              "rank": 33
+            },
+            {
+              "feature": "pointCount",
+              "mean_shap_value": 8.226765203289688e-05,
+              "rank": 34
+            },
+            {
+              "feature": "CreationDate",
+              "mean_shap_value": 0.0,
+              "rank": 35
+            },
+            {
+              "feature": "Creator",
+              "mean_shap_value": 0.0,
+              "rank": 36
+            },
+            {
+              "feature": "EditDate",
+              "mean_shap_value": 0.0,
+              "rank": 37
+            },
+            {
+              "feature": "Editor",
+              "mean_shap_value": 0.0,
+              "rank": 38
+            },
+            {
+              "feature": "region",
+              "mean_shap_value": 0.0,
+              "rank": 39
+            },
+            {
+              "feature": "country",
+              "mean_shap_value": 0.0,
+              "rank": 40
+            },
+            {
+              "feature": "fsq_category",
+              "mean_shap_value": 0.0,
+              "rank": 41
+            },
+            {
+              "feature": "fsq_category_all",
+              "mean_shap_value": 0.0,
+              "rank": 42
+            },
+            {
+              "feature": "INDUSTRY_DESC",
+              "mean_shap_value": 0.0,
+              "rank": 43
+            },
+            {
+              "feature": "source",
+              "mean_shap_value": 0.0,
+              "rank": 44
+            }
+          ],
+          "sample_size": 100,
+          "base_value": 11.394600868225098
+        },
+        "cross_validation": {
+          "mean_cv_score": 0.976365005469369,
+          "std_cv_score": 0.029856818158077912,
+          "cv_scores": [
+            0.9181780093707098,
+            0.9790009746040558,
+            0.9963232227932654,
+            0.9982060744641589,
+            0.9901167461146548
+          ]
+        },
+        "model_artifacts": {
+          "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/general_analysis_model/model.joblib",
+          "features_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/general_analysis_model/features.json",
+          "hyperparameters_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/general_analysis_model/hyperparameters.json",
+          "model_directory": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/general_analysis_model"
+        },
+        "feature_columns": [
+          "MP10104A_B",
+          "MP10104A_B_P",
+          "Shape__Area",
+          "Shape__Length",
+          "CreationDate",
+          "Creator",
+          "EditDate",
+          "Editor",
+          "X14060_X",
+          "X14060_X_A",
+          "pointCount",
+          "MP10002A_B",
+          "MP10002A_B_P",
+          "X14068_X",
+          "X14068_X_A",
+          "MP10116A_B",
+          "MP10116A_B_P",
+          "region",
+          "postcode",
+          "country",
+          "fsq_category",
+          "fsq_category_all",
+          "INDUSTRY_DESC",
+          "source",
+          "LATITUDE",
+          "LONGITUDE",
+          "MP10128A_B",
+          "MP10128A_B_P",
+          "MP10138A_B",
+          "MP10138A_B_P",
+          "MP10020A_B",
+          "MP10020A_B_P",
+          "X14058_X",
+          "X14058_X_A",
+          "GENZ_CY",
+          "GENZ_CY_P",
+          "MP10028A_B",
+          "MP10028A_B_P",
+          "MP10110A_B",
+          "MP10110A_B_P",
+          "MP10120A_B",
+          "MP10120A_B_P",
+          "GENALPHACY",
+          "GENALPHACY_P"
+        ]
+      },
+      "ensemble_models": {
+        "message": "Insufficient models for ensemble creation"
+      }
+    }
+  },
+  "field_mappings": {
+    "mappings": {
+      "DESCRIPTION": "description",
+      "thematic_value": "strategic_value",
+      "name": "area_name",
+      "region": "region_id",
+      "postcode": "postal_code",
+      "DESC_": "description",
+      "LATITUDE": "latitude",
+      "LONGITUDE": "longitude"
+    },
+    "confidence_scores": {
+      "DESCRIPTION": 1,
+      "thematic_value": 0.8064428109486383,
+      "name": 0.6598864723754523,
+      "region": 0.9766482392034559,
+      "postcode": 0.524123656121112,
+      "DESC_": 0.5178395876855931,
+      "LATITUDE": 1,
+      "LONGITUDE": 1
+    },
+    "mapping_reasons": {
+      "DESCRIPTION": [
+        "Semantic similarity: 1.00",
+        "+0.15 (substring match)",
+        "+0.10 (category: descriptive)",
+        "+0.20 (synonym/abbreviation)",
+        "Final score: 1.00"
+      ],
+      "thematic_value": [
+        "Semantic similarity: 0.51",
+        "+0.10 (category: score)",
+        "+0.20 (synonym/abbreviation)",
+        "Final score: 0.81"
+      ],
+      "name": [
+        "Semantic similarity: 0.51",
+        "+0.15 (substring match)",
+        "Final score: 0.66"
+      ],
+      "region": [
+        "Semantic similarity: 0.73",
+        "+0.15 (substring match)",
+        "+0.10 (category: geographic)",
+        "Final score: 0.98"
+      ],
+      "postcode": [
+        "Semantic similarity: 0.47",
+        "+0.05 (type compatible)",
+        "Final score: 0.52"
+      ],
+      "DESC_": [
+        "Semantic similarity: 0.32",
+        "+0.20 (synonym/abbreviation)",
+        "Final score: 0.52"
+      ],
+      "LATITUDE": [
+        "Semantic similarity: 1.00",
+        "+0.15 (substring match)",
+        "+0.10 (category: unknown)",
+        "+0.05 (type compatible)",
+        "Final score: 1.00"
+      ],
+      "LONGITUDE": [
+        "Semantic similarity: 1.00",
+        "+0.15 (substring match)",
+        "+0.10 (category: unknown)",
+        "+0.05 (type compatible)",
+        "Final score: 1.00"
+      ]
+    },
+    "statistics": {
+      "total_fields": 53,
+      "mapped_fields": 8,
+      "unmapped_fields": 45,
+      "high_confidence": 5,
+      "medium_confidence": 1,
+      "low_confidence": 2
+    },
+    "unmapped_fields": [
+      "OBJECTID",
+      "ID",
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "address",
+      "locality",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "esri_pid",
+      "MP10128A_B",
+      "MP10128A_B_P",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ],
+    "unmapped_analysis": {
+      "clusters": [
+        {
+          "cluster_id": "4",
+          "fields": [
+            "OBJECTID",
+            "ID",
+            "Creator",
+            "EditDate",
+            "Editor",
+            "pointCount",
+            "address",
+            "locality",
+            "country",
+            "fsq_category",
+            "fsq_category_all",
+            "INDUSTRY_DESC",
+            "esri_pid",
+            "GENZ_CY",
+            "GENZ_CY_P",
+            "GENALPHACY",
+            "GENALPHACY_P"
+          ],
+          "suggested_pattern": "similar_pattern: 17 fields"
+        },
+        {
+          "cluster_id": "1",
+          "fields": [
+            "MP10104A_B",
+            "MP10104A_B_P",
+            "MP10116A_B",
+            "MP10116A_B_P",
+            "MP10128A_B",
+            "MP10128A_B_P",
+            "MP10138A_B",
+            "MP10138A_B_P",
+            "MP10110A_B",
+            "MP10110A_B_P",
+            "MP10120A_B",
+            "MP10120A_B_P"
+          ],
+          "suggested_pattern": "prefix: MP101"
+        },
+        {
+          "cluster_id": "2",
+          "fields": [
+            "Shape__Area",
+            "Shape__Length",
+            "CreationDate",
+            "source"
+          ],
+          "suggested_pattern": "similar_pattern: 4 fields"
+        },
+        {
+          "cluster_id": "0",
+          "fields": [
+            "X14060_X",
+            "X14060_X_A",
+            "X14068_X",
+            "X14068_X_A",
+            "X14058_X",
+            "X14058_X_A"
+          ],
+          "suggested_pattern": "prefix: X140"
+        },
+        {
+          "cluster_id": "3",
+          "fields": [
+            "MP10002A_B",
+            "MP10002A_B_P",
+            "MP10020A_B",
+            "MP10020A_B_P",
+            "MP10028A_B",
+            "MP10028A_B_P"
+          ],
+          "suggested_pattern": "prefix: MP100"
+        }
+      ],
+      "suggestions": [
+        {
+          "source_field": "OBJECTID",
+          "suggested_target": "geo_objectidentifier",
+          "category": "geographic",
+          "confidence": "manual_review"
+        },
+        {
+          "source_field": "ID",
+          "suggested_target": "geo_identifier",
+          "category": "geographic",
+          "confidence": "manual_review"
+        },
+        {
+          "source_field": "Shape__Area",
+          "suggested_target": "geo_shape_area",
+          "category": "geographic",
+          "confidence": "manual_review"
+        },
+        {
+          "source_field": "CreationDate",
+          "suggested_target": "temporal_creationdate",
+          "category": "temporal",
+          "confidence": "manual_review"
+        },
+        {
+          "source_field": "EditDate",
+          "suggested_target": "temporal_editdate",
+          "category": "temporal",
+          "confidence": "manual_review"
+        },
+        {
+          "source_field": "esri_pid",
+          "suggested_target": "geo_esri_pidentifier",
+          "category": "geographic",
+          "confidence": "manual_review"
+        }
+      ]
+    },
+    "quality_recommendations": [
+      "Review 2 low-confidence mappings manually: ['postcode', 'DESC_']",
+      "Check 1 targets with multiple mappings: ['description']"
+    ]
+  },
+  "service_url": "https://services8.arcgis.com/VhrZdFGa39zmfR47/arcgis/rest/services/Synapse54__ca07eefffe5b4914/FeatureServer",
+  "created_at": "2025-08-10T08:16:42.923541",
+  "deployment_instructions": {
+    "render_service_name": "HRB-microservice",
+    "environment_variables": {
+      "MODEL_PATH": "/app/models",
+      "DATA_PATH": "/app/data"
+    }
+  }
+}
