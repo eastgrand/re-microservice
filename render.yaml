@@ -5,11 +5,7 @@ services:
     env: python
     plan: starter
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
-    buildCommand: |
-      pip install --upgrade pip setuptools wheel && \
-      pip install -r requirements.txt && \
-      patch -p1 < shap-numpy-fix.patch && \
-      python precalculate_shap.py
+    buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
     envVars:
       - key: MODEL_PATH
         value: "/app/models"
