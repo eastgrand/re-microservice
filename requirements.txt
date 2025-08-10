@@ -1,21 +1,21 @@
-# SHAP Microservice - Python 3.13 Compatible Requirements
+# SHAP Microservice - Python 3.11 Stable Requirements
 
 # Flask web framework
-Flask==3.0.0
+Flask==2.3.3
 Flask-CORS==4.0.0
 
-# Data processing
-pandas==2.1.4
-numpy==1.26.2
+# Data processing - using stable versions with wheels
+pandas==2.0.3
+numpy==1.24.3
 
-# Machine learning
-xgboost==2.0.2
-scikit-learn==1.3.2
-shap==0.44.1
+# Machine learning - stable versions
+xgboost==1.7.6
+scikit-learn==1.3.0
+shap==0.42.1
 
 # Utilities
 python-dotenv==1.0.0
-psutil==5.9.6
+psutil==5.9.5
 joblib==1.3.2
 
 # Production server
