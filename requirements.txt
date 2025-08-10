@@ -1,14 +1,15 @@
-# SHAP Microservice - Python 3.11 Stable Requirements
+# SHAP Microservice - Simplified Requirements (Redis-Free)
+# Core dependencies for synchronous dataset generation
 
 # Flask web framework
 Flask==2.3.3
 Flask-CORS==4.0.0
 
-# Data processing - using stable versions with wheels
+# Data processing
 pandas==2.0.3
 numpy==1.24.3
 
-# Machine learning - stable versions
+# Machine learning
 xgboost==1.7.6
 scikit-learn==1.3.0
 shap==0.42.1
@@ -16,7 +17,6 @@ shap==0.42.1
 # Utilities
 python-dotenv==1.0.0
 psutil==5.9.5
-joblib==1.3.2
 
 # Production server
 gunicorn==21.2.0

@@ -4,11 +4,10 @@ services:
     name: hrb-microservice
     env: python
     plan: starter
-    pythonVersion: "3.11.7"
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
     buildCommand: |
-      pip install --upgrade pip && \
-      pip install --only-binary=all --no-cache-dir -r requirements.txt
+      pip install --upgrade pip setuptools wheel && \
+      pip install -r requirements.txt
     envVars:
       - key: MODEL_PATH
         value: "/app/models"
