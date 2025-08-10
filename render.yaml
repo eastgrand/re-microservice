@@ -13,3 +13,18 @@ services:
         value: "/app/data"
       - key: SERVICE_NAME
         value: "HRB SHAP Microservice"
+
+  # Worker service for background processing
+  - type: worker
+    name: hrb-worker
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
+    startCommand: python simple_worker.py
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: upstash-redis-cache
+      - key: SERVICE_NAME
+        value: "HRB Worker"
