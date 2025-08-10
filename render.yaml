@@ -8,7 +8,8 @@ services:
     buildCommand: |
       pip install --upgrade pip setuptools wheel && \
       pip install -r requirements.txt && \
-      patch -p1 < shap-numpy-fix.patch
+      patch -p1 < shap-numpy-fix.patch && \
+      python precalculate_shap.py
     envVars:
       - key: MODEL_PATH
         value: "/app/models"
