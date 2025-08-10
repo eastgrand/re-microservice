@@ -64,14 +64,28 @@ FEATURE_NAMES_PATH = "models/feature_names.txt"
 TRAINING_DATASET_PATH = "data/training_data.csv"  # Updated to use HRB training data
 JOINED_DATASET_PATH = "data/joined_data.csv"
 
-# New specialized model paths
+# Comprehensive model paths (12 models total)
 SPECIALIZED_MODELS = {
+    # Original specialized models (6)
     'strategic_analysis': 'models/strategic_analysis_model',
-    'competitive_analysis': 'models/competitive_analysis_model',
+    'competitive_analysis': 'models/competitive_analysis_model', 
     'demographic_analysis': 'models/demographic_analysis_model',
     'correlation_analysis': 'models/correlation_analysis_model',
     'predictive_modeling': 'models/predictive_modeling_model',
-    'ensemble': 'models/ensemble_model'
+    'ensemble': 'models/ensemble_model',
+    
+    # Additional algorithm models (6)
+    'xgboost': 'models/xgboost_model',
+    'random_forest': 'models/random_forest_model',
+    'linear_regression': 'models/linear_regression_model',
+    'neural_network': 'models/neural_network_model',
+    'knn': 'models/knn_model',
+    'svr': 'models/svr_model',
+    
+    # Unsupervised models (3) - for analysis endpoints that need them
+    'anomaly_detection': 'models/anomaly_detection_model',
+    'clustering': 'models/clustering_model', 
+    'dimensionality_reduction': 'models/dimensionality_reduction_model'
 }
 
 # --- GLOBAL DATA STORAGE ---
@@ -185,7 +199,7 @@ def load_model_and_data():
             else:
                 logger.warning(f"⚠️ Failed to load {model_type} model")
         
-        logger.info(f"✅ Loaded {models_loaded}/{len(SPECIALIZED_MODELS)} specialized models")
+        logger.info(f"✅ Loaded {models_loaded}/{len(SPECIALIZED_MODELS)} comprehensive models (6 specialized + 6 algorithm + 3 unsupervised)")
         
         # Load legacy XGBoost model as fallback
         if os.path.exists(MODEL_PATH):
@@ -282,6 +296,8 @@ def health_check():
         "version": "3.0.0-complete",
         "redis_enabled": False,
         "model_loaded": model is not None,
+        "specialized_models_loaded": len(specialized_models),
+        "total_models_available": len(SPECIALIZED_MODELS),
         "schema_initialized": schema_initialized,
         "memory_usage_mb": get_memory_usage(),
         "endpoints_available": 16
