@@ -22,9 +22,9 @@ services:
     buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
     startCommand: python simple_worker.py
     envVars:
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: upstash-redis-cache
       - key: SERVICE_NAME
         value: "HRB Worker"
+      - key: MODEL_PATH
+        value: "/app/models"
+      - key: DATA_PATH
+        value: "/app/data"
