@@ -1,30 +1,17 @@
-# Blueprint-Managed SHAP Demographic Analytics v3.0
+# HRB SHAP Microservice
 services:
   - type: web
-    name: shap-demographic-analytics-v3
+    name: hrb-microservice
     env: python
     plan: starter
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
     buildCommand: |
       pip install --upgrade pip setuptools wheel && \
-      pip install -r requirements.txt && \
-      patch -p1 < shap-numpy-fix.patch && \
-      python precalculate_shap.py
-
-  # Worker service for background processing
-  - type: worker
-    name: shap-demographic-worker-v3
-    env: python
-    plan: starter
-    buildCommand: |
-      pip install --upgrade pip setuptools wheel && \
-      pip install -r requirements.txt && \
-      patch -p1 < shap-numpy-fix.patch
-    startCommand: python simple_worker.py
+      pip install -r requirements.txt
     envVars:
-#       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: upstash-redis-cache
+      - key: MODEL_PATH
+        value: "/app/models"
+      - key: DATA_PATH
+        value: "/app/data"
       - key: SERVICE_NAME
-        value: "SHAP Demographic Worker v3.0"
+        value: "HRB SHAP Microservice"
