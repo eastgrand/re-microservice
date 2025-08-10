@@ -7,7 +7,8 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
     buildCommand: |
       pip install --upgrade pip setuptools wheel && \
-      pip install -r requirements.txt
+      pip install -r requirements.txt && \
+      patch -p1 < shap-numpy-fix.patch
     envVars:
       - key: MODEL_PATH
         value: "/app/models"
