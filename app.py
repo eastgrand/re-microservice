@@ -59,13 +59,24 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 REQUIRE_AUTH = API_KEY is not None
 
 # --- PATHS ---
-MODEL_PATH = "models/xgboost_model.pkl"
+MODEL_PATH = "models/xgboost_model.pkl"  # Fallback legacy model
 FEATURE_NAMES_PATH = "models/feature_names.txt"
-TRAINING_DATASET_PATH = "data/nesto_merge_0.csv"
+TRAINING_DATASET_PATH = "data/training_data.csv"  # Updated to use HRB training data
 JOINED_DATASET_PATH = "data/joined_data.csv"
 
+# New specialized model paths
+SPECIALIZED_MODELS = {
+    'strategic_analysis': 'models/strategic_analysis_model',
+    'competitive_analysis': 'models/competitive_analysis_model',
+    'demographic_analysis': 'models/demographic_analysis_model',
+    'correlation_analysis': 'models/correlation_analysis_model',
+    'predictive_modeling': 'models/predictive_modeling_model',
+    'ensemble': 'models/ensemble_model'
+}
+
 # --- GLOBAL DATA STORAGE ---
-model = None
+model = None  # Legacy fallback model
+specialized_models = {}  # Dictionary to store specialized models
 feature_names = []
 training_data = None
 joined_data = None
@@ -113,28 +124,90 @@ def require_api_key(f):
     return decorated_function
 
 # --- INITIALIZATION FUNCTIONS ---
-def load_model_and_data():
-    """Load model, features, and datasets on startup"""
-    global model, feature_names, training_data, joined_data, schema_initialized
+def load_specialized_model(model_type):
+    """Load a specific specialized model"""
+    import joblib
+    
+    model_dir = SPECIALIZED_MODELS.get(model_type)
+    if not model_dir or not os.path.exists(model_dir):
+        return None
     
     try:
-        logger.info("Loading model and data...")
+        model_data = {}
         
-        # Load XGBoost model
+        # Load the trained model
+        model_file = os.path.join(model_dir, 'model.joblib')
+        if os.path.exists(model_file):
+            model_data['model'] = joblib.load(model_file)
+        
+        # Load features
+        features_file = os.path.join(model_dir, 'features.json')
+        if os.path.exists(features_file):
+            with open(features_file, 'r') as f:
+                model_data['features'] = json.load(f)
+        
+        # Load hyperparameters
+        hyperparams_file = os.path.join(model_dir, 'hyperparameters.json')
+        if os.path.exists(hyperparams_file):
+            with open(hyperparams_file, 'r') as f:
+                model_data['hyperparameters'] = json.load(f)
+        
+        # Load scalers and encoders
+        scaler_file = os.path.join(model_dir, 'scaler.joblib')
+        if os.path.exists(scaler_file):
+            model_data['scaler'] = joblib.load(scaler_file)
+            
+        encoders_file = os.path.join(model_dir, 'label_encoders.joblib')
+        if os.path.exists(encoders_file):
+            model_data['encoders'] = joblib.load(encoders_file)
+        
+        return model_data
+    except Exception as e:
+        logger.error(f"❌ Error loading specialized model {model_type}: {str(e)}")
+        return None
+
+def load_model_and_data():
+    """Load models, features, and datasets on startup"""
+    global model, specialized_models, feature_names, training_data, joined_data, schema_initialized
+    
+    try:
+        logger.info("Loading models and data...")
+        
+        # Load specialized models first
+        models_loaded = 0
+        for model_type in SPECIALIZED_MODELS.keys():
+            logger.info(f"Loading {model_type} model...")
+            model_data = load_specialized_model(model_type)
+            if model_data:
+                specialized_models[model_type] = model_data
+                models_loaded += 1
+                logger.info(f"✅ {model_type} model loaded successfully")
+            else:
+                logger.warning(f"⚠️ Failed to load {model_type} model")
+        
+        logger.info(f"✅ Loaded {models_loaded}/{len(SPECIALIZED_MODELS)} specialized models")
+        
+        # Load legacy XGBoost model as fallback
         if os.path.exists(MODEL_PATH):
             with open(MODEL_PATH, 'rb') as f:
                 model = pickle.load(f)
-            logger.info("✅ XGBoost model loaded successfully")
+            logger.info("✅ Legacy XGBoost model loaded as fallback")
         else:
-            logger.warning(f"⚠️ Model file not found: {MODEL_PATH}")
+            logger.warning(f"⚠️ Legacy model file not found: {MODEL_PATH}")
         
-        # Load feature names
-        if os.path.exists(FEATURE_NAMES_PATH):
+        # Load feature names (try from strategic analysis model first, then fallback)
+        feature_names_loaded = False
+        if 'strategic_analysis' in specialized_models and 'features' in specialized_models['strategic_analysis']:
+            feature_names = specialized_models['strategic_analysis']['features']
+            feature_names_loaded = True
+            logger.info(f"✅ Feature names loaded from specialized model: {len(feature_names)} features")
+        
+        if not feature_names_loaded and os.path.exists(FEATURE_NAMES_PATH):
             with open(FEATURE_NAMES_PATH, 'r') as f:
                 feature_names = [line.strip() for line in f.readlines()]
-            logger.info(f"✅ Feature names loaded: {len(feature_names)} features")
-        else:
-            logger.warning(f"⚠️ Feature names file not found: {FEATURE_NAMES_PATH}")
+            logger.info(f"✅ Feature names loaded from file: {len(feature_names)} features")
+        elif not feature_names_loaded:
+            logger.warning(f"⚠️ Feature names not found")
         
         # Load training dataset
         if os.path.exists(TRAINING_DATASET_PATH):

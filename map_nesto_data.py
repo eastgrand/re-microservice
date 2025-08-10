@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # Public constants expected by app.py -----------------------------------------------------------
 
 # Default target variable used by the query-analyzer/UI.  Keep in sync with
-# the analyzer default (currently the Nike shoe metric).
-TARGET_VARIABLE: str = "MP30034A_B"
+# the analyzer default (currently H&R Block Online tax preparation usage).
+TARGET_VARIABLE: str = "MP10128A_B_P"
 
 # Canonical <field_code -> metadata> mapping.  The micro-service only needs
 # this for alias resolution; an *empty* dict is acceptable because the fallback

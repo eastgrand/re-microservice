@@ -1,0 +1,2712 @@
+{
+  "strategic_analysis": {
+    "success": true,
+    "analysis_type": "strategic_analysis",
+    "target_column": "MP10128A_B_P",
+    "training_duration_seconds": 17.370357,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "best_hyperparameters": {
+      "colsample_bytree": 0.8,
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 300,
+      "subsample": 0.8
+    },
+    "performance": {
+      "r2_score": 0.6083937183582347,
+      "rmse": 0.2997652935949587,
+      "mae": 0.14535967812320302,
+      "mape": Infinity,
+      "train_r2": 0.9999472505078068,
+      "train_rmse": 0.004269800766671631,
+      "overfitting_ratio": 1.6435857576014898
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.13656358420848846,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.09463293105363846,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.08157410472631454,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.07947560399770737,
+        "rank": 4
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.07594653964042664,
+        "rank": 5
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.06857489794492722,
+        "rank": 6
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.06120062991976738,
+        "rank": 7
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.053426530212163925,
+        "rank": 8
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.04049087315797806,
+        "rank": 9
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.03878725692629814,
+        "rank": 10
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.027996106073260307,
+        "rank": 11
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.02635716274380684,
+        "rank": 12
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0246334969997406,
+        "rank": 13
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.02288695052266121,
+        "rank": 14
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.017178859561681747,
+        "rank": 15
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.016612233594059944,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.016597099602222443,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.012225749902427197,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.011220963671803474,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.010739114135503769,
+        "rank": 20
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.007136306259781122,
+        "rank": 21
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.00625456590205431,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.00584867037832737,
+        "rank": 23
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0037812755908817053,
+        "rank": 24
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0037408298812806606,
+        "rank": 25
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.00354187423363328,
+        "rank": 26
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003535771043971181,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.003375640604645014,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.003303953679278493,
+        "rank": 29
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0024710004217922688,
+        "rank": 30
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.002266230992972851,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0021428230684250593,
+        "rank": 32
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0020781198982149363,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.00042976162512786686,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.00011548488691914827,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 2.3154960217652842e-05,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.12569548189640045,
+          "rank": 1
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.09395139664411545,
+          "rank": 2
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.07638637721538544,
+          "rank": 3
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.05898463726043701,
+          "rank": 4
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.028283683583140373,
+          "rank": 5
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.02799491584300995,
+          "rank": 6
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.02654758282005787,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.02365916222333908,
+          "rank": 8
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.021369336172938347,
+          "rank": 9
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.016396626830101013,
+          "rank": 10
+        },
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.014153067953884602,
+          "rank": 11
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.010106845758855343,
+          "rank": 12
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.009376628324389458,
+          "rank": 13
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.009124060161411762,
+          "rank": 14
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.008832601830363274,
+          "rank": 15
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.007615930866450071,
+          "rank": 16
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.007422792725265026,
+          "rank": 17
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.006709865760058165,
+          "rank": 18
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.005946335848420858,
+          "rank": 19
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.005905251018702984,
+          "rank": 20
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.0050144619308412075,
+          "rank": 21
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0049939993768930435,
+          "rank": 22
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.004971748683601618,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.004359825048595667,
+          "rank": 24
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.004084254615008831,
+          "rank": 25
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.004071816336363554,
+          "rank": 26
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0038930056616663933,
+          "rank": 27
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0036489050835371017,
+          "rank": 28
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.0024259642232209444,
+          "rank": 29
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0022892761044204235,
+          "rank": 30
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0018323687836527824,
+          "rank": 31
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0015708986902609468,
+          "rank": 32
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0015197898028418422,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00040707673178985715,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 3.977046799263917e-05,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 1.6422746966782142e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.0133161544799805
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.7468149249105798,
+      "std_cv_score": 0.13007278682886386,
+      "cv_scores": [
+        0.5026524340086871,
+        0.8345726468233836,
+        0.7225176861360476,
+        0.8237319042385753,
+        0.8505999533462052
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/strategic_analysis_model/model.joblib",
+      "features_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/strategic_analysis_model/features.json",
+      "hyperparameters_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/strategic_analysis_model/hyperparameters.json",
+      "model_directory": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/strategic_analysis_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "competitive_analysis": {
+    "success": true,
+    "analysis_type": "competitive_analysis",
+    "target_column": "MP10128A_B_P",
+    "training_duration_seconds": 17.140078,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "best_hyperparameters": {
+      "colsample_bytree": 0.8,
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 300,
+      "subsample": 0.8
+    },
+    "performance": {
+      "r2_score": 0.6083937183582347,
+      "rmse": 0.2997652935949587,
+      "mae": 0.14535967812320302,
+      "mape": Infinity,
+      "train_r2": 0.9999472505078068,
+      "train_rmse": 0.004269800766671631,
+      "overfitting_ratio": 1.6435857576014898
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.13656358420848846,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.09463293105363846,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.08157410472631454,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.07947560399770737,
+        "rank": 4
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.07594653964042664,
+        "rank": 5
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.06857489794492722,
+        "rank": 6
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.06120062991976738,
+        "rank": 7
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.053426530212163925,
+        "rank": 8
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.04049087315797806,
+        "rank": 9
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.03878725692629814,
+        "rank": 10
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.027996106073260307,
+        "rank": 11
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.02635716274380684,
+        "rank": 12
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0246334969997406,
+        "rank": 13
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.02288695052266121,
+        "rank": 14
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.017178859561681747,
+        "rank": 15
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.016612233594059944,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.016597099602222443,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.012225749902427197,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.011220963671803474,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.010739114135503769,
+        "rank": 20
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.007136306259781122,
+        "rank": 21
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.00625456590205431,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.00584867037832737,
+        "rank": 23
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0037812755908817053,
+        "rank": 24
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0037408298812806606,
+        "rank": 25
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.00354187423363328,
+        "rank": 26
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003535771043971181,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.003375640604645014,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.003303953679278493,
+        "rank": 29
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0024710004217922688,
+        "rank": 30
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.002266230992972851,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0021428230684250593,
+        "rank": 32
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0020781198982149363,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.00042976162512786686,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.00011548488691914827,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 2.3154960217652842e-05,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.12569548189640045,
+          "rank": 1
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.09395139664411545,
+          "rank": 2
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.07638637721538544,
+          "rank": 3
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.05898463726043701,
+          "rank": 4
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.028283683583140373,
+          "rank": 5
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.02799491584300995,
+          "rank": 6
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.02654758282005787,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.02365916222333908,
+          "rank": 8
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.021369336172938347,
+          "rank": 9
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.016396626830101013,
+          "rank": 10
+        },
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.014153067953884602,
+          "rank": 11
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.010106845758855343,
+          "rank": 12
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.009376628324389458,
+          "rank": 13
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.009124060161411762,
+          "rank": 14
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.008832601830363274,
+          "rank": 15
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.007615930866450071,
+          "rank": 16
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.007422792725265026,
+          "rank": 17
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.006709865760058165,
+          "rank": 18
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.005946335848420858,
+          "rank": 19
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.005905251018702984,
+          "rank": 20
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.0050144619308412075,
+          "rank": 21
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0049939993768930435,
+          "rank": 22
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.004971748683601618,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.004359825048595667,
+          "rank": 24
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.004084254615008831,
+          "rank": 25
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.004071816336363554,
+          "rank": 26
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0038930056616663933,
+          "rank": 27
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0036489050835371017,
+          "rank": 28
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.0024259642232209444,
+          "rank": 29
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0022892761044204235,
+          "rank": 30
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0018323687836527824,
+          "rank": 31
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0015708986902609468,
+          "rank": 32
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0015197898028418422,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00040707673178985715,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 3.977046799263917e-05,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 1.6422746966782142e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.0133161544799805
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.7468149249105798,
+      "std_cv_score": 0.13007278682886386,
+      "cv_scores": [
+        0.5026524340086871,
+        0.8345726468233836,
+        0.7225176861360476,
+        0.8237319042385753,
+        0.8505999533462052
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/competitive_analysis_model/model.joblib",
+      "features_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/competitive_analysis_model/features.json",
+      "hyperparameters_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/competitive_analysis_model/hyperparameters.json",
+      "model_directory": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/competitive_analysis_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "demographic_analysis": {
+    "success": true,
+    "analysis_type": "demographic_analysis",
+    "target_column": "MP10128A_B_P",
+    "training_duration_seconds": 17.033365,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "best_hyperparameters": {
+      "colsample_bytree": 0.8,
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 300,
+      "subsample": 0.8
+    },
+    "performance": {
+      "r2_score": 0.6083937183582347,
+      "rmse": 0.2997652935949587,
+      "mae": 0.14535967812320302,
+      "mape": Infinity,
+      "train_r2": 0.9999472505078068,
+      "train_rmse": 0.004269800766671631,
+      "overfitting_ratio": 1.6435857576014898
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.13656358420848846,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.09463293105363846,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.08157410472631454,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.07947560399770737,
+        "rank": 4
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.07594653964042664,
+        "rank": 5
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.06857489794492722,
+        "rank": 6
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.06120062991976738,
+        "rank": 7
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.053426530212163925,
+        "rank": 8
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.04049087315797806,
+        "rank": 9
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.03878725692629814,
+        "rank": 10
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.027996106073260307,
+        "rank": 11
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.02635716274380684,
+        "rank": 12
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0246334969997406,
+        "rank": 13
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.02288695052266121,
+        "rank": 14
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.017178859561681747,
+        "rank": 15
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.016612233594059944,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.016597099602222443,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.012225749902427197,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.011220963671803474,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.010739114135503769,
+        "rank": 20
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.007136306259781122,
+        "rank": 21
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.00625456590205431,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.00584867037832737,
+        "rank": 23
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0037812755908817053,
+        "rank": 24
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0037408298812806606,
+        "rank": 25
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.00354187423363328,
+        "rank": 26
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003535771043971181,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.003375640604645014,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.003303953679278493,
+        "rank": 29
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0024710004217922688,
+        "rank": 30
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.002266230992972851,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0021428230684250593,
+        "rank": 32
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0020781198982149363,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.00042976162512786686,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.00011548488691914827,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 2.3154960217652842e-05,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.12569548189640045,
+          "rank": 1
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.09395139664411545,
+          "rank": 2
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.07638637721538544,
+          "rank": 3
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.05898463726043701,
+          "rank": 4
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.028283683583140373,
+          "rank": 5
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.02799491584300995,
+          "rank": 6
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.02654758282005787,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.02365916222333908,
+          "rank": 8
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.021369336172938347,
+          "rank": 9
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.016396626830101013,
+          "rank": 10
+        },
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.014153067953884602,
+          "rank": 11
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.010106845758855343,
+          "rank": 12
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.009376628324389458,
+          "rank": 13
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.009124060161411762,
+          "rank": 14
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.008832601830363274,
+          "rank": 15
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.007615930866450071,
+          "rank": 16
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.007422792725265026,
+          "rank": 17
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.006709865760058165,
+          "rank": 18
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.005946335848420858,
+          "rank": 19
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.005905251018702984,
+          "rank": 20
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.0050144619308412075,
+          "rank": 21
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0049939993768930435,
+          "rank": 22
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.004971748683601618,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.004359825048595667,
+          "rank": 24
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.004084254615008831,
+          "rank": 25
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.004071816336363554,
+          "rank": 26
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0038930056616663933,
+          "rank": 27
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0036489050835371017,
+          "rank": 28
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.0024259642232209444,
+          "rank": 29
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0022892761044204235,
+          "rank": 30
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0018323687836527824,
+          "rank": 31
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0015708986902609468,
+          "rank": 32
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0015197898028418422,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00040707673178985715,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 3.977046799263917e-05,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 1.6422746966782142e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.0133161544799805
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.7468149249105798,
+      "std_cv_score": 0.13007278682886386,
+      "cv_scores": [
+        0.5026524340086871,
+        0.8345726468233836,
+        0.7225176861360476,
+        0.8237319042385753,
+        0.8505999533462052
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/demographic_analysis_model/model.joblib",
+      "features_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/demographic_analysis_model/features.json",
+      "hyperparameters_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/demographic_analysis_model/hyperparameters.json",
+      "model_directory": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/demographic_analysis_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "correlation_analysis": {
+    "success": true,
+    "analysis_type": "correlation_analysis",
+    "target_column": "MP10128A_B_P",
+    "training_duration_seconds": 16.482049,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "best_hyperparameters": {
+      "colsample_bytree": 0.8,
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 300,
+      "subsample": 0.8
+    },
+    "performance": {
+      "r2_score": 0.6083937183582347,
+      "rmse": 0.2997652935949587,
+      "mae": 0.14535967812320302,
+      "mape": Infinity,
+      "train_r2": 0.9999472505078068,
+      "train_rmse": 0.004269800766671631,
+      "overfitting_ratio": 1.6435857576014898
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.13656358420848846,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.09463293105363846,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.08157410472631454,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.07947560399770737,
+        "rank": 4
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.07594653964042664,
+        "rank": 5
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.06857489794492722,
+        "rank": 6
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.06120062991976738,
+        "rank": 7
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.053426530212163925,
+        "rank": 8
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.04049087315797806,
+        "rank": 9
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.03878725692629814,
+        "rank": 10
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.027996106073260307,
+        "rank": 11
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.02635716274380684,
+        "rank": 12
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0246334969997406,
+        "rank": 13
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.02288695052266121,
+        "rank": 14
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.017178859561681747,
+        "rank": 15
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.016612233594059944,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.016597099602222443,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.012225749902427197,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.011220963671803474,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.010739114135503769,
+        "rank": 20
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.007136306259781122,
+        "rank": 21
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.00625456590205431,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.00584867037832737,
+        "rank": 23
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0037812755908817053,
+        "rank": 24
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0037408298812806606,
+        "rank": 25
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.00354187423363328,
+        "rank": 26
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003535771043971181,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.003375640604645014,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.003303953679278493,
+        "rank": 29
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0024710004217922688,
+        "rank": 30
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.002266230992972851,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0021428230684250593,
+        "rank": 32
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0020781198982149363,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.00042976162512786686,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.00011548488691914827,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 2.3154960217652842e-05,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.12569548189640045,
+          "rank": 1
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.09395139664411545,
+          "rank": 2
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.07638637721538544,
+          "rank": 3
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.05898463726043701,
+          "rank": 4
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.028283683583140373,
+          "rank": 5
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.02799491584300995,
+          "rank": 6
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.02654758282005787,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.02365916222333908,
+          "rank": 8
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.021369336172938347,
+          "rank": 9
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.016396626830101013,
+          "rank": 10
+        },
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.014153067953884602,
+          "rank": 11
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.010106845758855343,
+          "rank": 12
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.009376628324389458,
+          "rank": 13
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.009124060161411762,
+          "rank": 14
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.008832601830363274,
+          "rank": 15
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.007615930866450071,
+          "rank": 16
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.007422792725265026,
+          "rank": 17
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.006709865760058165,
+          "rank": 18
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.005946335848420858,
+          "rank": 19
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.005905251018702984,
+          "rank": 20
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.0050144619308412075,
+          "rank": 21
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0049939993768930435,
+          "rank": 22
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.004971748683601618,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.004359825048595667,
+          "rank": 24
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.004084254615008831,
+          "rank": 25
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.004071816336363554,
+          "rank": 26
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0038930056616663933,
+          "rank": 27
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0036489050835371017,
+          "rank": 28
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.0024259642232209444,
+          "rank": 29
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0022892761044204235,
+          "rank": 30
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0018323687836527824,
+          "rank": 31
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0015708986902609468,
+          "rank": 32
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0015197898028418422,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00040707673178985715,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 3.977046799263917e-05,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 1.6422746966782142e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.0133161544799805
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.7468149249105798,
+      "std_cv_score": 0.13007278682886386,
+      "cv_scores": [
+        0.5026524340086871,
+        0.8345726468233836,
+        0.7225176861360476,
+        0.8237319042385753,
+        0.8505999533462052
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/correlation_analysis_model/model.joblib",
+      "features_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/correlation_analysis_model/features.json",
+      "hyperparameters_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/correlation_analysis_model/hyperparameters.json",
+      "model_directory": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/correlation_analysis_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "predictive_modeling": {
+    "success": true,
+    "analysis_type": "predictive_modeling",
+    "target_column": "MP10128A_B_P",
+    "training_duration_seconds": 16.697265,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "best_hyperparameters": {
+      "colsample_bytree": 0.8,
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 300,
+      "subsample": 0.8
+    },
+    "performance": {
+      "r2_score": 0.6083937183582347,
+      "rmse": 0.2997652935949587,
+      "mae": 0.14535967812320302,
+      "mape": Infinity,
+      "train_r2": 0.9999472505078068,
+      "train_rmse": 0.004269800766671631,
+      "overfitting_ratio": 1.6435857576014898
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.13656358420848846,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.09463293105363846,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.08157410472631454,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.07947560399770737,
+        "rank": 4
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.07594653964042664,
+        "rank": 5
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.06857489794492722,
+        "rank": 6
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.06120062991976738,
+        "rank": 7
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.053426530212163925,
+        "rank": 8
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.04049087315797806,
+        "rank": 9
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.03878725692629814,
+        "rank": 10
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.027996106073260307,
+        "rank": 11
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.02635716274380684,
+        "rank": 12
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0246334969997406,
+        "rank": 13
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.02288695052266121,
+        "rank": 14
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.017178859561681747,
+        "rank": 15
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.016612233594059944,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.016597099602222443,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.012225749902427197,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.011220963671803474,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.010739114135503769,
+        "rank": 20
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.007136306259781122,
+        "rank": 21
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.00625456590205431,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.00584867037832737,
+        "rank": 23
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0037812755908817053,
+        "rank": 24
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0037408298812806606,
+        "rank": 25
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.00354187423363328,
+        "rank": 26
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003535771043971181,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.003375640604645014,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.003303953679278493,
+        "rank": 29
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0024710004217922688,
+        "rank": 30
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.002266230992972851,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0021428230684250593,
+        "rank": 32
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0020781198982149363,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.00042976162512786686,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.00011548488691914827,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 2.3154960217652842e-05,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.12569548189640045,
+          "rank": 1
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.09395139664411545,
+          "rank": 2
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.07638637721538544,
+          "rank": 3
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.05898463726043701,
+          "rank": 4
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.028283683583140373,
+          "rank": 5
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.02799491584300995,
+          "rank": 6
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.02654758282005787,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.02365916222333908,
+          "rank": 8
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.021369336172938347,
+          "rank": 9
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.016396626830101013,
+          "rank": 10
+        },
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.014153067953884602,
+          "rank": 11
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.010106845758855343,
+          "rank": 12
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.009376628324389458,
+          "rank": 13
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.009124060161411762,
+          "rank": 14
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.008832601830363274,
+          "rank": 15
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.007615930866450071,
+          "rank": 16
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.007422792725265026,
+          "rank": 17
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.006709865760058165,
+          "rank": 18
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.005946335848420858,
+          "rank": 19
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.005905251018702984,
+          "rank": 20
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.0050144619308412075,
+          "rank": 21
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0049939993768930435,
+          "rank": 22
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.004971748683601618,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.004359825048595667,
+          "rank": 24
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.004084254615008831,
+          "rank": 25
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.004071816336363554,
+          "rank": 26
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0038930056616663933,
+          "rank": 27
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0036489050835371017,
+          "rank": 28
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.0024259642232209444,
+          "rank": 29
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0022892761044204235,
+          "rank": 30
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0018323687836527824,
+          "rank": 31
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0015708986902609468,
+          "rank": 32
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0015197898028418422,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00040707673178985715,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 3.977046799263917e-05,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 1.6422746966782142e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.0133161544799805
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.7468149249105798,
+      "std_cv_score": 0.13007278682886386,
+      "cv_scores": [
+        0.5026524340086871,
+        0.8345726468233836,
+        0.7225176861360476,
+        0.8237319042385753,
+        0.8505999533462052
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/predictive_modeling_model/model.joblib",
+      "features_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/predictive_modeling_model/features.json",
+      "hyperparameters_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/predictive_modeling_model/hyperparameters.json",
+      "model_directory": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/predictive_modeling_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "ensemble_models": {
+    "multi_target_ensemble": {
+      "success": true,
+      "targets": [
+        "MP10128A_B_P",
+        "MP10128A_B_P",
+        "MP10128A_B_P",
+        "MP10128A_B_P",
+        "MP10128A_B_P"
+      ],
+      "features": 44,
+      "training_records": 984,
+      "model_file": "/Users/voldeck/code/mpiq-ai-chat/projects/HRB/trained_models/ensemble_model/ensemble_model.joblib"
+    }
+  }
+}

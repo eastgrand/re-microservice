@@ -1,0 +1,36 @@
+{
+  "training_timestamp": "2025-08-10T13:51:32.252476",
+  "total_models_trained": 5,
+  "models_overview": {
+    "strategic_analysis": {
+      "target_column": "MP10128A_B_P",
+      "r2_score": 0.6083937183582347,
+      "features_used": 44,
+      "training_records": 590
+    },
+    "competitive_analysis": {
+      "target_column": "MP10128A_B_P",
+      "r2_score": 0.6083937183582347,
+      "features_used": 44,
+      "training_records": 590
+    },
+    "demographic_analysis": {
+      "target_column": "MP10128A_B_P",
+      "r2_score": 0.6083937183582347,
+      "features_used": 44,
+      "training_records": 590
+    },
+    "correlation_analysis": {
+      "target_column": "MP10128A_B_P",
+      "r2_score": 0.6083937183582347,
+      "features_used": 44,
+      "training_records": 590
+    },
+    "predictive_modeling": {
+      "target_column": "MP10128A_B_P",
+      "r2_score": 0.6083937183582347,
+      "features_used": 44,
+      "training_records": 590
+    }
+  }
+}
