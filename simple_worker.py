@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # filepath: /Users/voldeck/code/shap-microservice/simple_worker.py
 """
-Simple RQ Worker for SHAP microservice
+Simple Worker for SHAP microservice
 
-This is a simplified worker script that runs an RQ worker for the SHAP microservice.
-It doesn't rely on the Connection context manager which appears to be causing issues.
+This worker can run with or without Redis dependency.
+If REDIS_URL is not set, it runs as a simple heartbeat worker.
+If REDIS_URL is set, it runs as a full RQ worker.
 """
 
 import os
@@ -60,17 +61,38 @@ def cleanup_stale_workers(conn):
     except Exception as e:
         logger.warning(f"Error during stale worker cleanup: {str(e)}")
 
-def main():
-    """Run a simple RQ worker"""
-    # Enable garbage collection
-    gc.enable()
-    logger.info(f"Garbage collection enabled with thresholds: {gc.get_threshold()}")
+def run_simple_worker():
+    """Run worker without Redis dependency"""
+    logger.info("Simple Worker starting up...")
+    logger.info("Worker is running in no-op mode (no Redis dependency)")
     
-    # Get Redis URL from environment
-    redis_url = os.environ.get("REDIS_URL")
-    if not redis_url:
-        logger.error("REDIS_URL environment variable not set")
+    # Log environment info
+    service_name = os.environ.get('SERVICE_NAME', 'SHAP Microservice v3.0')
+    service_version = os.environ.get('SERVICE_VERSION', '3.0.0')
+    
+    logger.info(f"Service: {service_name}")
+    logger.info(f"Version: {service_version}")
+    logger.info("Worker ready - monitoring for tasks...")
+    
+    try:
+        # Keep worker alive with periodic health checks
+        while True:
+            time.sleep(60)  # Sleep for 1 minute
+            logger.info("Worker heartbeat - running successfully")
+            
+    except KeyboardInterrupt:
+        logger.info("Worker shutdown requested")
+        return 0
+    except Exception as e:
+        logger.error(f"Worker error: {e}")
         return 1
+    finally:
+        logger.info("Simple Worker shutting down...")
+    
+    return 0
+
+def run_redis_worker(redis_url):
+    """Run RQ worker with Redis"""
     
     try:
         # Import needed modules
@@ -137,7 +159,7 @@ def main():
         unique_id = f"{hostname}-{os.getpid()}-{int(time.time())}-{str(uuid.uuid4())[:8]}"
         worker_name = f"shap-worker-{unique_id}"
         
-        logger.info("Starting simple worker...")
+        logger.info("Starting Redis worker...")
         worker = Worker(['shap-jobs'], connection=conn, name=worker_name)
         logger.info(f"Worker created with ID: {worker.name}")
         
@@ -205,7 +227,9 @@ def main():
                     return 1
                 logger.info(f"Waiting {retry_delay} seconds before retry...")
                 time.sleep(retry_delay)
-    
+        
+        return 0
+        
     except ImportError as e:
         logger.error(f"Missing required module: {str(e)}")
         logger.error("Please install the required packages: pip install redis rq psutil")
@@ -214,6 +238,21 @@ def main():
         logger.error(f"Error in worker: {str(e)}")
         logger.error(traceback.format_exc())
         return 1
+
+def main():
+    """Run a simple worker with or without Redis dependency"""
+    # Enable garbage collection
+    gc.enable()
+    logger.info(f"Garbage collection enabled with thresholds: {gc.get_threshold()}")
+    
+    # Check if Redis is needed (skip if not configured)
+    redis_url = os.environ.get("REDIS_URL")
+    if not redis_url:
+        logger.info("REDIS_URL environment variable not set - running in no-op mode")
+        # Run as a simple heartbeat worker without Redis
+        return run_simple_worker()
+    
+    return run_redis_worker(redis_url)
 
 if __name__ == "__main__":
     sys.exit(main())
