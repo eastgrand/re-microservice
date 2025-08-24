@@ -1,4 +1,5 @@
-# Python mapping placeholder
+# Project Configuration Module
+# Handles target variable, schema, and data loading for the SHAP microservice
 
 import os
 import logging
@@ -7,24 +8,22 @@ from typing import Dict, Any
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# NOTE:
-# This module originally held the full data-mapping logic for the NESTO dataset
-# (MASTER_SCHEMA, data loaders, etc.).  During recent refactors it was replaced
-# with an empty placeholder which breaks the import in app.py during deploy
-# (ImportError: cannot import name 'MASTER_SCHEMA').
-#
-# To restore compatibility – and unblock deployments – we provide *minimal*
-# stub implementations that satisfy the expected interface.  They can be
-# replaced with the full logic once it is re-integrated.
+# PROJECT CONFIGURATION
+# This module provides project-specific configuration including target variables,
+# schema mappings, and data loading functionality for the SHAP microservice.
+# 
+# Current Project: Red Bull Energy Drinks Market Analysis
+# Domain: Energy Drinks / Functional Beverages
+# Data Source: ArcGIS FeatureServer with percentage-based usage data
 # ---------------------------------------------------------------------------
 
 logger = logging.getLogger(__name__)
 
 # Public constants expected by app.py -----------------------------------------------------------
 
-# Default target variable used by the query-analyzer/UI.  Keep in sync with
-# the analyzer default (currently H&R Block Online tax preparation usage).
-TARGET_VARIABLE: str = "MP10128A_B_P"
+# Target variable for Red Bull energy drinks analysis
+# Updated from H&R Block tax services to Red Bull energy drink usage percentage
+TARGET_VARIABLE: str = "MP12207A_B_P"  # Red Bull usage percentage (2025 data)
 
 # Canonical <field_code -> metadata> mapping.  The micro-service only needs
 # this for alias resolution; an *empty* dict is acceptable because the fallback

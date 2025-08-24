@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 from typing import Dict, Any, List, Optional
 
 # Import custom modules
-from map_nesto_data import MASTER_SCHEMA, TARGET_VARIABLE, load_and_preprocess_data, initialize_schema
+from project_config import MASTER_SCHEMA, TARGET_VARIABLE, load_and_preprocess_data, initialize_schema
 from enhanced_analysis_worker import enhanced_analysis_worker
 from field_utils import resolve_field_name
 from memory_utils import (
@@ -104,9 +104,9 @@ def safe_jsonify(data, status_code=200):
             return {key: convert_nan(value) for key, value in obj.items()}
         elif isinstance(obj, list):
             return [convert_nan(item) for item in obj]
-        elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        elif hasattr(obj, 'dtype') and np.issubdtype(obj.dtype, np.integer):
             return int(obj)
-        elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        elif hasattr(obj, 'dtype') and np.issubdtype(obj.dtype, np.floating):
             if pd.isna(obj) or np.isnan(obj) or np.isinf(obj):
                 return None
             return float(obj)

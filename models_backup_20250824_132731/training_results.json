@@ -1,0 +1,2604 @@
+{
+  "xgboost": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "xgboost",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 2.589854,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "n_estimators": 300,
+      "max_depth": 5,
+      "learning_rate": 0.1,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "random_state": 42
+    },
+    "performance": {
+      "r2_score": 0.6083937183582347,
+      "rmse": 0.2997652935949587,
+      "mae": 0.14535967812320302,
+      "mape": Infinity,
+      "train_r2": 0.9999472505078068,
+      "train_rmse": 0.004269800766671631,
+      "overfitting_ratio": 1.6435857576014898
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.13656358420848846,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.09463293105363846,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.08157410472631454,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.07947560399770737,
+        "rank": 4
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.07594653964042664,
+        "rank": 5
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.06857489794492722,
+        "rank": 6
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.06120062991976738,
+        "rank": 7
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.053426530212163925,
+        "rank": 8
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.04049087315797806,
+        "rank": 9
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.03878725692629814,
+        "rank": 10
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.027996106073260307,
+        "rank": 11
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.02635716274380684,
+        "rank": 12
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0246334969997406,
+        "rank": 13
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.02288695052266121,
+        "rank": 14
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.017178859561681747,
+        "rank": 15
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.016612233594059944,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.016597099602222443,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.012225749902427197,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.011220963671803474,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.010739114135503769,
+        "rank": 20
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.007136306259781122,
+        "rank": 21
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.00625456590205431,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.00584867037832737,
+        "rank": 23
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0037812755908817053,
+        "rank": 24
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0037408298812806606,
+        "rank": 25
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.00354187423363328,
+        "rank": 26
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003535771043971181,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.003375640604645014,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.003303953679278493,
+        "rank": 29
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0024710004217922688,
+        "rank": 30
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.002266230992972851,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0021428230684250593,
+        "rank": 32
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0020781198982149363,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.00042976162512786686,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.00011548488691914827,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 2.3154960217652842e-05,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.12569548189640045,
+          "rank": 1
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.09395139664411545,
+          "rank": 2
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.07638637721538544,
+          "rank": 3
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.05898463726043701,
+          "rank": 4
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.028283683583140373,
+          "rank": 5
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.02799491584300995,
+          "rank": 6
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.02654758282005787,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.02365916222333908,
+          "rank": 8
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.021369336172938347,
+          "rank": 9
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.016396626830101013,
+          "rank": 10
+        },
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.014153067953884602,
+          "rank": 11
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.010106845758855343,
+          "rank": 12
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.009376628324389458,
+          "rank": 13
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.009124060161411762,
+          "rank": 14
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.008832601830363274,
+          "rank": 15
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.007615930866450071,
+          "rank": 16
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.007422792725265026,
+          "rank": 17
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.006709865760058165,
+          "rank": 18
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.005946335848420858,
+          "rank": 19
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.005905251018702984,
+          "rank": 20
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.0050144619308412075,
+          "rank": 21
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0049939993768930435,
+          "rank": 22
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.004971748683601618,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.004359825048595667,
+          "rank": 24
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.004084254615008831,
+          "rank": 25
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.004071816336363554,
+          "rank": 26
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0038930056616663933,
+          "rank": 27
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0036489050835371017,
+          "rank": 28
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.0024259642232209444,
+          "rank": 29
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0022892761044204235,
+          "rank": 30
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0018323687836527824,
+          "rank": 31
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0015708986902609468,
+          "rank": 32
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0015197898028418422,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00040707673178985715,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 3.977046799263917e-05,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 1.6422746966782142e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.0133161544799805
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.7468149249105798,
+      "std_cv_score": 0.13007278682886386,
+      "cv_scores": [
+        0.5026524340086871,
+        0.8345726468233836,
+        0.7225176861360476,
+        0.8237319042385753,
+        0.8505999533462052
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/xgboost_model/model.joblib",
+      "features_file": "comprehensive_models/xgboost_model/features.json",
+      "hyperparameters_file": "comprehensive_models/xgboost_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/xgboost_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "random_forest": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "random_forest",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 5.403898,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "n_estimators": 200,
+      "max_depth": 10,
+      "min_samples_split": 5,
+      "min_samples_leaf": 2,
+      "random_state": 42
+    },
+    "performance": {
+      "r2_score": 0.5131808710654624,
+      "rmse": 0.3342260852172712,
+      "mae": 0.1664492049318446,
+      "mape": Infinity,
+      "train_r2": 0.9369511398901116,
+      "train_rmse": 0.14761724265713713,
+      "overfitting_ratio": 1.825771755569962
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.18712163065723705,
+        "rank": 1
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.18436492793759254,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.13704576045649583,
+        "rank": 3
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.046548548472999676,
+        "rank": 4
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.03681228094083985,
+        "rank": 5
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.03614692536295,
+        "rank": 6
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.033902692711230004,
+        "rank": 7
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.023385932670936593,
+        "rank": 8
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.022465513131613365,
+        "rank": 9
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.021327695553566835,
+        "rank": 10
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.020940925646667437,
+        "rank": 11
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.020611294662219542,
+        "rank": 12
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.018553641986171317,
+        "rank": 13
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.01814704036891194,
+        "rank": 14
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.017336511201014114,
+        "rank": 15
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.015879982002485814,
+        "rank": 16
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.012839922745880037,
+        "rank": 17
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.012055548746389066,
+        "rank": 18
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.012023246889550344,
+        "rank": 19
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.011947142434694795,
+        "rank": 20
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.009359253947515763,
+        "rank": 21
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.0074009853770127445,
+        "rank": 22
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.006364690692608047,
+        "rank": 23
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.006171628507737467,
+        "rank": 24
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.005492728427914638,
+        "rank": 25
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.004949127589803545,
+        "rank": 26
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.004679360587067205,
+        "rank": 27
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.0042955249194849675,
+        "rank": 28
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0035831784937926676,
+        "rank": 29
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.003190532126860165,
+        "rank": 30
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.0015469700026520439,
+        "rank": 31
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0012172679954531409,
+        "rank": 32
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.0009818880268050096,
+        "rank": 33
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.0002172731074864768,
+        "rank": 34
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 3.0630769997950895e-06,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 1.09928536838567e-06,
+        "rank": 36
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {
+      "shap_importance": [
+        {
+          "feature": "thematic_value",
+          "mean_shap_value": 0.09399313778478319,
+          "rank": 1
+        },
+        {
+          "feature": "MP10104A_B_P",
+          "mean_shap_value": 0.09238797469647371,
+          "rank": 2
+        },
+        {
+          "feature": "MP10002A_B_P",
+          "mean_shap_value": 0.06247143967597607,
+          "rank": 3
+        },
+        {
+          "feature": "MP10120A_B_P",
+          "mean_shap_value": 0.05794614180948986,
+          "rank": 4
+        },
+        {
+          "feature": "MP10116A_B_P",
+          "mean_shap_value": 0.03740964841015313,
+          "rank": 5
+        },
+        {
+          "feature": "MP10028A_B_P",
+          "mean_shap_value": 0.027787771613760635,
+          "rank": 6
+        },
+        {
+          "feature": "GENALPHACY_P",
+          "mean_shap_value": 0.020536073167766077,
+          "rank": 7
+        },
+        {
+          "feature": "MP10020A_B_P",
+          "mean_shap_value": 0.007838877301008608,
+          "rank": 8
+        },
+        {
+          "feature": "MP10138A_B_P",
+          "mean_shap_value": 0.007397638207216114,
+          "rank": 9
+        },
+        {
+          "feature": "MP10128A_B",
+          "mean_shap_value": 0.0072404906589061,
+          "rank": 10
+        },
+        {
+          "feature": "MP10110A_B_P",
+          "mean_shap_value": 0.006268484105434727,
+          "rank": 11
+        },
+        {
+          "feature": "GENZ_CY_P",
+          "mean_shap_value": 0.005299018878829926,
+          "rank": 12
+        },
+        {
+          "feature": "Shape__Area",
+          "mean_shap_value": 0.003656236755883217,
+          "rank": 13
+        },
+        {
+          "feature": "GENALPHACY",
+          "mean_shap_value": 0.0034223056718377587,
+          "rank": 14
+        },
+        {
+          "feature": "Shape__Length",
+          "mean_shap_value": 0.002386016468102255,
+          "rank": 15
+        },
+        {
+          "feature": "X14060_X",
+          "mean_shap_value": 0.0022622386146034326,
+          "rank": 16
+        },
+        {
+          "feature": "MP10110A_B",
+          "mean_shap_value": 0.0021357355939402244,
+          "rank": 17
+        },
+        {
+          "feature": "GENZ_CY",
+          "mean_shap_value": 0.001930379817101255,
+          "rank": 18
+        },
+        {
+          "feature": "LONGITUDE",
+          "mean_shap_value": 0.0016500832114423709,
+          "rank": 19
+        },
+        {
+          "feature": "MP10116A_B",
+          "mean_shap_value": 0.0013247275600974783,
+          "rank": 20
+        },
+        {
+          "feature": "MP10104A_B",
+          "mean_shap_value": 0.001318571389597881,
+          "rank": 21
+        },
+        {
+          "feature": "X14058_X",
+          "mean_shap_value": 0.0012608761024261936,
+          "rank": 22
+        },
+        {
+          "feature": "MP10020A_B",
+          "mean_shap_value": 0.0011068524216577508,
+          "rank": 23
+        },
+        {
+          "feature": "MP10002A_B",
+          "mean_shap_value": 0.0010824999163753658,
+          "rank": 24
+        },
+        {
+          "feature": "X14058_X_A",
+          "mean_shap_value": 0.0010696945940445281,
+          "rank": 25
+        },
+        {
+          "feature": "MP10120A_B",
+          "mean_shap_value": 0.001058704874108973,
+          "rank": 26
+        },
+        {
+          "feature": "X14068_X_A",
+          "mean_shap_value": 0.0009641370849653331,
+          "rank": 27
+        },
+        {
+          "feature": "MP10028A_B",
+          "mean_shap_value": 0.000947564331840088,
+          "rank": 28
+        },
+        {
+          "feature": "MP10138A_B",
+          "mean_shap_value": 0.0007998761014396631,
+          "rank": 29
+        },
+        {
+          "feature": "X14060_X_A",
+          "mean_shap_value": 0.0007172859434258938,
+          "rank": 30
+        },
+        {
+          "feature": "X14068_X",
+          "mean_shap_value": 0.0007005529970191127,
+          "rank": 31
+        },
+        {
+          "feature": "postcode",
+          "mean_shap_value": 0.0005731577256718505,
+          "rank": 32
+        },
+        {
+          "feature": "LATITUDE",
+          "mean_shap_value": 0.0004794305857802823,
+          "rank": 33
+        },
+        {
+          "feature": "pointCount",
+          "mean_shap_value": 0.00033739623645027825,
+          "rank": 34
+        },
+        {
+          "feature": "fsq_category",
+          "mean_shap_value": 9.988965322579514e-06,
+          "rank": 35
+        },
+        {
+          "feature": "fsq_category_all",
+          "mean_shap_value": 5.715294829205262e-06,
+          "rank": 36
+        },
+        {
+          "feature": "CreationDate",
+          "mean_shap_value": 0.0,
+          "rank": 37
+        },
+        {
+          "feature": "Creator",
+          "mean_shap_value": 0.0,
+          "rank": 38
+        },
+        {
+          "feature": "EditDate",
+          "mean_shap_value": 0.0,
+          "rank": 39
+        },
+        {
+          "feature": "Editor",
+          "mean_shap_value": 0.0,
+          "rank": 40
+        },
+        {
+          "feature": "region",
+          "mean_shap_value": 0.0,
+          "rank": 41
+        },
+        {
+          "feature": "country",
+          "mean_shap_value": 0.0,
+          "rank": 42
+        },
+        {
+          "feature": "INDUSTRY_DESC",
+          "mean_shap_value": 0.0,
+          "rank": 43
+        },
+        {
+          "feature": "source",
+          "mean_shap_value": 0.0,
+          "rank": 44
+        }
+      ],
+      "sample_size": 100,
+      "base_value": 3.015633813559322
+    },
+    "cross_validation": {
+      "mean_cv_score": 0.6612985670796029,
+      "std_cv_score": 0.1364448877457339,
+      "cv_scores": [
+        0.5013308203725048,
+        0.7558827694416363,
+        0.49099115850808517,
+        0.7493912320824033,
+        0.808896854993385
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/random_forest_model/model.joblib",
+      "features_file": "comprehensive_models/random_forest_model/features.json",
+      "hyperparameters_file": "comprehensive_models/random_forest_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/random_forest_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "linear_regression": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "linear_regression",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 1.129017,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {},
+    "performance": {
+      "r2_score": 0.2972641731308401,
+      "rmse": 0.40156196642274383,
+      "mae": 0.1605859172808708,
+      "mape": Infinity,
+      "train_r2": 0.8420820886512332,
+      "train_rmse": 0.2336222299205001,
+      "overfitting_ratio": 2.8327735555289837
+    },
+    "feature_importance": [
+      {
+        "feature": "X14060_X",
+        "importance": 6.545962945200025,
+        "rank": 1
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 4.922122183806929,
+        "rank": 2
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 3.953591152303234,
+        "rank": 3
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 2.4170591285764313,
+        "rank": 4
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 2.0531761397174737,
+        "rank": 5
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 1.8404214245079578,
+        "rank": 6
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 1.6907335309812819,
+        "rank": 7
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 1.1815351116508348,
+        "rank": 8
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.8424299040968185,
+        "rank": 9
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.5767988878138457,
+        "rank": 10
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.43987738668300036,
+        "rank": 11
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.3846139657566364,
+        "rank": 12
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.369101230955871,
+        "rank": 13
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.29068516919042503,
+        "rank": 14
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.24757745940138756,
+        "rank": 15
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.2023127148436461,
+        "rank": 16
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.193885565560258,
+        "rank": 17
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.1840164209415872,
+        "rank": 18
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.1605742518481687,
+        "rank": 19
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.06567105403304699,
+        "rank": 20
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.06153021607251626,
+        "rank": 21
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.05326042854363163,
+        "rank": 22
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.04893747503636486,
+        "rank": 23
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.04684885450805732,
+        "rank": 24
+      },
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.04684885450802874,
+        "rank": 25
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.027129236425154232,
+        "rank": 26
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.024237263952956275,
+        "rank": 27
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.015594714982080116,
+        "rank": 28
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.013975935667790474,
+        "rank": 29
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.013963058413674598,
+        "rank": 30
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.013102284790028581,
+        "rank": 31
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.010565034776103478,
+        "rank": 32
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.004758502375576769,
+        "rank": 33
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 0.0036027063756635938,
+        "rank": 34
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0034415575822753924,
+        "rank": 35
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.0032471193517641717,
+        "rank": 36
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.0011413606471868973,
+        "rank": 37
+      },
+      {
+        "feature": "region",
+        "importance": 2.2426505097428162e-14,
+        "rank": 38
+      },
+      {
+        "feature": "Creator",
+        "importance": 1.8096635301390052e-14,
+        "rank": 39
+      },
+      {
+        "feature": "EditDate",
+        "importance": 6.036837696399289e-15,
+        "rank": 40
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 4.066191827689636e-15,
+        "rank": 41
+      },
+      {
+        "feature": "Editor",
+        "importance": 3.566591466608315e-15,
+        "rank": 42
+      },
+      {
+        "feature": "source",
+        "importance": 1.9984014443252818e-15,
+        "rank": 43
+      },
+      {
+        "feature": "country",
+        "importance": 2.7755575615628914e-16,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {},
+    "cross_validation": {
+      "mean_cv_score": 0.6235125239952737,
+      "std_cv_score": 0.2056921756255186,
+      "cv_scores": [
+        0.482567457329116,
+        0.565790727933281,
+        0.35083485256978575,
+        0.8210200784610663,
+        0.8973495036831193
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/linear_regression_model/model.joblib",
+      "features_file": "comprehensive_models/linear_regression_model/features.json",
+      "hyperparameters_file": "comprehensive_models/linear_regression_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/linear_regression_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "ridge_regression": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "ridge_regression",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 0.112503,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "alpha": 1.0,
+      "random_state": 42
+    },
+    "performance": {
+      "r2_score": 0.3493380997019926,
+      "rmse": 0.38639741582234083,
+      "mae": 0.16536044316259582,
+      "mape": Infinity,
+      "train_r2": 0.8094586610829679,
+      "train_rmse": 0.2566215215309047,
+      "overfitting_ratio": 2.317121040543494
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10128A_B",
+        "importance": 1.2727753371550994,
+        "rank": 1
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.929537442405327,
+        "rank": 2
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.6210044114420856,
+        "rank": 3
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.5900904484278531,
+        "rank": 4
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.4957738780645987,
+        "rank": 5
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.4475238130046178,
+        "rank": 6
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.3909869468830844,
+        "rank": 7
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.3773312486201843,
+        "rank": 8
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.29982099928281924,
+        "rank": 9
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.23377122698509203,
+        "rank": 10
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.23302395681702073,
+        "rank": 11
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.2251316614614197,
+        "rank": 12
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.18612405912603947,
+        "rank": 13
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.18550694162703588,
+        "rank": 14
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.16381522949117674,
+        "rank": 15
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.16093573207697062,
+        "rank": 16
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.1575324770971398,
+        "rank": 17
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.12453062543467831,
+        "rank": 18
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.08543116771569848,
+        "rank": 19
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.07266408600848237,
+        "rank": 20
+      },
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.07047958820491819,
+        "rank": 21
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.07047958820491439,
+        "rank": 22
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.0633533884080652,
+        "rank": 23
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.05169143813160797,
+        "rank": 24
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.048379512131711315,
+        "rank": 25
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.04190218053094809,
+        "rank": 26
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.03925492536676157,
+        "rank": 27
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.03864008312431138,
+        "rank": 28
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.030665239525454857,
+        "rank": 29
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.02812880600882296,
+        "rank": 30
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.019311280724268635,
+        "rank": 31
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.013419153272682699,
+        "rank": 32
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.012053932206530695,
+        "rank": 33
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 0.00731228194253991,
+        "rank": 34
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.005351335243760808,
+        "rank": 35
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.003571016144740156,
+        "rank": 36
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.00032451669812941984,
+        "rank": 37
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {},
+    "cross_validation": {
+      "mean_cv_score": 0.6325497240493649,
+      "std_cv_score": 0.15946893504387896,
+      "cv_scores": [
+        0.4215531051911826,
+        0.532054604521239,
+        0.5753246343404004,
+        0.7915891388171277,
+        0.8422271373768752
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/ridge_regression_model/model.joblib",
+      "features_file": "comprehensive_models/ridge_regression_model/features.json",
+      "hyperparameters_file": "comprehensive_models/ridge_regression_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/ridge_regression_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "lasso_regression": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "lasso_regression",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 0.052933,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "alpha": 0.1,
+      "random_state": 42
+    },
+    "performance": {
+      "r2_score": 0.2654384843500257,
+      "rmse": 0.4105543049652979,
+      "mae": 0.2615741267582066,
+      "mape": Infinity,
+      "train_r2": 0.5554175432583537,
+      "train_rmse": 0.3919896769286525,
+      "overfitting_ratio": 2.0924529637004006
+    },
+    "feature_importance": [
+      {
+        "feature": "MP10104A_B_P",
+        "importance": 0.16038942983754573,
+        "rank": 1
+      },
+      {
+        "feature": "MP10120A_B_P",
+        "importance": 0.10628948188061257,
+        "rank": 2
+      },
+      {
+        "feature": "MP10028A_B_P",
+        "importance": 0.10515143364701064,
+        "rank": 3
+      },
+      {
+        "feature": "GENALPHACY_P",
+        "importance": 0.05005696286716698,
+        "rank": 4
+      },
+      {
+        "feature": "MP10104A_B",
+        "importance": 0.0,
+        "rank": 5
+      },
+      {
+        "feature": "thematic_value",
+        "importance": 0.0,
+        "rank": 6
+      },
+      {
+        "feature": "Shape__Area",
+        "importance": 0.0,
+        "rank": 7
+      },
+      {
+        "feature": "Shape__Length",
+        "importance": 0.0,
+        "rank": 8
+      },
+      {
+        "feature": "CreationDate",
+        "importance": 0.0,
+        "rank": 9
+      },
+      {
+        "feature": "Creator",
+        "importance": 0.0,
+        "rank": 10
+      },
+      {
+        "feature": "EditDate",
+        "importance": 0.0,
+        "rank": 11
+      },
+      {
+        "feature": "Editor",
+        "importance": 0.0,
+        "rank": 12
+      },
+      {
+        "feature": "X14060_X",
+        "importance": 0.0,
+        "rank": 13
+      },
+      {
+        "feature": "X14060_X_A",
+        "importance": 0.0,
+        "rank": 14
+      },
+      {
+        "feature": "pointCount",
+        "importance": 0.0,
+        "rank": 15
+      },
+      {
+        "feature": "MP10002A_B",
+        "importance": 0.0,
+        "rank": 16
+      },
+      {
+        "feature": "MP10002A_B_P",
+        "importance": 0.0,
+        "rank": 17
+      },
+      {
+        "feature": "X14068_X",
+        "importance": 0.0,
+        "rank": 18
+      },
+      {
+        "feature": "X14068_X_A",
+        "importance": 0.0,
+        "rank": 19
+      },
+      {
+        "feature": "MP10116A_B",
+        "importance": 0.0,
+        "rank": 20
+      },
+      {
+        "feature": "MP10116A_B_P",
+        "importance": 0.0,
+        "rank": 21
+      },
+      {
+        "feature": "region",
+        "importance": 0.0,
+        "rank": 22
+      },
+      {
+        "feature": "postcode",
+        "importance": 0.0,
+        "rank": 23
+      },
+      {
+        "feature": "country",
+        "importance": 0.0,
+        "rank": 24
+      },
+      {
+        "feature": "fsq_category",
+        "importance": 0.0,
+        "rank": 25
+      },
+      {
+        "feature": "fsq_category_all",
+        "importance": 0.0,
+        "rank": 26
+      },
+      {
+        "feature": "INDUSTRY_DESC",
+        "importance": 0.0,
+        "rank": 27
+      },
+      {
+        "feature": "source",
+        "importance": 0.0,
+        "rank": 28
+      },
+      {
+        "feature": "LATITUDE",
+        "importance": 0.0,
+        "rank": 29
+      },
+      {
+        "feature": "LONGITUDE",
+        "importance": 0.0,
+        "rank": 30
+      },
+      {
+        "feature": "MP10128A_B",
+        "importance": 0.0,
+        "rank": 31
+      },
+      {
+        "feature": "MP10138A_B",
+        "importance": 0.0,
+        "rank": 32
+      },
+      {
+        "feature": "MP10138A_B_P",
+        "importance": 0.0,
+        "rank": 33
+      },
+      {
+        "feature": "MP10020A_B",
+        "importance": 0.0,
+        "rank": 34
+      },
+      {
+        "feature": "MP10020A_B_P",
+        "importance": 0.0,
+        "rank": 35
+      },
+      {
+        "feature": "X14058_X",
+        "importance": 0.0,
+        "rank": 36
+      },
+      {
+        "feature": "X14058_X_A",
+        "importance": 0.0,
+        "rank": 37
+      },
+      {
+        "feature": "GENZ_CY",
+        "importance": 0.0,
+        "rank": 38
+      },
+      {
+        "feature": "GENZ_CY_P",
+        "importance": 0.0,
+        "rank": 39
+      },
+      {
+        "feature": "MP10028A_B",
+        "importance": 0.0,
+        "rank": 40
+      },
+      {
+        "feature": "MP10110A_B",
+        "importance": 0.0,
+        "rank": 41
+      },
+      {
+        "feature": "MP10110A_B_P",
+        "importance": 0.0,
+        "rank": 42
+      },
+      {
+        "feature": "MP10120A_B",
+        "importance": 0.0,
+        "rank": 43
+      },
+      {
+        "feature": "GENALPHACY",
+        "importance": 0.0,
+        "rank": 44
+      }
+    ],
+    "shap_analysis": {},
+    "cross_validation": {
+      "mean_cv_score": 0.45900604142336326,
+      "std_cv_score": 0.07926549942007537,
+      "cv_scores": [
+        0.42272164475011853,
+        0.34067617418207796,
+        0.43776565127593603,
+        0.5373678518177964,
+        0.5564988850908871
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/lasso_regression_model/model.joblib",
+      "features_file": "comprehensive_models/lasso_regression_model/features.json",
+      "hyperparameters_file": "comprehensive_models/lasso_regression_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/lasso_regression_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "svr": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "svr",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 0.123283,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "kernel": "rbf",
+      "C": 1.0,
+      "gamma": "scale"
+    },
+    "performance": {
+      "r2_score": 0.608861082006404,
+      "rmse": 0.29958636231467833,
+      "mae": 0.15802853811250125,
+      "mape": Infinity,
+      "train_r2": 0.8184568691530524,
+      "train_rmse": 0.25048883895434865,
+      "overfitting_ratio": 1.3442423786653586
+    },
+    "feature_importance": [],
+    "shap_analysis": {},
+    "cross_validation": {
+      "mean_cv_score": 0.6314062543316805,
+      "std_cv_score": 0.1799876447829955,
+      "cv_scores": [
+        0.47290216953556874,
+        0.5392123796927273,
+        0.4482779037097687,
+        0.8672387051230288,
+        0.8294001135973084
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/svr_model/model.joblib",
+      "features_file": "comprehensive_models/svr_model/features.json",
+      "hyperparameters_file": "comprehensive_models/svr_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/svr_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "knn": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "knn",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 0.324784,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "n_neighbors": 5,
+      "weights": "distance"
+    },
+    "performance": {
+      "r2_score": 0.4710281369794892,
+      "rmse": 0.3483957195045795,
+      "mae": 0.2157437510592842,
+      "mape": Infinity,
+      "train_r2": 0.9999999999999953,
+      "train_rmse": 4.0365996616087155e-08,
+      "overfitting_ratio": 2.1230154241158212
+    },
+    "feature_importance": [],
+    "shap_analysis": {},
+    "cross_validation": {
+      "mean_cv_score": 0.5214440247037053,
+      "std_cv_score": 0.19579468050980808,
+      "cv_scores": [
+        0.46822349328905555,
+        0.47321163601715976,
+        0.2074959465174352,
+        0.7001910628172132,
+        0.758097984877663
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/knn_model/model.joblib",
+      "features_file": "comprehensive_models/knn_model/features.json",
+      "hyperparameters_file": "comprehensive_models/knn_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/knn_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "neural_network": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "neural_network",
+    "target_variable": "MP10128A_B_P",
+    "training_duration_seconds": 1.63154,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44,
+      "train_records": 590,
+      "test_records": 197
+    },
+    "hyperparameters": {
+      "hidden_layer_sizes": [
+        100,
+        50
+      ],
+      "max_iter": 500,
+      "random_state": 42,
+      "early_stopping": true
+    },
+    "performance": {
+      "r2_score": 0.28368446096661903,
+      "rmse": 0.40542330607711197,
+      "mae": 0.20804753207407722,
+      "mape": Infinity,
+      "train_r2": 0.9442356137665783,
+      "train_rmse": 0.13882795698672343,
+      "overfitting_ratio": 3.3284713958220147
+    },
+    "feature_importance": [],
+    "shap_analysis": {},
+    "cross_validation": {
+      "mean_cv_score": -0.28570002350450047,
+      "std_cv_score": 0.8522508750424778,
+      "cv_scores": [
+        -0.18607988212841176,
+        -0.013463331197318684,
+        -1.785037217747548,
+        0.854235773333941,
+        -0.2981554597831648
+      ]
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/neural_network_model/model.joblib",
+      "features_file": "comprehensive_models/neural_network_model/features.json",
+      "hyperparameters_file": "comprehensive_models/neural_network_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/neural_network_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "region",
+      "postcode",
+      "country",
+      "fsq_category",
+      "fsq_category_all",
+      "INDUSTRY_DESC",
+      "source",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "anomaly_detection": {
+    "success": true,
+    "model_type": "unsupervised",
+    "algorithm": "anomaly_detection",
+    "training_duration_seconds": 0.12268,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 37
+    },
+    "hyperparameters": {
+      "contamination": 0.1,
+      "random_state": 42
+    },
+    "performance": {
+      "n_outliers": "99",
+      "outlier_ratio": 0.10060975609756098,
+      "normal_points": "885"
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/anomaly_detection_model/model.joblib",
+      "features_file": "comprehensive_models/anomaly_detection_model/features.json",
+      "hyperparameters_file": "comprehensive_models/anomaly_detection_model/hyperparameters.json",
+      "scaler_file": "comprehensive_models/anomaly_detection_model/scaler.joblib",
+      "model_directory": "comprehensive_models/anomaly_detection_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "EditDate",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "postcode",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10128A_B_P",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "clustering": {
+    "success": true,
+    "model_type": "unsupervised",
+    "algorithm": "clustering",
+    "training_duration_seconds": 0.068387,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 37
+    },
+    "hyperparameters": {
+      "n_clusters": 8,
+      "random_state": 42,
+      "n_init": 10
+    },
+    "performance": {
+      "n_clusters": 8,
+      "silhouette_score": 0.1559075485403768,
+      "cluster_distribution": {
+        "0": 128,
+        "1": 229,
+        "2": 9,
+        "3": 71,
+        "4": 243,
+        "5": 124,
+        "6": 162,
+        "7": 18
+      }
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/clustering_model/model.joblib",
+      "features_file": "comprehensive_models/clustering_model/features.json",
+      "hyperparameters_file": "comprehensive_models/clustering_model/hyperparameters.json",
+      "scaler_file": "comprehensive_models/clustering_model/scaler.joblib",
+      "model_directory": "comprehensive_models/clustering_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "EditDate",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "postcode",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10128A_B_P",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "dimensionality_reduction": {
+    "success": true,
+    "model_type": "unsupervised",
+    "algorithm": "dimensionality_reduction",
+    "training_duration_seconds": 0.016201,
+    "data_info": {
+      "total_records": 984,
+      "features_used": 37
+    },
+    "hyperparameters": {
+      "n_components": 10,
+      "random_state": 42
+    },
+    "performance": {
+      "n_components": 10,
+      "explained_variance_ratio": [
+        0.3999821708955955,
+        0.15707042700975402,
+        0.12336580585423094,
+        0.058182266122036315,
+        0.049528269314066155,
+        0.036518856464099546,
+        0.028078900639400276,
+        0.023618602151821547,
+        0.021208255672109915,
+        0.019691124182611503
+      ],
+      "cumulative_variance": [
+        0.3999821708955955,
+        0.5570525979053496,
+        0.6804184037595805,
+        0.7386006698816169,
+        0.788128939195683,
+        0.8246477956597826,
+        0.852726696299183,
+        0.8763452984510045,
+        0.8975535541231144,
+        0.917244678305726
+      ],
+      "total_variance_explained": 0.917244678305726
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/dimensionality_reduction_model/model.joblib",
+      "features_file": "comprehensive_models/dimensionality_reduction_model/features.json",
+      "hyperparameters_file": "comprehensive_models/dimensionality_reduction_model/hyperparameters.json",
+      "scaler_file": "comprehensive_models/dimensionality_reduction_model/scaler.joblib",
+      "model_directory": "comprehensive_models/dimensionality_reduction_model"
+    },
+    "feature_columns": [
+      "MP10104A_B",
+      "MP10104A_B_P",
+      "thematic_value",
+      "Shape__Area",
+      "Shape__Length",
+      "CreationDate",
+      "EditDate",
+      "X14060_X",
+      "X14060_X_A",
+      "pointCount",
+      "MP10002A_B",
+      "MP10002A_B_P",
+      "X14068_X",
+      "X14068_X_A",
+      "MP10116A_B",
+      "MP10116A_B_P",
+      "postcode",
+      "LATITUDE",
+      "LONGITUDE",
+      "MP10128A_B",
+      "MP10128A_B_P",
+      "MP10138A_B",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "MP10020A_B_P",
+      "X14058_X",
+      "X14058_X_A",
+      "GENZ_CY",
+      "GENZ_CY_P",
+      "MP10028A_B",
+      "MP10028A_B_P",
+      "MP10110A_B",
+      "MP10110A_B_P",
+      "MP10120A_B",
+      "MP10120A_B_P",
+      "GENALPHACY",
+      "GENALPHACY_P"
+    ]
+  },
+  "ensemble": {
+    "success": true,
+    "model_type": "supervised",
+    "algorithm": "ensemble",
+    "target_variable": "MP10128A_B_P",
+    "component_models": [
+      "xgboost",
+      "random_forest",
+      "linear_regression",
+      "ridge_regression",
+      "lasso_regression",
+      "svr",
+      "knn",
+      "neural_network"
+    ],
+    "performance": {
+      "r2_score": 0.8791222269774461,
+      "rmse": 0.1654801887639463,
+      "mae": 0.12096024448095488,
+      "mape": Infinity,
+      "train_r2": 0.9240490574913898,
+      "train_rmse": 0.16812564892259535,
+      "overfitting_ratio": 1.051104191357337
+    },
+    "model_artifacts": {
+      "model_file": "comprehensive_models/ensemble_model/model.joblib",
+      "features_file": "comprehensive_models/ensemble_model/features.json",
+      "hyperparameters_file": "comprehensive_models/ensemble_model/hyperparameters.json",
+      "model_directory": "comprehensive_models/ensemble_model"
+    },
+    "feature_columns": [
+      "MP10104A_B_P",
+      "source",
+      "X14058_X",
+      "LATITUDE",
+      "MP10028A_B",
+      "GENALPHACY_P",
+      "region",
+      "postcode",
+      "EditDate",
+      "MP10138A_B",
+      "X14060_X",
+      "X14068_X",
+      "MP10110A_B_P",
+      "GENALPHACY",
+      "CreationDate",
+      "MP10128A_B",
+      "fsq_category",
+      "MP10116A_B",
+      "fsq_category_all",
+      "GENZ_CY",
+      "Shape__Length",
+      "MP10138A_B_P",
+      "MP10020A_B",
+      "X14060_X_A",
+      "MP10110A_B",
+      "MP10120A_B",
+      "Editor",
+      "INDUSTRY_DESC",
+      "pointCount",
+      "LONGITUDE",
+      "X14068_X_A",
+      "X14058_X_A",
+      "MP10020A_B_P",
+      "thematic_value",
+      "Creator",
+      "MP10002A_B_P",
+      "MP10116A_B_P",
+      "MP10028A_B_P",
+      "GENZ_CY_P",
+      "country",
+      "Shape__Area",
+      "MP10120A_B_P",
+      "MP10104A_B",
+      "MP10002A_B"
+    ],
+    "data_info": {
+      "total_records": 984,
+      "features_used": 44
+    }
+  }
+}

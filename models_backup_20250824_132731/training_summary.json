@@ -1,0 +1,220 @@
+{
+  "training_timestamp": "2025-08-10T14:21:15.344228",
+  "target_variable": "MP10128A_B_P",
+  "total_models_attempted": 12,
+  "successful_models": 12,
+  "models_overview": {
+    "xgboost": {
+      "algorithm": "xgboost",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.6083937183582347,
+        "rmse": 0.2997652935949587,
+        "mae": 0.14535967812320302,
+        "mape": Infinity,
+        "train_r2": 0.9999472505078068,
+        "train_rmse": 0.004269800766671631,
+        "overfitting_ratio": 1.6435857576014898
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "random_forest": {
+      "algorithm": "random_forest",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.5131808710654624,
+        "rmse": 0.3342260852172712,
+        "mae": 0.1664492049318446,
+        "mape": Infinity,
+        "train_r2": 0.9369511398901116,
+        "train_rmse": 0.14761724265713713,
+        "overfitting_ratio": 1.825771755569962
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "linear_regression": {
+      "algorithm": "linear_regression",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.2972641731308401,
+        "rmse": 0.40156196642274383,
+        "mae": 0.1605859172808708,
+        "mape": Infinity,
+        "train_r2": 0.8420820886512332,
+        "train_rmse": 0.2336222299205001,
+        "overfitting_ratio": 2.8327735555289837
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "ridge_regression": {
+      "algorithm": "ridge_regression",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.3493380997019926,
+        "rmse": 0.38639741582234083,
+        "mae": 0.16536044316259582,
+        "mape": Infinity,
+        "train_r2": 0.8094586610829679,
+        "train_rmse": 0.2566215215309047,
+        "overfitting_ratio": 2.317121040543494
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "lasso_regression": {
+      "algorithm": "lasso_regression",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.2654384843500257,
+        "rmse": 0.4105543049652979,
+        "mae": 0.2615741267582066,
+        "mape": Infinity,
+        "train_r2": 0.5554175432583537,
+        "train_rmse": 0.3919896769286525,
+        "overfitting_ratio": 2.0924529637004006
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "svr": {
+      "algorithm": "svr",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.608861082006404,
+        "rmse": 0.29958636231467833,
+        "mae": 0.15802853811250125,
+        "mape": Infinity,
+        "train_r2": 0.8184568691530524,
+        "train_rmse": 0.25048883895434865,
+        "overfitting_ratio": 1.3442423786653586
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "knn": {
+      "algorithm": "knn",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.4710281369794892,
+        "rmse": 0.3483957195045795,
+        "mae": 0.2157437510592842,
+        "mape": Infinity,
+        "train_r2": 0.9999999999999953,
+        "train_rmse": 4.0365996616087155e-08,
+        "overfitting_ratio": 2.1230154241158212
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "neural_network": {
+      "algorithm": "neural_network",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.28368446096661903,
+        "rmse": 0.40542330607711197,
+        "mae": 0.20804753207407722,
+        "mape": Infinity,
+        "train_r2": 0.9442356137665783,
+        "train_rmse": 0.13882795698672343,
+        "overfitting_ratio": 3.3284713958220147
+      },
+      "features_used": 44,
+      "training_records": 984
+    },
+    "anomaly_detection": {
+      "algorithm": "anomaly_detection",
+      "model_type": "unsupervised",
+      "target_variable": null,
+      "performance": {
+        "n_outliers": "99",
+        "outlier_ratio": 0.10060975609756098,
+        "normal_points": "885"
+      },
+      "features_used": 37,
+      "training_records": 984
+    },
+    "clustering": {
+      "algorithm": "clustering",
+      "model_type": "unsupervised",
+      "target_variable": null,
+      "performance": {
+        "n_clusters": 8,
+        "silhouette_score": 0.1559075485403768,
+        "cluster_distribution": {
+          "0": 128,
+          "1": 229,
+          "2": 9,
+          "3": 71,
+          "4": 243,
+          "5": 124,
+          "6": 162,
+          "7": 18
+        }
+      },
+      "features_used": 37,
+      "training_records": 984
+    },
+    "dimensionality_reduction": {
+      "algorithm": "dimensionality_reduction",
+      "model_type": "unsupervised",
+      "target_variable": null,
+      "performance": {
+        "n_components": 10,
+        "explained_variance_ratio": [
+          0.3999821708955955,
+          0.15707042700975402,
+          0.12336580585423094,
+          0.058182266122036315,
+          0.049528269314066155,
+          0.036518856464099546,
+          0.028078900639400276,
+          0.023618602151821547,
+          0.021208255672109915,
+          0.019691124182611503
+        ],
+        "cumulative_variance": [
+          0.3999821708955955,
+          0.5570525979053496,
+          0.6804184037595805,
+          0.7386006698816169,
+          0.788128939195683,
+          0.8246477956597826,
+          0.852726696299183,
+          0.8763452984510045,
+          0.8975535541231144,
+          0.917244678305726
+        ],
+        "total_variance_explained": 0.917244678305726
+      },
+      "features_used": 37,
+      "training_records": 984
+    },
+    "ensemble": {
+      "algorithm": "ensemble",
+      "model_type": "supervised",
+      "target_variable": "MP10128A_B_P",
+      "performance": {
+        "r2_score": 0.8791222269774461,
+        "rmse": 0.1654801887639463,
+        "mae": 0.12096024448095488,
+        "mape": Infinity,
+        "train_r2": 0.9240490574913898,
+        "train_rmse": 0.16812564892259535,
+        "overfitting_ratio": 1.051104191357337
+      },
+      "features_used": 44,
+      "training_records": 984
+    }
+  }
+}
