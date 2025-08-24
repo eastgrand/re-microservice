@@ -1,5 +1,5 @@
 {
-  "project_name": "HRB",
+  "project_name": "red_bull_energy_drinks",
   "model_info": {
     "passed": true,
     "models_trained": 2,
@@ -800,10 +800,10 @@
       "Check 1 targets with multiple mappings: ['description']"
     ]
   },
-  "service_url": "https://services8.arcgis.com/VhrZdFGa39zmfR47/arcgis/rest/services/Synapse54__ca07eefffe5b4914/FeatureServer",
+  "service_url": "https://services8.arcgis.com/VhrZdFGa39zmfR47/arcgis/rest/services/Synapse54__09db2071715949f6/FeatureServer",
   "created_at": "2025-08-10T08:16:42.923541",
   "deployment_instructions": {
-    "render_service_name": "HRB-microservice",
+    "render_service_name": "red-bull-microservice",
     "environment_variables": {
       "MODEL_PATH": "/app/models",
       "DATA_PATH": "/app/data"

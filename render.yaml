@@ -1,7 +1,7 @@
-# HRB SHAP Microservice
+# Red Bull Energy Drinks SHAP Microservice
 services:
   - type: web
-    name: hrb-microservice
+    name: red-bull-microservice
     env: python
     plan: starter
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 180
@@ -12,19 +12,27 @@ services:
       - key: DATA_PATH
         value: "/app/data"
       - key: SERVICE_NAME
-        value: "HRB SHAP Microservice"
+        value: "Red Bull Energy Drinks SHAP Microservice"
+      - key: TARGET_VARIABLE
+        value: "MP12207A_B_P"
+      - key: PROJECT_DOMAIN
+        value: "Energy Drinks"
 
   # Worker service for background processing
   - type: worker
-    name: hrb-worker
+    name: red-bull-worker
     env: python
     plan: starter
     buildCommand: pip install -r requirements_py313.txt && chmod +x ./render_pre_deploy.sh && ./render_pre_deploy.sh
     startCommand: python simple_worker.py
     envVars:
       - key: SERVICE_NAME
-        value: "HRB Worker"
+        value: "Red Bull Energy Drinks Worker"
       - key: MODEL_PATH
         value: "/app/models"
       - key: DATA_PATH
         value: "/app/data"
+      - key: TARGET_VARIABLE
+        value: "MP12207A_B_P"
+      - key: PROJECT_DOMAIN
+        value: "Energy Drinks"
