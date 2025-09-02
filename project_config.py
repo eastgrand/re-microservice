@@ -12,18 +12,18 @@ import pandas as pd
 # This module provides project-specific configuration including target variables,
 # schema mappings, and data loading functionality for the SHAP microservice.
 # 
-# Current Project: Red Bull Energy Drinks Market Analysis
-# Domain: Energy Drinks / Functional Beverages
-# Data Source: ArcGIS FeatureServer with percentage-based usage data
+# Current Project: Housing Market Analysis
+# Domain: Real Estate / Housing Market
+# Data Source: ArcGIS FeatureServer with housing demographics data
 # ---------------------------------------------------------------------------
 
 logger = logging.getLogger(__name__)
 
 # Public constants expected by app.py -----------------------------------------------------------
 
-# Target variable for Red Bull energy drinks analysis
-# Updated from H&R Block tax services to Red Bull energy drink usage percentage
-TARGET_VARIABLE: str = "MP12207A_B_P"  # Red Bull usage percentage (2025 data)
+# Target variable for housing market analysis
+# Updated to housing homeownership percentage
+TARGET_VARIABLE: str = "ECYTENOWN_P"  # Homeownership percentage (2025 data)
 
 # Canonical <field_code -> metadata> mapping.  The micro-service only needs
 # this for alias resolution; an *empty* dict is acceptable because the fallback
